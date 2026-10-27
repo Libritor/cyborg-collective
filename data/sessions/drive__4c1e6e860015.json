@@ -1,12 +1,12 @@
 {
  "stamp": "drive__4c1e6e860015",
- "tag": "P1143",
+ "tag": "P597Right3",
  "source": "drive",
- "project_folder": "P591",
- "folder": "P591/EEG P597/P971",
+ "project_folder": "ControlWithMindData",
+ "folder": "ControlWithMindData/EEG P597/P597Glance",
  "size": 7222790,
  "kind": "device",
- "file": "P1143",
+ "file": "P597Right3",
  "columns": 82,
  "rows": 13128,
  "packet_types": {

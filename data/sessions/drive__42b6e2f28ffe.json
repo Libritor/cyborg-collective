@@ -1,12 +1,12 @@
 {
  "stamp": "drive__42b6e2f28ffe",
- "tag": "P329_eeg",
+ "tag": "AVP870_eeg",
  "source": "drive",
  "project_folder": "EMG",
  "folder": "EMG",
  "size": 15304990,
  "kind": "device",
- "file": "P329_eeg",
+ "file": "AVP870_eeg",
  "columns": 82,
  "rows": 31268,
  "packet_types": {
