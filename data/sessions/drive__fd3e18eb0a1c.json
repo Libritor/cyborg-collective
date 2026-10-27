@@ -1,0 +1,93 @@
+{
+ "stamp": "drive__fd3e18eb0a1c",
+ "tag": "P925 Right Wink",
+ "source": "drive",
+ "project_folder": "ControlWithMindData",
+ "folder": "ControlWithMindData/EEG P925/P925Wink",
+ "size": 6573356,
+ "kind": "device",
+ "file": "P925 Right Wink",
+ "columns": 82,
+ "rows": 14516,
+ "packet_types": {
+  "EEG": 14516
+ },
+ "start": "2026-03-15 10:32:08.803000",
+ "end": "2026-03-15 10:33:09.455000",
+ "duration_s": 60.652,
+ "fs_est": 239.33258589988787,
+ "hsi": {
+  "TP9": {
+   "2": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "2": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 313.02792598504743,
+  "AF7": 21.35798062248893,
+  "AF8": 13.606342099464541,
+  "TP10": 336.4146812919231
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.8214285714285714,
+  "AF8": 0.9642857142857143,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": -0.183515,
+   "AF8": -0.096765,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": -0.384645,
+   "AF8": -0.200153,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": -0.048571,
+   "AF8": 0.107896,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": -0.03734,
+   "AF8": 0.073533,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": -0.358947,
+   "AF8": -0.122822,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  75.0,
+  75.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__fd3e18eb0a1c.svg",
+ "date": "2026-03-15T10:32:08.803000"
+}

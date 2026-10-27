@@ -1,0 +1,91 @@
+{
+ "stamp": "20260507_001018",
+ "tag": "Muse1_I_don_t_know_what_happened_bro",
+ "recovered": false,
+ "size": 2742410,
+ "phone_mtime": "2026-05-07 00:10",
+ "kind": "device",
+ "file": "muse_session_20260507_001018_Muse1_I_don_t_know_what_happened_bro.csv",
+ "columns": 82,
+ "rows": 4064,
+ "packet_types": {
+  "EEG": 4064
+ },
+ "start": "2026-05-07 00:10:18.148000",
+ "end": "2026-05-07 00:10:35.157000",
+ "duration_s": 17.009,
+ "fs_est": 238.93232994297136,
+ "hsi": {
+  "TP9": {
+   "2": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 506.259972482984,
+  "AF7": 20.57685018953951,
+  "AF8": 18.558532959477624,
+  "TP10": 554.6174446915094
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.8571428571428571,
+  "AF8": 1.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": -0.15497,
+   "AF8": -0.38597,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": -0.145152,
+   "AF8": -0.322519,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.072238,
+   "AF8": 0.064593,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.608456,
+   "AF8": 0.548594,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.546004,
+   "AF8": 0.648691,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 1.9904432668683356,
+ "battery": [
+  82.0,
+  82.0
+ ],
+ "usable": true,
+ "preview": "20260507_001018__Muse1_I_don_t_know_what_happened_bro.svg"
+}

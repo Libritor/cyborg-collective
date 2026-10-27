@@ -135,8 +135,20 @@
       return localStorage.getItem("collective.relay") || "";
     } catch { return q || ""; }
   }
-  function connect() {
-    const url = relayUrl();
+  // when the relay itself serves this page, its sockets live on the same origin
+  async function sameOriginRelay() {
+    if (!/^https?:$/.test(location.protocol)) return "";
+    try {
+      const r = await fetch("stats", { cache: "no-store" });
+      if (!r.ok) return "";
+      const j = await r.json();
+      if (typeof j.people !== "number") return "";
+      return location.origin.replace(/^http/, "ws") + location.pathname.replace(/[^/]*$/, "") + "live";
+    } catch { return ""; }
+  }
+  async function connect() {
+    let url = relayUrl();
+    if (!url) url = await sameOriginRelay();
     if (!url) { linkEl.textContent = "no relay configured on this page yet."; return; }
     let ws;
     try { ws = new WebSocket(url); } catch { linkEl.textContent = "relay address invalid."; return; }
@@ -153,10 +165,19 @@
   const monthKey = s => s.slice(0, 7);
   let projects = [], sessions = [];
   function projectOf(dateIso) {
-    const d = dateIso.slice(0, 10);
+    const d = (dateIso || "").slice(0, 10);
     for (const p of projects) { if (p.stamps && p.stamps.includes(d)) return p; }
     for (const p of projects) { if (d >= p.from && d <= p.to) return p; }
     return null;
+  }
+  // a session from the lab's shared folders is tagged by its folder; the phone's by date
+  function projectFor(s) {
+    if (s.project_folder) {
+      let p = projects.find(x => x.id === "folder:" + s.project_folder);
+      if (!p) { p = { id: "folder:" + s.project_folder, name: s.project_folder, folder: true, from: "", to: "", summary: "A shared folder of the lab's recordings, catalogued as found; participant names replaced by pseudonyms.", links: [] }; projects.push(p); }
+      return p;
+    }
+    return projectOf(s.date);
   }
   function cleanFrac(dev) {
     const v = Object.values(dev.clean_epoch_frac || {});
@@ -170,7 +191,7 @@
       const devs = s.devices.filter(d => d.kind !== "events");
       const usable = devs.some(d => d.usable);
       if (fu && !usable) continue;
-      const p = projectOf(s.date);
+      const p = projectFor(s);
       if (fp && (!p || p.id !== fp)) continue;
       if (fm && monthKey(s.date) !== fm) continue;
       shown++;
@@ -233,12 +254,14 @@
   }
   function renderProjects(list) {
     const fp = $("f-project");
+    for (const s of list) projectFor(s);          // registers the folder projects
     $("projects-list").innerHTML = projects.map(p => {
-      const n = list.filter(s => projectOf(s.date)?.id === p.id);
+      const n = list.filter(s => projectFor(s)?.id === p.id);
       const mins = n.reduce((a, s) => a + s.minutes, 0);
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; fp.appendChild(o);
       const links = (p.links || []).filter(l => l[1]).map(l => `<a href="${l[1]}">${l[0]}</a>`).join(" · ");
-      return `<div class="card project"><h3>${p.name}</h3><div class="when">${p.from} to ${p.to}</div><p>${p.summary}</p><div class="n">${n.length} sessions, ${(mins / 60).toFixed(1)} h${links ? " · " + links : ""}</div></div>`;
+      const when = p.folder ? (n.length ? `${n.map(s => s.date.slice(0, 10)).sort()[0]} to ${n.map(s => s.date.slice(0, 10)).sort().slice(-1)[0]}` : "") : `${p.from} to ${p.to}`;
+      return `<div class="card project"><h3>${p.name}</h3><div class="when">${when}</div><p>${p.summary}</p><div class="n">${n.length} sessions, ${(mins / 60).toFixed(1)} h${links ? " · " + links : ""}</div></div>`;
     }).join("");
   }
   async function load() {

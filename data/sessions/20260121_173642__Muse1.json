@@ -1,0 +1,16 @@
+{
+ "stamp": "20260121_173642",
+ "tag": "Muse1",
+ "recovered": false,
+ "size": 113657,
+ "phone_mtime": "2026-01-21 17:36",
+ "kind": "device",
+ "file": "muse_session_20260121_173642_Muse1.csv",
+ "columns": 82,
+ "rows": 192,
+ "packet_types": {
+  "EEG": 192
+ },
+ "usable": false,
+ "preview": null
+}
