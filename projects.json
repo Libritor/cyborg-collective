@@ -1,0 +1,29 @@
+{
+  "note": "Sessions are tagged by the date range they fall in. Edit freely; 'stamps' pins single sessions.",
+  "projects": [
+    {"id": "muselog", "name": "MuseLog: building the recorder", "from": "2025-12-01", "to": "2026-01-15",
+     "summary": "The multi-headband Android recorder itself, tested on the author's own head while it was written: raw EEG at 256 Hz, band powers, contact quality, optics and motion in one CSV per headband.",
+     "links": [["MuseLog on GitHub (private, by request)", "https://github.com/Libritor/MuseLog"]]},
+    {"id": "snowcold", "name": "Brain state in snow and cold", "from": "2026-01-16", "to": "2026-01-31",
+     "summary": "Wearable EEG with inertial sensing outdoors in winter; chirplet time-frequency analysis of the non-stationary dynamics during movement in snow, with the gyroscope used to suppress motion artefacts.",
+     "links": []},
+    {"id": "coldplay", "name": "Cold exposure, mini-golf and Cocaine Buzzkill", "from": "2026-02-01", "to": "2026-03-31",
+     "summary": "Field sessions around cold-water immersion: motor-cognitive putting before and after a plunge with the headband on, and the passthrough XR snowball game played at the lakeshore in winter with EEG mapped to the snowballs.",
+     "links": [["Cocaine Buzzkill, IEEE GEM 2026", ""]]},
+    {"id": "spring", "name": "Spring 2026 pilots", "from": "2026-04-01", "to": "2026-06-30",
+     "summary": "Shorter sittings with the headband while the analysis pipelines were built: caffeine and modality in study, water and the ear, early validation runs.",
+     "links": []},
+    {"id": "water", "name": "The ear in water", "from": "2026-07-01", "to": "2026-07-31",
+     "summary": "Recordings with the headband at the water: what the ear electrodes pick up when the head meets the lake, and the optical channels' pulse.",
+     "links": []},
+    {"id": "eyecam", "name": "Eye as a Camera on a headset", "from": "2026-09-01", "to": "2026-10-21",
+     "summary": "The 2019 eye-as-a-camera method rebuilt on a Muse headband with an added occipital electrode and a Meta Quest 3S: words, colours and a sealed optotype read from the EEG; the ear as a microphone; an objective eye exam.",
+     "links": [["eyecam on GitHub", "https://github.com/Libritor/eyecam"]]},
+    {"id": "buzzcold", "name": "Buzzkill after the cold plunge", "from": "2026-10-22", "to": "2026-10-24",
+     "summary": "Three sittings of the XR game, one warm and two after a plunge in Lake Ontario, recorded by the phone: what each sensor survives in the field (the optical pulse held; the dry EEG did not).",
+     "links": []},
+    {"id": "sleep", "name": "Jobbing on the Sleep", "from": "2026-10-25", "to": "2026-12-31",
+     "summary": "Overnight recordings toward Mann's idea of working through sleep: a nap rig that watches the headband and logs what the sleeper does.",
+     "links": []}
+  ]
+}
