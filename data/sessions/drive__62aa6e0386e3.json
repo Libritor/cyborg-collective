@@ -1,12 +1,12 @@
 {
  "stamp": "drive__62aa6e0386e3",
- "tag": "P597P419_eeg",
+ "tag": "P753_eeg",
  "source": "drive",
  "project_folder": "EMG",
  "folder": "EMG",
  "size": 11184201,
  "kind": "device",
- "file": "P597P419_eeg",
+ "file": "P753_eeg",
  "columns": 82,
  "rows": 22528,
  "packet_types": {

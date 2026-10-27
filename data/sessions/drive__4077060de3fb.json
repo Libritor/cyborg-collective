@@ -1,12 +1,12 @@
 {
  "stamp": "drive__4077060de3fb",
- "tag": "blinking_2",
+ "tag": "P832_2",
  "source": "drive",
- "project_folder": "ControlWithMindData",
- "folder": "ControlWithMindData/P324/Glance",
+ "project_folder": "P591",
+ "folder": "P591/P324/Glance",
  "size": 17878992,
  "kind": "device",
- "file": "blinking_2",
+ "file": "P832_2",
  "columns": 85,
  "rows": 31140,
  "packet_types": {

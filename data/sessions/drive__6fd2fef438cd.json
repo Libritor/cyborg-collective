@@ -1,12 +1,12 @@
 {
  "stamp": "drive__6fd2fef438cd",
- "tag": "P597Blink4",
+ "tag": "P2664",
  "source": "drive",
- "project_folder": "ControlWithMindData",
- "folder": "ControlWithMindData/EEG P597/P597Glance",
+ "project_folder": "P591",
+ "folder": "P591/EEG P597/P971",
  "size": 7489933,
  "kind": "device",
- "file": "P597Blink4",
+ "file": "P2664",
  "columns": 82,
  "rows": 13564,
  "packet_types": {

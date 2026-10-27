@@ -1,12 +1,12 @@
 {
  "stamp": "drive__a259981e9ec4",
- "tag": "AV_nofeedback_eeg",
+ "tag": "AV_P256_eeg",
  "source": "drive",
  "project_folder": "EMG",
  "folder": "EMG",
  "size": 13228010,
  "kind": "device",
- "file": "AV_nofeedback_eeg",
+ "file": "AV_P256_eeg",
  "columns": 82,
  "rows": 19168,
  "packet_types": {

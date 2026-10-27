@@ -1,12 +1,12 @@
 {
  "stamp": "drive__24b8149aec2a",
- "tag": "MuseP217P610_2025-10-18_16_23_46_MU_04PRESET_51_EEG@256Hz_P525@52Hz_P401@52Hz_DRL_REF@32Hz_PPG@64Hz_",
+ "tag": "P279_2025-10-18_16_23_46_MU_04PRESET_51_EEG@256Hz_Accelerometer@52Hz_Gyroscope@52Hz_DRL_REF@32Hz_PPG@64Hz_",
  "source": "drive",
  "project_folder": "Muse State of Float Datasets",
  "folder": "Muse State of Float Datasets/Oct 18th 2025/Total Data",
  "size": 163898104,
  "kind": "device",
- "file": "MuseP217P610_2025-10-18_16_23_46_MU_04PRESET_51_EEG@256Hz_P525@52Hz_P401@52Hz_DRL_REF@32Hz_PPG@64Hz_",
+ "file": "P279_2025-10-18_16_23_46_MU_04PRESET_51_EEG@256Hz_Accelerometer@52Hz_Gyroscope@52Hz_DRL_REF@32Hz_PPG@64Hz_",
  "columns": 67,
  "rows": 186546,
  "packet_types": {
