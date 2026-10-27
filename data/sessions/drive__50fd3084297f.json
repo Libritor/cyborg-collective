@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__50fd3084297f",
+ "tag": "P597 Blink",
+ "source": "drive",
+ "project_folder": "ControlWithMindData",
+ "folder": "ControlWithMindData/EEG P597/P597Winks",
+ "size": 4950488,
+ "kind": "device",
+ "file": "P597 Blink",
+ "columns": 82,
+ "rows": 12288,
+ "packet_types": {
+  "EEG": 12288
+ },
+ "start": "2026-03-15 10:14:07.053000",
+ "end": "2026-03-15 10:15:07.777000",
+ "duration_s": 60.724,
+ "fs_est": 202.35821092154669,
+ "hsi": {
+  "TP9": {
+   "1": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "1": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 1.0,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 1.0
+ },
+ "raw_rms_uv": {
+  "TP9": 330.2594506697463,
+  "AF7": 270.1103232071294,
+  "AF8": 333.1260476109232,
+  "TP10": 338.7396704141819
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.041666666666666664,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  80.0,
+  80.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__50fd3084297f.svg",
+ "date_source": "recording",
+ "date": "2026-03-15T10:14:07.053000"
+}

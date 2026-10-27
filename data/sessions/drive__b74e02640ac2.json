@@ -1,0 +1,101 @@
+{
+ "stamp": "drive__b74e02640ac2",
+ "tag": "SMBuzzkillOct22Control",
+ "source": "drive",
+ "project_folder": "loose files",
+ "folder": "",
+ "size": 36063410,
+ "kind": "device",
+ "file": "SMBuzzkillOct22Control",
+ "columns": 82,
+ "rows": 57664,
+ "packet_types": {
+  "EEG": 57664
+ },
+ "start": "2026-10-22 17:16:04.597000",
+ "end": "2026-10-22 17:19:49.304000",
+ "duration_s": 224.707,
+ "fs_est": 256.61861891262845,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 241.80402896906566,
+  "AF7": 489.1076787649469,
+  "AF8": 465.33481672720666,
+  "TP10": 216.41220818095334
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.014615
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.074252
+  },
+  "alpha": {
+   "TP9": 0.379393,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.535882
+  },
+  "beta": {
+   "TP9": 0.972554,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.691532
+  },
+  "gamma": {
+   "TP9": 0.977107,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.653987
+  }
+ },
+ "pulse": {
+  "channel": "850nm_LEFT_OUTER",
+  "bpm_mean": 57.857142857142854,
+  "bpm_sd": 3.388154635894692,
+  "windows": 7,
+  "valid": 7
+ },
+ "gyro_rms": 22.796748663315416,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__b74e02640ac2.svg",
+ "date_source": "recording",
+ "date": "2026-10-22T17:16:04.597000"
+}

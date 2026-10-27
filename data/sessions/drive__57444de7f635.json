@@ -1,0 +1,16 @@
+{
+ "stamp": "drive__57444de7f635",
+ "tag": "P782_P350_emg",
+ "source": "drive",
+ "project_folder": "EMG",
+ "folder": "EMG",
+ "size": 1176708,
+ "kind": "device",
+ "file": "P782_P350_emg",
+ "usable": false,
+ "format": "other-csv",
+ "columns": 2,
+ "preview": null,
+ "date_source": "file time",
+ "date": "2026-04-22T19:58:52"
+}

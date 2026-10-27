@@ -1,0 +1,111 @@
+{
+ "stamp": "drive__8f5545821615",
+ "tag": "AVWater2",
+ "source": "drive",
+ "project_folder": "Muse State of Float Datasets",
+ "folder": "Muse State of Float Datasets/Oct 18th 2025/Total Data",
+ "size": 112433814,
+ "kind": "device",
+ "file": "AVWater2",
+ "columns": 67,
+ "rows": 247842,
+ "packet_types": {
+  "EEG": 111300,
+  "PPG": 27828,
+  "GYRO": 22494,
+  "ACCELEROMETER": 22494,
+  "DRL_REF": 12366,
+  "BETA_ABSOLUTE": 4280,
+  "DELTA_ABSOLUTE": 4280,
+  "THETA_ABSOLUTE": 4280,
+  "ALPHA_ABSOLUTE": 4280,
+  "GAMMA_ABSOLUTE": 4280,
+  "ALPHA_RELATIVE": 4280,
+  "DELTA_RELATIVE": 4280,
+  "BETA_RELATIVE": 4280,
+  "THETA_RELATIVE": 4280,
+  "GAMMA_RELATIVE": 4280,
+  "IS_GOOD": 4280,
+  "HSI_PRECISION": 4280
+ },
+ "start": "2026-10-27 16:00:45",
+ "end": "2026-10-27 16:08:00",
+ "duration_s": 434.718,
+ "fs_est": 256.02804576760104,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 871.1210763366219,
+  "AF7": 872.9529172266875,
+  "AF8": 571.0568356177785,
+  "TP10": 874.0193346560495
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 33.22040463734371,
+ "battery": [
+  75.0,
+  75.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__8f5545821615.svg",
+ "date_source": "recording",
+ "date": "2026-10-27T16:00:45"
+}

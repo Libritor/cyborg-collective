@@ -1,0 +1,95 @@
+{
+ "stamp": "drive__2dadf9695d46",
+ "tag": "P269RestingAfter",
+ "source": "drive",
+ "project_folder": "StateOfLearningWithCoffeeAndVR",
+ "folder": "StateOfLearningWithCoffeeAndVR",
+ "size": 8622367,
+ "kind": "device",
+ "file": "P269RestingAfter",
+ "columns": 82,
+ "rows": 16112,
+ "packet_types": {
+  "EEG": 16112
+ },
+ "start": "2026-03-12 16:03:39.813000",
+ "end": "2026-03-12 16:05:44.987000",
+ "duration_s": 125.174,
+ "fs_est": 128.7168261779603,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 131.44768547754404,
+  "AF7": 85.10476842912539,
+  "AF8": 278.38772567886974,
+  "TP10": 79.69916166324029
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.03225806451612903,
+  "AF7": 0.8387096774193549,
+  "AF8": 0.0,
+  "TP10": 0.4838709677419355
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.772057,
+   "AF7": 0.371152,
+   "AF8": -3.60354,
+   "TP10": 0.585417
+  },
+  "theta": {
+   "TP9": 0.604269,
+   "AF7": 0.0,
+   "AF8": -3.741544,
+   "TP10": 0.272276
+  },
+  "alpha": {
+   "TP9": 0.693102,
+   "AF7": 0.161353,
+   "AF8": -3.835088,
+   "TP10": 0.561257
+  },
+  "beta": {
+   "TP9": 0.526323,
+   "AF7": 0.13694,
+   "AF8": -3.349063,
+   "TP10": 0.506409
+  },
+  "gamma": {
+   "TP9": 0.212163,
+   "AF7": 0.092457,
+   "AF8": -3.473322,
+   "TP10": 0.280942
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 11.733694125155798,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__2dadf9695d46.svg",
+ "date_source": "recording",
+ "date": "2026-03-12T16:03:39.813000"
+}

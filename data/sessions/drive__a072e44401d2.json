@@ -1,0 +1,16 @@
+{
+ "stamp": "drive__a072e44401d2",
+ "tag": "P803P596Visual_emg",
+ "source": "drive",
+ "project_folder": "EMG",
+ "folder": "EMG",
+ "size": 809149,
+ "kind": "device",
+ "file": "P803P596Visual_emg",
+ "usable": false,
+ "format": "other-csv",
+ "columns": 2,
+ "preview": null,
+ "date_source": "file time",
+ "date": "2026-05-06T18:39:52"
+}

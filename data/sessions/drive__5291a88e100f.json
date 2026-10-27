@@ -1,0 +1,113 @@
+{
+ "stamp": "drive__5291a88e100f",
+ "tag": "SMLandBefore1",
+ "source": "drive",
+ "project_folder": "Muse State of Float Datasets",
+ "folder": "Muse State of Float Datasets/Oct 18th 2025/Total Data",
+ "size": 182453979,
+ "kind": "device",
+ "file": "SMLandBefore1",
+ "columns": 67,
+ "rows": 167556,
+ "packet_types": {
+  "EEG": 75240,
+  "PPG": 18810,
+  "GYRO": 15210,
+  "ACCELEROMETER": 15210,
+  "DRL_REF": 8358,
+  "ALPHA_ABSOLUTE": 2894,
+  "BETA_ABSOLUTE": 2894,
+  "DELTA_ABSOLUTE": 2894,
+  "THETA_ABSOLUTE": 2894,
+  "DELTA_RELATIVE": 2894,
+  "BETA_RELATIVE": 2894,
+  "ALPHA_RELATIVE": 2894,
+  "GAMMA_ABSOLUTE": 2894,
+  "HSI_PRECISION": 2894,
+  "IS_GOOD": 2894,
+  "GAMMA_RELATIVE": 2894,
+  "THETA_RELATIVE": 2894
+ },
+ "start": "2026-10-27 17:28:46",
+ "end": "2026-10-27 17:33:40",
+ "duration_s": 293.894,
+ "fs_est": 256.0106705138587,
+ "hsi": {
+  "TP9": {
+   "1": 0.979,
+   "2": 0.021
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "1": 0.979,
+   "2": 0.021
+  }
+ },
+ "hsi_streamed": true,
+ "artifact_free_frac": {
+  "TP9": 0.706,
+  "AF7": 0.987,
+  "AF8": 0.985,
+  "TP10": 0.772
+ },
+ "raw_rms_uv": {
+  "TP9": 21.604266018857484,
+  "AF7": 6.050446179419694,
+  "AF8": 6.770657001125784,
+  "TP10": 16.24674437756227
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.9178082191780822,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 0.9246575342465754
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.6801337845488757,
+   "AF7": -0.213191880566937,
+   "AF8": 0.2592423536499503,
+   "TP10": 0.6912209513957657
+  },
+  "theta": {
+   "TP9": 0.4410258682625767,
+   "AF7": -0.2612141685450352,
+   "AF8": 0.0174118236787907,
+   "TP10": 0.4077119757620107
+  },
+  "alpha": {
+   "TP9": 0.8136360843949362,
+   "AF7": 0.0598816389377236,
+   "AF8": 0.1744456276740373,
+   "TP10": 0.7302253186469139
+  },
+  "beta": {
+   "TP9": 0.8892392899891829,
+   "AF7": -0.0342270157861955,
+   "AF8": -0.0792061778223422,
+   "TP10": 0.5709467077662638
+  },
+  "gamma": {
+   "TP9": 0.7293060382968807,
+   "AF7": -0.2695643234601609,
+   "AF8": -0.483049620547063,
+   "TP10": 0.3425023247588824
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 6.46919230488295,
+ "battery": [
+  50.0,
+  50.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__5291a88e100f.svg",
+ "date_source": "recording",
+ "date": "2026-10-27T17:28:46"
+}

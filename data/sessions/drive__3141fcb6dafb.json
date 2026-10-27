@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__3141fcb6dafb",
+ "tag": "EAAH5",
+ "source": "drive",
+ "project_folder": "loose files",
+ "folder": "",
+ "size": 784614,
+ "kind": "device",
+ "file": "EAAH5",
+ "columns": 82,
+ "rows": 1860,
+ "packet_types": {
+  "EEG": 1860
+ },
+ "start": "2026-10-17 15:41:10.439000",
+ "end": "2026-10-17 15:41:17.922000",
+ "duration_s": 7.483,
+ "fs_est": 248.56341039689966,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "2": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 1067.3225477439519,
+  "AF7": 192.115845925818,
+  "AF8": 585.1720476633534,
+  "TP10": 787.9661608314008
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": -2.750743,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": -3.227047,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": -3.160039,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": -2.996518,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": -3.043819,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__3141fcb6dafb.svg",
+ "date_source": "recording",
+ "date": "2026-10-17T15:41:10.439000"
+}

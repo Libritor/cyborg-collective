@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__9cc07e0cca48",
+ "tag": "EAAHStick3",
+ "source": "drive",
+ "project_folder": "loose files",
+ "folder": "",
+ "size": 10564093,
+ "kind": "device",
+ "file": "EAAHStick3",
+ "columns": 82,
+ "rows": 23184,
+ "packet_types": {
+  "EEG": 23184
+ },
+ "start": "2026-10-17 15:48:01.343000",
+ "end": "2026-10-17 15:49:32.507000",
+ "duration_s": 91.164,
+ "fs_est": 254.31091220218508,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 1.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 1.9590554729071898,
+  "AF7": 708.8720792335018,
+  "AF8": 139.8767852666763,
+  "TP10": 893.7880857702636
+ },
+ "clean_epoch_frac": {
+  "TP9": 1.0,
+  "AF7": 0.06666666666666667,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": -1.224186,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": -3.627139
+  },
+  "theta": {
+   "TP9": -1.253187,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": -3.660273
+  },
+  "alpha": {
+   "TP9": -0.873691,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": -3.418363
+  },
+  "beta": {
+   "TP9": -0.909491,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": -2.724974
+  },
+  "gamma": {
+   "TP9": -1.121972,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": -3.115124
+  }
+ },
+ "pulse": null,
+ "battery": [
+  100.0,
+  100.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__9cc07e0cca48.svg",
+ "date_source": "recording",
+ "date": "2026-10-17T15:48:01.343000"
+}

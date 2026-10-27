@@ -1,0 +1,16 @@
+{
+ "stamp": "drive__35740006aa8f",
+ "tag": "P2711_emg",
+ "source": "drive",
+ "project_folder": "EMG",
+ "folder": "EMG",
+ "size": 1077528,
+ "kind": "device",
+ "file": "P2711_emg",
+ "usable": false,
+ "format": "other-csv",
+ "columns": 2,
+ "preview": null,
+ "date_source": "file time",
+ "date": "2026-05-02T00:48:08"
+}

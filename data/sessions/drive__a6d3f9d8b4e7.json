@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__a6d3f9d8b4e7",
+ "tag": "P597 Background",
+ "source": "drive",
+ "project_folder": "ControlWithMindData",
+ "folder": "ControlWithMindData/EEG P597/P597Winks",
+ "size": 6396695,
+ "kind": "device",
+ "file": "P597 Background",
+ "columns": 82,
+ "rows": 12748,
+ "packet_types": {
+  "EEG": 12748
+ },
+ "start": "2026-03-15 10:17:58.732000",
+ "end": "2026-03-15 10:18:58.909000",
+ "duration_s": 60.177,
+ "fs_est": 211.84173355268624,
+ "hsi": {
+  "TP9": {
+   "1": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "1": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 1.0,
+  "AF7": 1.0,
+  "AF8": 0.0,
+  "TP10": 1.0
+ },
+ "raw_rms_uv": {
+  "TP9": 11.42880025477715,
+  "AF7": 10.123908038906372,
+  "AF8": 7.382507610450436,
+  "TP10": 12.073984200727347
+ },
+ "clean_epoch_frac": {
+  "TP9": 1.0,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 1.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.037972,
+   "AF7": 0.214054,
+   "AF8": 0.311897,
+   "TP10": 0.014023
+  },
+  "theta": {
+   "TP9": 0.234508,
+   "AF7": 0.111828,
+   "AF8": 0.143076,
+   "TP10": 0.127723
+  },
+  "alpha": {
+   "TP9": 0.528843,
+   "AF7": 0.325184,
+   "AF8": 0.364966,
+   "TP10": 0.447208
+  },
+  "beta": {
+   "TP9": 0.399307,
+   "AF7": 0.047505,
+   "AF8": -0.033161,
+   "TP10": 0.436391
+  },
+  "gamma": {
+   "TP9": 0.036403,
+   "AF7": -0.408279,
+   "AF8": -0.451845,
+   "TP10": 0.132406
+  }
+ },
+ "pulse": null,
+ "battery": [
+  80.0,
+  80.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__a6d3f9d8b4e7.svg",
+ "date_source": "recording",
+ "date": "2026-03-15T10:17:58.732000"
+}

@@ -1,0 +1,16 @@
+{
+ "stamp": "drive__2a404456f275",
+ "tag": "P859_av_eeg",
+ "source": "drive",
+ "project_folder": "EMG",
+ "folder": "EMG",
+ "size": 906561,
+ "kind": "device",
+ "file": "P859_av_eeg",
+ "usable": false,
+ "format": "other-csv",
+ "columns": 2,
+ "preview": null,
+ "date_source": "file time",
+ "date": "2026-04-30T22:05:34"
+}

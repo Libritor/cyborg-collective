@@ -1,0 +1,118 @@
+{
+ "stamp": "drive__fc300bcf6ba0",
+ "tag": "MuseCrocMobile_2025-10-18_152958_MU_04PRESET_51_EEG@256Hz_Accelerometer@52Hz_Gyroscope@52Hz_DRL_REF@32Hz_PPG@64Hz_",
+ "source": "drive",
+ "project_folder": "Muse State of Float Datasets",
+ "folder": "Muse State of Float Datasets/Oct 18th 2025/Total Data",
+ "size": 274004213,
+ "kind": "device",
+ "file": "MuseCrocMobile_2025-10-18_152958_MU_04PRESET_51_EEG@256Hz_Accelerometer@52Hz_Gyroscope@52Hz_DRL_REF@32Hz_PPG@64Hz_",
+ "columns": 67,
+ "rows": 294240,
+ "packet_types": {
+  "EEG": 132132,
+  "PPG": 33030,
+  "GYRO": 26706,
+  "ACCELEROMETER": 26706,
+  "DRL_REF": 14682,
+  "DELTA_ABSOLUTE": 5082,
+  "THETA_ABSOLUTE": 5082,
+  "ALPHA_ABSOLUTE": 5082,
+  "BETA_ABSOLUTE": 5082,
+  "ALPHA_RELATIVE": 5082,
+  "GAMMA_ABSOLUTE": 5082,
+  "BETA_RELATIVE": 5082,
+  "DELTA_RELATIVE": 5082,
+  "GAMMA_RELATIVE": 5082,
+  "THETA_RELATIVE": 5082,
+  "HSI_PRECISION": 5082,
+  "IS_GOOD": 5082
+ },
+ "start": "2026-10-27 15:29:58",
+ "end": "2026-10-27 15:38:34",
+ "duration_s": 516.074,
+ "fs_est": 256.0330495239055,
+ "hsi": {
+  "TP9": {
+   "4": 0.983,
+   "2": 0.017
+  },
+  "AF7": {
+   "1": 0.992,
+   "2": 0.005,
+   "4": 0.003
+  },
+  "AF8": {
+   "1": 0.977,
+   "4": 0.012,
+   "2": 0.011
+  },
+  "TP10": {
+   "1": 0.639,
+   "2": 0.353,
+   "4": 0.008
+  }
+ },
+ "hsi_streamed": true,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.646,
+  "AF8": 0.636,
+  "TP10": 0.515
+ },
+ "raw_rms_uv": {
+  "TP9": 619.1970026355422,
+  "AF7": 48.40382949585757,
+  "AF8": 67.7043234243476,
+  "TP10": 88.51117450210909
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.7790697674418605,
+  "AF8": 0.7674418604651163,
+  "TP10": 0.6356589147286822
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.42331468617339224,
+   "AF8": 0.4708790343008683,
+   "TP10": 0.8847337958820912
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.12921801789185589,
+   "AF8": 0.132444038311228,
+   "TP10": 0.6515866119489024
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.31371904977352993,
+   "AF8": 0.3037214286197923,
+   "TP10": 0.8922181893140496
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.03169032664657835,
+   "AF8": -0.01823913013324785,
+   "TP10": 0.6233469706128731
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": -0.2581234638103277,
+   "AF8": -0.4099715022952087,
+   "TP10": 0.20266534537778952
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 36.043892525031694,
+ "battery": [
+  95.0,
+  85.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__fc300bcf6ba0.svg",
+ "date_source": "recording",
+ "date": "2026-10-27T15:29:58"
+}

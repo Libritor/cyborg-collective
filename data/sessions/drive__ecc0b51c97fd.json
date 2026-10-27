@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__ecc0b51c97fd",
+ "tag": "P903AudioVisual_eeg",
+ "source": "drive",
+ "project_folder": "EMG",
+ "folder": "EMG",
+ "size": 13589140,
+ "kind": "device",
+ "file": "P903AudioVisual_eeg",
+ "columns": 82,
+ "rows": 28888,
+ "packet_types": {
+  "EEG": 28888
+ },
+ "start": "2026-05-01 20:35:30.100000",
+ "end": "2026-05-01 20:37:34.270000",
+ "duration_s": 124.17,
+ "fs_est": 232.64878795200127,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "2": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 1047.2772808752086,
+  "AF7": 30.541548924285017,
+  "AF8": 33.055712295502936,
+  "TP10": 41.161301825087406
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.9285714285714286,
+  "AF8": 0.5892857142857143,
+  "TP10": 0.25
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.876613,
+   "AF8": 0.80036,
+   "TP10": 0.983324
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.627898,
+   "AF8": 1.077978,
+   "TP10": 0.79443
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.812285,
+   "AF8": 1.125308,
+   "TP10": 0.915347
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.920165,
+   "AF8": 1.144663,
+   "TP10": 0.843957
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.609986,
+   "AF8": 0.705238,
+   "TP10": 0.42473
+  }
+ },
+ "pulse": null,
+ "battery": [
+  50.0,
+  50.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__ecc0b51c97fd.svg",
+ "date_source": "recording",
+ "date": "2026-05-01T20:35:30.100000"
+}

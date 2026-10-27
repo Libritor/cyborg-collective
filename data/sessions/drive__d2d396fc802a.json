@@ -1,0 +1,95 @@
+{
+ "stamp": "drive__d2d396fc802a",
+ "tag": "muse_session_20260204_151742_Muse2",
+ "source": "drive",
+ "project_folder": "Snow data",
+ "folder": "Snow data/muse_snow_data_2026_02_04",
+ "size": 23175001,
+ "kind": "device",
+ "file": "muse_session_20260204_151742_Muse2",
+ "columns": 82,
+ "rows": 51816,
+ "packet_types": {
+  "EEG": 51816
+ },
+ "start": "2026-02-04 20:17:42.353000",
+ "end": "2026-02-04 20:21:26.084000",
+ "duration_s": 223.731,
+ "fs_est": 231.5995548225324,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "2": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 450.1309518159578,
+  "AF7": 688.8640984864547,
+  "AF8": 746.9076662678162,
+  "TP10": 419.2465146084344
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 52.808992372093265,
+ "battery": [
+  45.0,
+  45.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__d2d396fc802a.svg",
+ "date_source": "recording",
+ "date": "2026-02-04T20:17:42.353000"
+}

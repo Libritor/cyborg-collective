@@ -1,0 +1,16 @@
+{
+ "stamp": "drive__d0e3e7995260",
+ "tag": "P456_P108",
+ "source": "drive",
+ "project_folder": "EEG_Audio_Decomp",
+ "folder": "EEG_Audio_Decomp/EEG_Audio_Decomp/stimuli",
+ "size": 2686,
+ "kind": "device",
+ "file": "P456_P108",
+ "usable": false,
+ "format": "other-csv",
+ "columns": 7,
+ "preview": null,
+ "date_source": "file time",
+ "date": "2026-10-14T03:26:32"
+}

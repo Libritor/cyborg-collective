@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__d73986bc02ea",
+ "tag": "post-CWI-cog-assessments-mar-2_154116_Muse1",
+ "source": "drive",
+ "project_folder": "State of Golf",
+ "folder": "State of Golf/CWI Only/mar-2/post-CWI Cognitive Assessments",
+ "size": 64551593,
+ "kind": "device",
+ "file": "post-CWI-cog-assessments-mar-2_154116_Muse1",
+ "columns": 86,
+ "rows": 161580,
+ "packet_types": {
+  "EEG": 161580
+ },
+ "start": "2026-03-02 15:41:16.397000",
+ "end": "2026-03-02 15:51:50.322000",
+ "duration_s": 633.925,
+ "fs_est": 254.88819655322004,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 983.8569591587503,
+  "AF7": 1021.2354765557774,
+  "AF8": 681.9890189815317,
+  "TP10": 786.4347879512416
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0031746031746031746,
+  "AF7": 0.0,
+  "AF8": 0.006349206349206349,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__d73986bc02ea.svg",
+ "date_source": "recording",
+ "date": "2026-03-02T15:41:16.397000"
+}

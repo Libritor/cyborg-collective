@@ -1,0 +1,13 @@
+{
+ "stamp": "drive__5ee4e736c065",
+ "tag": "p02_muse_1P953",
+ "source": "drive",
+ "project_folder": "EEG_Audio_Decomp",
+ "folder": "EEG_Audio_Decomp/EEG_Audio_Decomp/data/raw",
+ "size": 102802804,
+ "kind": "other",
+ "usable": false,
+ "format": "npz",
+ "date_source": "file time",
+ "date": "2026-10-12T20:33:28"
+}

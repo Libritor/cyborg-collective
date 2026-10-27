@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__a837aa9f0e85",
+ "tag": "block 1 data",
+ "source": "drive",
+ "project_folder": "EEG_Audio_Decomp",
+ "folder": "EEG_Audio_Decomp/EEG_Audio_Decomp",
+ "size": 35669005,
+ "kind": "device",
+ "file": "block 1 data",
+ "columns": 82,
+ "rows": 71420,
+ "packet_types": {
+  "EEG": 71420
+ },
+ "start": "2026-10-14 02:29:55.808000",
+ "end": "2026-10-14 02:34:55.543000",
+ "duration_s": 299.735,
+ "fs_est": 238.27714481124994,
+ "hsi": {
+  "TP9": {
+   "1": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "1": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 1.0,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 53.87786227341039,
+  "AF7": 15.227949398199407,
+  "AF8": 20.478663681611817,
+  "TP10": 198.20855489923576
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.539568345323741,
+  "AF7": 0.9280575539568345,
+  "AF8": 0.9640287769784173,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.391744,
+   "AF7": 0.009536,
+   "AF8": 0.225164,
+   "TP10": 0.3697
+  },
+  "theta": {
+   "TP9": 0.494437,
+   "AF7": 0.137373,
+   "AF8": 0.063355,
+   "TP10": 0.474792
+  },
+  "alpha": {
+   "TP9": 0.941609,
+   "AF7": 0.4987,
+   "AF8": 0.25147,
+   "TP10": 0.935889
+  },
+  "beta": {
+   "TP9": 0.573162,
+   "AF7": 0.78165,
+   "AF8": 0.326344,
+   "TP10": 0.840518
+  },
+  "gamma": {
+   "TP9": 0.138909,
+   "AF7": 0.456184,
+   "AF8": 0.00456,
+   "TP10": 0.449235
+  }
+ },
+ "pulse": null,
+ "battery": [
+  100.0,
+  100.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__a837aa9f0e85.svg",
+ "date_source": "recording",
+ "date": "2026-10-14T02:29:55.808000"
+}

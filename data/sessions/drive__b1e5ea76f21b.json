@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__b1e5ea76f21b",
+ "tag": "Muse Session Data - 45 P507 left",
+ "source": "drive",
+ "project_folder": "ControlWithMindData",
+ "folder": "ControlWithMindData/EEG P925/Eye direction EEG",
+ "size": 6694922,
+ "kind": "device",
+ "file": "Muse Session Data - 45 P507 left",
+ "columns": 82,
+ "rows": 14188,
+ "packet_types": {
+  "EEG": 14188
+ },
+ "start": "2026-03-13 18:19:51.744000",
+ "end": "2026-03-13 18:20:49.896000",
+ "duration_s": 58.152,
+ "fs_est": 243.9812904113358,
+ "hsi": {
+  "TP9": {
+   "1": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "1": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 1.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 18.246043362760883,
+  "AF7": 285.3354559976675,
+  "AF8": 10.404567622187862,
+  "TP10": 47.73310392881564
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.9629629629629629,
+  "AF7": 0.0,
+  "AF8": 1.0,
+  "TP10": 0.8888888888888888
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.900931,
+   "AF7": 0.0,
+   "AF8": 0.678604,
+   "TP10": 0.665037
+  },
+  "theta": {
+   "TP9": 0.687202,
+   "AF7": 0.0,
+   "AF8": 0.326244,
+   "TP10": 0.479117
+  },
+  "alpha": {
+   "TP9": 0.834543,
+   "AF7": 0.0,
+   "AF8": 0.346776,
+   "TP10": 0.839743
+  },
+  "beta": {
+   "TP9": 0.649719,
+   "AF7": 0.0,
+   "AF8": 0.14735,
+   "TP10": 0.673471
+  },
+  "gamma": {
+   "TP9": 0.46718,
+   "AF7": 0.0,
+   "AF8": -0.204399,
+   "TP10": 0.323853
+  }
+ },
+ "pulse": null,
+ "battery": [
+  70.0,
+  70.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__b1e5ea76f21b.svg",
+ "date_source": "recording",
+ "date": "2026-03-13T18:19:51.744000"
+}

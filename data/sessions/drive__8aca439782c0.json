@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__8aca439782c0",
+ "tag": "LUCIA-mar4-during-CWI-and-post-143846_Muse1",
+ "source": "drive",
+ "project_folder": "State of Golf",
+ "folder": "State of Golf/CWI Only/mar-4",
+ "size": 12844759,
+ "kind": "device",
+ "file": "LUCIA-mar4-during-CWI-and-post-143846_Muse1",
+ "columns": 86,
+ "rows": 30900,
+ "packet_types": {
+  "EEG": 30900
+ },
+ "start": "2026-03-04 14:38:46.316000",
+ "end": "2026-03-04 14:40:47.110000",
+ "duration_s": 120.794,
+ "fs_est": 255.80740765269798,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 690.5041810308846,
+  "AF7": 454.7633884795482,
+  "AF8": 563.7296161337699,
+  "TP10": 656.3728592754322
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.3,
+  "AF8": 0.03333333333333333,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.576542,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.365913,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.514424,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.54246,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__8aca439782c0.svg",
+ "date_source": "recording",
+ "date": "2026-03-04T14:38:46.316000"
+}

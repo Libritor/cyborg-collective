@@ -1,0 +1,18 @@
+{
+ "stamp": "drive__6478b9b5555c",
+ "tag": "Muse Session Data(2)",
+ "source": "drive",
+ "project_folder": "Snow data",
+ "folder": "Snow data/muse_snow_data_2026_01_31",
+ "size": 1478,
+ "kind": "device",
+ "file": "Muse Session Data(2)",
+ "columns": 85,
+ "rows": 0,
+ "packet_types": {},
+ "usable": false,
+ "format": "muselog",
+ "preview": null,
+ "date_source": "name",
+ "date": "2026-01-31T00:00:00"
+}

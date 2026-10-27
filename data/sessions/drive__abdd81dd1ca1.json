@@ -1,0 +1,94 @@
+{
+ "stamp": "drive__abdd81dd1ca1",
+ "tag": "Muse Session Data",
+ "source": "drive",
+ "project_folder": "Snow data",
+ "folder": "Snow data/Feb232026VR-BCI",
+ "size": 3040253,
+ "kind": "device",
+ "file": "Muse Session Data",
+ "columns": 85,
+ "rows": 7684,
+ "packet_types": {
+  "EEG": 7684
+ },
+ "start": "2026-02-24 00:27:19.625000",
+ "end": "2026-02-24 00:27:49.080000",
+ "duration_s": 29.455,
+ "fs_est": 260.87251739942286,
+ "hsi": {
+  "TP9": {
+   "4": 1.0
+  },
+  "AF7": {
+   "4": 1.0
+  },
+  "AF8": {
+   "4": 1.0
+  },
+  "TP10": {
+   "4": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 1035.5355154170288,
+  "AF7": 1038.9873909426349,
+  "AF8": 778.5247640186824,
+  "TP10": 1059.087346508997
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.0,
+  "AF7": 0.0,
+  "AF8": 0.0,
+  "TP10": 0.0
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "theta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "alpha": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "beta": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  },
+  "gamma": {
+   "TP9": 0.0,
+   "AF7": 0.0,
+   "AF8": 0.0,
+   "TP10": 0.0
+  }
+ },
+ "pulse": null,
+ "battery": [
+  0.0,
+  0.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__abdd81dd1ca1.svg",
+ "date_source": "recording",
+ "date": "2026-02-24T00:27:19.625000"
+}

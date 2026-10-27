@@ -1,0 +1,95 @@
+{
+ "stamp": "drive__4031603b6f8c",
+ "tag": "Copy of muse_session_20260214_232902_Muse1",
+ "source": "drive",
+ "project_folder": "State of Flight Datasets",
+ "folder": "State of Flight Datasets/P419 Data/Landing",
+ "size": 68586744,
+ "kind": "device",
+ "file": "Copy of muse_session_20260214_232902_Muse1",
+ "columns": 85,
+ "rows": 122856,
+ "packet_types": {
+  "EEG": 122856
+ },
+ "start": "2026-02-14 23:29:04.505000",
+ "end": "2026-02-14 23:37:08.636000",
+ "duration_s": 484.131,
+ "fs_est": 253.7660261375537,
+ "hsi": {
+  "TP9": {
+   "2": 1.0
+  },
+  "AF7": {
+   "1": 1.0
+  },
+  "AF8": {
+   "1": 1.0
+  },
+  "TP10": {
+   "2": 1.0
+  }
+ },
+ "hsi_streamed": false,
+ "artifact_free_frac": {
+  "TP9": 0.0,
+  "AF7": 1.0,
+  "AF8": 1.0,
+  "TP10": 0.0
+ },
+ "raw_rms_uv": {
+  "TP9": 158.87089164632803,
+  "AF7": 50.947185880686426,
+  "AF8": 44.502759385665506,
+  "TP10": 75.14547719939492
+ },
+ "clean_epoch_frac": {
+  "TP9": 0.058577405857740586,
+  "AF7": 0.9832635983263598,
+  "AF8": 0.9707112970711297,
+  "TP10": 0.029288702928870293
+ },
+ "bands_median": {
+  "delta": {
+   "TP9": 1.399572,
+   "AF7": 0.678719,
+   "AF8": 0.552997,
+   "TP10": 1.481325
+  },
+  "theta": {
+   "TP9": 1.371686,
+   "AF7": 0.211072,
+   "AF8": 0.149012,
+   "TP10": 1.684903
+  },
+  "alpha": {
+   "TP9": 0.988539,
+   "AF7": 0.25297,
+   "AF8": 0.15906,
+   "TP10": 1.493771
+  },
+  "beta": {
+   "TP9": 0.815995,
+   "AF7": 0.072565,
+   "AF8": -0.175021,
+   "TP10": 0.823446
+  },
+  "gamma": {
+   "TP9": 0.046147,
+   "AF7": -0.13417,
+   "AF8": -0.516426,
+   "TP10": 0.332863
+  }
+ },
+ "pulse": null,
+ "gyro_rms": 11.467786302825992,
+ "battery": [
+  73.0,
+  73.0
+ ],
+ "usable": true,
+ "format": "muselog",
+ "preview": "drive__4031603b6f8c.svg",
+ "date_source": "recording",
+ "date": "2026-02-14T23:29:04.505000"
+}
