@@ -11,5 +11,6 @@
  "format": "other-csv",
  "columns": 2,
  "preview": null,
- "date": "2026-10-27T08:34:22.920535088"
+ "date_source": "file time",
+ "date": "2026-05-02T16:13:22"
 }
