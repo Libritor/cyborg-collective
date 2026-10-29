@@ -13,7 +13,7 @@
   <p class="tag">A window the person opens, not a feed that is taken. Live headbands when someone chooses to share; the record of every recording behind them, always.</p>
 </header>
 <nav>
-  <a href="#live">Live</a><a href="#record">The record</a><a href="#projects">Projects</a><a href="#about">About</a>
+  <a href="#live">Live</a><a href="#checkins">Check-ins</a><a href="#record">The record</a><a href="#projects">Projects</a><a href="#about">About</a>
 </nav>
 <main>
 
@@ -28,7 +28,17 @@
   </div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty">Nobody is sharing right now. The record below is always here.</div>
-  <p class="status more">The relay keeps nothing; this page shows what arrives while the tab is open. To point the page at a relay, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
+  <p class="status more">The relay keeps nothing of the signal; this page shows what arrives while the tab is open. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. To point the page at a relay, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
+</section>
+
+<section id="checkins">
+  <h2>Check-ins</h2>
+  <p class="sub">Daily check-ins people chose to publish: three minutes of eyes-open rest, then how they rated themselves, how they slept, what they drank. Their rating sits beside the resting estimate so the two can be compared, never merged. Each person can remove theirs from their phone.</p>
+  <table class="sessions checkins">
+    <thead><tr><th>when</th><th>who</th><th>doing</th><th>self-rated</th><th>sleep</th><th>caffeine</th><th>resting estimate</th><th>usable</th><th>pulse</th></tr></thead>
+    <tbody id="checkin-rows"></tbody>
+  </table>
+  <p class="status more" id="checkin-note">loading…</p>
 </section>
 
 <section id="record">

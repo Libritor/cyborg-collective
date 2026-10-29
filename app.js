@@ -16,10 +16,13 @@
     el.className = "card";
     el.innerHTML = `
       <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier"></span><span class="badge dev"></span></h3>
+      <div class="said"><span class="pseud" hidden></span><span class="chip activity" hidden></span></div>
+      <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><span class="moodtext"></span></div>
       <div class="dots">${CH.map(c => `<div class="dot" data-ch="${c}"><i></i>${c}</div>`).join("")}</div>
       <div class="est"><b>—</b><small></small></div>
       <div class="reason"></div>
       <div class="hr"></div>
+      <div class="checkin" hidden></div>
       <canvas class="bands" height="70" hidden></canvas>
       <canvas class="raw" height="70" hidden></canvas>`;
     el.querySelector(".name").textContent = p.pseudonym;
@@ -32,8 +35,53 @@
     if (!p) {
       p = { pseudonym: msg.pseudonym, tier: msg.tier, device: msg.device, raw: CH.map(() => []) };
       p.el = card(p); grid.appendChild(p.el); people.set(msg.pseudonym, p); empty.hidden = true;
+      if (msg.name || msg.activity || msg.mood) setProfile(p, msg);
     }
     return p;
+  }
+  // what the person typed: name (else the pseudonym), what they are doing,
+  // and their own mood rating. Labelled self-rated; never from the signal.
+  function setProfile(p, m) {
+    const name = p.el.querySelector(".name"), pseud = p.el.querySelector(".pseud");
+    const act = p.el.querySelector(".chip.activity"), mood = p.el.querySelector(".mood");
+    if (m.name) { name.textContent = m.name; pseud.textContent = p.pseudonym; pseud.hidden = false; }
+    else { name.textContent = p.pseudonym; pseud.hidden = true; }
+    if (m.activity) { act.textContent = m.activity; act.hidden = false; } else act.hidden = true;
+    if (m.mood && m.mood.arousal) {
+      mood.hidden = false;
+      drawMood(mood.querySelector("canvas"), m.mood.arousal, m.mood.valence);
+      mood.querySelector(".moodtext").textContent =
+        `self-rated mood · arousal ${m.mood.arousal}/9 · valence ${m.mood.valence}/9${m.mood.word ? ` · “${m.mood.word}”` : ""}`;
+    } else mood.hidden = true;
+  }
+  function drawMood(cv, arousal, valence) {
+    const s = cv.width, ctx = cv.getContext("2d"), cell = s / 9;
+    ctx.clearRect(0, 0, s, s);
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--line") || "#ccc";
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 9; i++) {
+      ctx.beginPath(); ctx.moveTo(i * cell + 0.5, 0); ctx.lineTo(i * cell + 0.5, s); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * cell + 0.5); ctx.lineTo(s, i * cell + 0.5); ctx.stroke();
+    }
+    ctx.fillStyle = "#4f46e5";
+    ctx.fillRect((valence - 1) * cell + 1, (9 - arousal) * cell + 1, cell - 1, cell - 1);
+  }
+  function fmtCheckin(c) {
+    const r = c.self_rating, parts = [];
+    if (c.date) parts.push(c.date);
+    if (r && r.arousal) parts.push(`self-rated ${r.arousal}/9 · ${r.valence}/9${r.word ? ` “${r.word}”` : ""}`);
+    if (c.estimate_median != null) parts.push(`resting estimate ${Math.round(c.estimate_median * 100)}%`);
+    else parts.push("resting estimate: no claim");
+    if (c.usable_fraction != null) parts.push(`${Math.round(c.usable_fraction * 100)}% usable`);
+    if (c.sleep_hours != null) parts.push(`sleep ${c.sleep_hours} h`);
+    if (c.caffeine) parts.push(c.caffeine);
+    if (c.hr_bpm_mean != null) parts.push(`♥ ${Math.round(c.hr_bpm_mean)}`);
+    return parts.join(" · ");
+  }
+  function setCheckin(p, c) {
+    const el = p.el.querySelector(".checkin");
+    el.hidden = false;
+    el.textContent = `today's check-in: ${fmtCheckin(c)}${c.publish ? " · published" : ""}`;
   }
   function remove(pseudonym) {
     const p = people.get(pseudonym);
@@ -75,7 +123,8 @@
     const gw = W / BANDS.length;
     BANDS.forEach((name, i) => {
       const vals = b.rel[name] || [];
-      const mean = vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : 0;
+      const nums = vals.filter(Number.isFinite); // null = channel without contact
+      const mean = nums.length ? nums.reduce((x, y) => x + y, 0) / nums.length : 0;
       const h = Math.max(2, mean * (H - 18 * devicePixelRatio));
       ctx.fillStyle = colors[i];
       ctx.fillRect(i * gw + gw * 0.2, H - 14 * devicePixelRatio - h, gw * 0.6, h);
@@ -112,13 +161,18 @@
       case "snapshot":
         for (const p of msg.people) {
           const q = ensure(p);
+          setProfile(q, p);
           if (p.last?.quality) setQuality(q, p.last.quality);
           if (p.last?.arousal) setArousal(q, p.last.arousal);
           if (p.last?.hr) setHr(q, p.last.hr);
           if (p.last?.bands) drawBands(q, p.last.bands);
+          if (p.last?.checkin) setCheckin(q, p.last.checkin);
         }
         break;
       case "join": case "presence": ensure(msg); break;
+      case "profile": setProfile(ensure(msg), msg); break;
+      case "checkin": setCheckin(ensure(msg), msg); if (msg.publish) loadCheckins(); break;
+      case "checkins_changed": loadCheckins(); break;
       case "leave": remove(msg.pseudonym); break;
       case "aggregate": aggregate(msg); break;
       case "quality": setQuality(ensure(msg), msg); break;
@@ -159,6 +213,57 @@
     ws.onerror = () => { try { ws.close(); } catch {} };
   }
   connect();
+
+  // ---------------- check-ins people chose to publish ----------------
+  // From the relay when it serves this page (or is configured), else from
+  // data/checkins.json exported at deploy time.
+  async function loadCheckins() {
+    const rows = $("checkin-rows"), note = $("checkin-note");
+    if (!rows) return;
+    let list = null, source = "";
+    const relay = relayUrl();
+    const bases = [];
+    if (/^https?:$/.test(location.protocol)) bases.push("checkins");
+    if (relay) bases.push(relay.replace(/^ws/, "http").replace(/\/live\/?$/, "/checkins"));
+    for (const b of bases) {
+      try {
+        const r = await fetch(b, { cache: "no-store" });
+        if (!r.ok) continue;
+        const j = await r.json();
+        if (Array.isArray(j.checkins)) { list = j.checkins; source = j.storage ? "relay" : "relay (no store)"; break; }
+      } catch {}
+    }
+    if (!list) {
+      try {
+        const r = await fetch("data/checkins.json", { cache: "no-store" });
+        if (r.ok) { const j = await r.json(); list = Array.isArray(j) ? j : (j.checkins || []); source = "last export"; }
+      } catch {}
+    }
+    if (!list) { note.textContent = "no check-ins available on this page yet."; return; }
+    rows.innerHTML = "";
+    for (const c of list) {
+      const tr = document.createElement("tr");
+      const r = c.self_rating || {};
+      const when = c.date || (c.ts ? new Date(c.ts).toISOString().slice(0, 10) : "");
+      const cells = [
+        when,
+        c.name || c.pseudonym || "",
+        c.activity || "",
+        r.arousal ? `${r.arousal}/9 · ${r.valence}/9${r.word ? ` “${r.word}”` : ""}` : "—",
+        c.sleep_hours != null ? `${c.sleep_hours} h` : "—",
+        c.caffeine || "—",
+        c.estimate_median != null ? `${Math.round(c.estimate_median * 100)}%` : "no claim",
+        c.usable_fraction != null ? `${Math.round(c.usable_fraction * 100)}%` : "—",
+        c.hr_bpm_mean != null ? `${Math.round(c.hr_bpm_mean)} bpm` : "—",
+      ];
+      for (const v of cells) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+      rows.appendChild(tr);
+    }
+    note.textContent = list.length
+      ? `${list.length} published check-in${list.length === 1 ? "" : "s"} · ${source}. A check-in is the person's own rating and numbers; the resting estimate is the median over usable windows of a 3-minute eyes-open baseline.`
+      : "Nobody has published a check-in yet.";
+  }
+  loadCheckins();
 
   // ---------------- the record: past recordings ----------------
   const fmtDate = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
