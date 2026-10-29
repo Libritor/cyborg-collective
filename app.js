@@ -225,28 +225,61 @@
     setAux(p, d.aux);
   }
   setInterval(() => { for (const p of people.values()) if (p.device?.since) p.el.querySelector(".fact.since").textContent = `sharing for ${fmtSince(p.device.since)}`; }, 15000);
+  // motion as the app shows it: a tile per axis, X red / Y green / Z blue
   function setImu(p, m) {
     const el = p.el.querySelector(".imu"); el.hidden = false;
-    // fixed-width numbers (always signed, two decimals) so the line never
-    // changes length between updates
-    const f = v => (v == null ? "   — " : ((v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2)).padStart(6, " "));
-    const g = m.gyro || [], a = m.accel || [];
-    el.textContent = `motion · gyro ${f(g[0])} ${f(g[1])} ${f(g[2])} °/s · accel ${f(a[0])} ${f(a[1])} ${f(a[2])} g`;
+    p.el.querySelector(".imu-title").hidden = false;
+    if (!el.firstChild) {
+      el.innerHTML = ["gyro", "accel"].map(k => `<div class="imu-row"><span class="imu-label">${k === "gyro" ? "gyroscope °/s" : "accelerometer g"}</span>${["X", "Y", "Z"].map((ax, i) =>
+        `<span class="tile-v" data-k="${k}${i}" style="border-color:${XYZ_COLORS[i]};color:${XYZ_COLORS[i]}"><b>${ax}</b> <span>—</span></span>`).join("")}</div>`).join("");
+    }
+    const f = v => (v == null ? "—" : ((v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2)));
+    (m.gyro || []).forEach((v, i) => { el.querySelector(`[data-k="gyro${i}"] span`).textContent = f(v); });
+    (m.accel || []).forEach((v, i) => { el.querySelector(`[data-k="accel${i}"] span`).textContent = f(v); });
   }
+  // optics as the app's fNIRS chart: 730 nm red and 850 nm blue over 20 s
+  // (mean of the sites that report), plus the per-site 850/730 ratios
   function setOptics(p, o) {
     const el = p.el.querySelector(".optics"); el.hidden = false;
+    p.el.querySelector(".optics-title").hidden = false;
     const parts = [];
+    const r730 = [], r850 = [];
     if (o.sites) {
       const names = { left_outer: "L out", left_inner: "L in", right_inner: "R in", right_outer: "R out" };
       for (const [k, v] of Object.entries(o.sites)) {
-        if (v && v.ratio != null) parts.push(`${names[k] || k} 850/730 ${v.ratio.toFixed(3)}`);
+        if (!v) continue;
+        if (v.ratio != null) parts.push(`${names[k] || k} 850/730 ${v.ratio.toFixed(3)}`);
+        if (Number.isFinite(v.r730)) r730.push(v.r730);
+        if (Number.isFinite(v.r850)) r850.push(v.r850);
       }
     }
     if (o.ppg) {
       const pp = Object.entries(o.ppg).filter(([, v]) => v != null).map(([k, v]) => `${k} ${Math.round(v)}`);
       if (pp.length) parts.push(`PPG ${pp.join(" · ")}`);
     }
-    el.textContent = parts.length ? `optics · ${parts.join(" · ")}` : "optics · no optical data on this model";
+    el.textContent = parts.length ? parts.join(" · ") : "no optical data on this model";
+    if (!r730.length && !r850.length) return;
+    p.opt = p.opt || [];
+    const t = o.ts || Date.now();
+    p.opt.push({ t, a: r730.length ? r730.reduce((x, y) => x + y, 0) / r730.length : null,
+                 b: r850.length ? r850.reduce((x, y) => x + y, 0) / r850.length : null });
+    p.opt = p.opt.filter(s => t - s.t <= 20000);
+    const cv = p.el.querySelector("canvas.optics-chart"); cv.hidden = false;
+    const { ctx, W, H } = prepCanvas(cv, 90);
+    const vals = p.opt.flatMap(s => [s.a, s.b]).filter(Number.isFinite);
+    if (vals.length < 2) return;
+    let lo = Math.min(...vals), hi = Math.max(...vals); if (hi - lo < 1) { hi = lo + 1; }
+    const pad = (hi - lo) * 0.1; lo -= pad; hi += pad;
+    const ax = axes(ctx, W, H, { left: 44, bottom: 12, yMin: lo, yMax: hi, yUnit: "µA", seconds: 20, yTicks: 3, xTicks: 4 });
+    for (const [key, col] of [["a", "#ef5350"], ["b", "#42a5f5"]]) {
+      ctx.beginPath(); ctx.strokeStyle = col; ctx.lineWidth = 1.5; let started = false;
+      for (const s of p.opt) {
+        if (!Number.isFinite(s[key])) continue;
+        const x = ax.x0 + ax.pw * (1 - (t - s.t) / 20000), y = ax.y0 + ax.ph * (1 - (s[key] - lo) / (hi - lo));
+        started ? ctx.lineTo(x, y) : ctx.moveTo(x, y); started = true;
+      }
+      ctx.stroke();
+    }
   }
   // band powers as the app's bar chart: one bar per band in the app's
   // colours, mean over the channels in contact, with the per-channel table
