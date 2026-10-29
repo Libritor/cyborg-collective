@@ -83,3 +83,6 @@ footer ul { padding-left: 18px; }
 .mood .moodtext { font-size: 12px; color: var(--muted); }
 .checkin { font-size: 12px; color: var(--muted); margin-top: 6px; }
 table.checkins td { white-space: nowrap; }
+
+/* the hidden attribute must win over the display rules above */
+[hidden] { display: none !important; }
