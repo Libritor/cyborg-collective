@@ -20,7 +20,12 @@
       <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><div class="moodside"><span class="moodchip"></span><span class="moodtext"></span></div></div>
       <div class="moodlog" hidden></div>
       <div class="facts"><span class="fact model"></span><span class="fact batt"></span><span class="fact since"></span><span class="fact auxq"></span></div>
-      <div class="dots">${CH.map(c => `<div class="dot" data-ch="${c}"><i></i>${c}</div>`).join("")}</div>
+      <svg class="horseshoe" viewBox="0 0 156 86" role="img" aria-label="contact quality per electrode">
+        <path d="M 12 70 A 48 58 0 0 1 108 70" fill="none" stroke="currentColor" stroke-opacity="0.35" stroke-width="2"/>
+        ${[["TP9", 12, 66], ["AF7", 38, 18], ["AF8", 82, 18], ["TP10", 108, 66]].map(([c, x, y]) =>
+          `<g class="el" data-ch="${c}"><title>${c}: no data</title><circle cx="${x}" cy="${y}" r="8" fill="#9ca3af"/><text x="${x}" y="${y + 20}" text-anchor="middle">${c}</text></g>`).join("")}
+        <g class="el aux" data-ch="AUX" hidden><title>aux electrode (derived)</title><circle cx="140" cy="42" r="8" fill="#9ca3af"/><text x="140" y="62" text-anchor="middle">AUX</text></g>
+      </svg>
       <div class="est"><b>—</b><small></small></div>
       <div class="reason"></div>
       <div class="hr"></div>
@@ -122,12 +127,26 @@
     p.el.remove(); people.delete(pseudonym);
     if (people.size === 0) empty.hidden = false;
   }
+  // the horseshoe: the app's contact indicator, same colours (good / ok / poor)
+  const hsiColor = v => (v === 1 ? "#16a34a" : v === 2 ? "#d97706" : v == null ? "#9ca3af" : "#dc2626");
+  const hsiWord = v => (v === 1 ? "good" : v === 2 ? "ok" : v == null ? "no data" : "poor");
   function setQuality(p, q) {
     for (const c of CH) {
-      const d = p.el.querySelector(`.dot[data-ch="${c}"]`);
+      const g = p.el.querySelector(`.horseshoe .el[data-ch="${c}"]`);
       const v = q.hsi ? q.hsi[c] : undefined;
-      d.className = "dot " + (v === 1 ? "g" : v === 2 ? "o" : v === undefined ? "" : "b");
+      g.querySelector("circle").setAttribute("fill", hsiColor(v));
+      g.querySelector("title").textContent = `${c}: ${hsiWord(v)}`;
     }
+  }
+  function setAux(p, aux) {
+    const g = p.el.querySelector(".horseshoe .el.aux");
+    const a = (aux || [])[0];
+    // SVG elements have no `hidden` property; toggle the attribute itself
+    if (!a) { g.setAttribute("hidden", ""); return; }
+    g.removeAttribute("hidden");
+    g.querySelector("circle").setAttribute("fill", hsiColor(a.hsi));
+    g.querySelector("text").textContent = a.channel === "AUX_L" ? "AUX L" : "AUX R";
+    g.querySelector("title").textContent = `${a.channel}: ${hsiWord(a.hsi)} (derived from the signal, ${Math.round(a.std_uv)} µV)`;
   }
   function setArousal(p, a) {
     const est = p.el.querySelector(".est"), reason = p.el.querySelector(".reason");
@@ -161,6 +180,7 @@
     el.querySelector(".fact.since").textContent = d.since ? `sharing for ${fmtSince(d.since)}` : "";
     const aux = (d.aux || []).map(a => `${a.channel === "AUX_L" ? "AUX L" : "AUX R"} ${a.hsi === 1 ? "good" : a.hsi === 2 ? "ok" : "poor"} (derived, ${Math.round(a.std_uv)} µV)`);
     el.querySelector(".fact.auxq").textContent = aux.join(" · ");
+    setAux(p, d.aux);
   }
   setInterval(() => { for (const p of people.values()) if (p.device?.since) p.el.querySelector(".fact.since").textContent = `sharing for ${fmtSince(p.device.since)}`; }, 15000);
   function setImu(p, m) {

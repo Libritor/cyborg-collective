@@ -101,3 +101,8 @@ table.bandtable th:first-child, table.bandtable td:first-child { text-align: lef
 .moodlog { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 2px 0 6px; }
 .moodlog-label { font-size: 11px; color: var(--muted); }
 .moodlog-chip { font-size: 11px; padding: 2px 8px; border-radius: 10px; }
+
+/* the horseshoe: contact per electrode, as in the app */
+.horseshoe { width: 156px; height: 86px; display: block; margin: 6px 0 0; color: var(--ink); }
+.horseshoe text { font: 9px system-ui, sans-serif; fill: var(--muted); }
+.horseshoe .el[hidden] { display: none; }
