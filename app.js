@@ -187,7 +187,7 @@
     const el = p.el.querySelector(".imu"); el.hidden = false;
     // fixed-width numbers (always signed, two decimals) so the line never
     // changes length between updates
-    const f = v => (v == null ? "   —  " : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).padStart(5, " "));
+    const f = v => (v == null ? "   — " : ((v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2)).padStart(6, " "));
     const g = m.gyro || [], a = m.accel || [];
     el.textContent = `motion · gyro ${f(g[0])} ${f(g[1])} ${f(g[2])} °/s · accel ${f(a[0])} ${f(a[1])} ${f(a[2])} g`;
   }
