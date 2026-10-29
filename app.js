@@ -2,6 +2,41 @@
   "use strict";
   const CH = ["TP9", "AF7", "AF8", "TP10"];
   const BANDS = ["delta", "theta", "alpha", "beta", "gamma"];
+  // the app's palettes: EEG channels blue/red/green/orange, bands
+  // red/orange/green/blue/purple, axes X red / Y green / Z blue
+  const EEG_COLORS = ["#2196f3", "#f44336", "#4caf50", "#ff9800"];
+  const BAND_COLORS = ["#f44336", "#ff9800", "#4caf50", "#2196f3", "#9c27b0"];
+  const XYZ_COLORS = ["#f44336", "#4caf50", "#2196f3"];
+  const cssVar = n => getComputedStyle(document.body).getPropertyValue(n).trim();
+  function prepCanvas(cv, cssHeight) {
+    const dpr = devicePixelRatio || 1;
+    const W = cv.clientWidth || 300;
+    cv.width = Math.round(W * dpr); cv.height = Math.round(cssHeight * dpr);
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, cssHeight);
+    return { ctx, W, H: cssHeight };
+  }
+  // grid + axis labels the way the app's charts draw them
+  function axes(ctx, W, H, { left, bottom, yMin, yMax, yUnit, seconds, yTicks = 4, xTicks = 5 }) {
+    const grid = "rgba(128,128,128,0.2)", muted = cssVar("--muted") || "#888";
+    ctx.font = "9px system-ui, sans-serif"; ctx.fillStyle = muted; ctx.strokeStyle = grid; ctx.lineWidth = 1;
+    const pw = W - left - 4, ph = H - bottom - 4;
+    for (let i = 0; i <= yTicks; i++) {
+      const y = 4 + ph - ph * i / yTicks;
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(W - 4, y); ctx.stroke();
+      const v = yMin + (yMax - yMin) * i / yTicks;
+      ctx.textAlign = "right"; ctx.fillText(Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2), left - 3, y + 3);
+    }
+    for (let i = 0; i <= xTicks; i++) {
+      const x = left + pw * i / xTicks;
+      ctx.beginPath(); ctx.moveTo(x, 4); ctx.lineTo(x, 4 + ph); ctx.stroke();
+      ctx.textAlign = "center"; ctx.fillText(`${(-seconds + seconds * i / xTicks).toFixed(0)}`, x, H - 1);
+    }
+    ctx.textAlign = "left"; ctx.fillText(yUnit, 2, 10);
+    ctx.textAlign = "right"; ctx.fillText("s", W - 4, H - 1);
+    return { x0: left, y0: 4, pw, ph };
+  }
   const $ = id => document.getElementById(id);
 
   // ---------------- live: the Cyborg Collective relay ----------------
@@ -30,12 +65,19 @@
       <div class="reason"></div>
       <div class="hr"></div>
       <div class="checkin" hidden></div>
-      <canvas class="bands" height="70" hidden></canvas>
+      <div class="chart-title raw-title" hidden>EEG raw · last 10 s · µV
+        <span class="legend">${CH.map((c, i) => `<i style="background:${EEG_COLORS[i]}"></i>${c}`).join("")}</span></div>
+      <canvas class="raw" height="150" hidden></canvas>
+      <div class="chart-title bands-title" hidden>Band powers · relative · mean of channels in contact</div>
+      <canvas class="bands" height="96" hidden></canvas>
       <table class="bandtable" hidden><thead><tr><th>rel. power</th>${CH.map(c => `<th>${c}</th>`).join("")}</tr></thead>
         <tbody>${BANDS.map(b => `<tr data-band="${b}"><td>${b}</td>${CH.map(() => "<td>—</td>").join("")}</tr>`).join("")}</tbody></table>
+      <div class="chart-title imu-title" hidden>Motion</div>
       <div class="imu" hidden></div>
-      <div class="optics" hidden></div>
-      <canvas class="raw" height="70" hidden></canvas>`;
+      <div class="chart-title optics-title" hidden>Optics · last 20 s
+        <span class="legend"><i style="background:#ef5350"></i>730 nm<i style="background:#42a5f5"></i>850 nm</span></div>
+      <canvas class="optics-chart" height="90" hidden></canvas>
+      <div class="optics" hidden></div>`;
     el.querySelector(".name").textContent = p.pseudonym;
     el.querySelector(".tier").textContent = tierLabel(p.tier);
     el.querySelector(".dev").textContent = p.device || "";
@@ -206,14 +248,22 @@
     }
     el.textContent = parts.length ? `optics · ${parts.join(" · ")}` : "optics · no optical data on this model";
   }
+  // band powers as the app's bar chart: one bar per band in the app's
+  // colours, mean over the channels in contact, with the per-channel table
   function drawBands(p, b) {
     const cv = p.el.querySelector("canvas.bands"); cv.hidden = false;
-    const ctx = cv.getContext("2d");
-    const W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = 70 * devicePixelRatio;
-    ctx.clearRect(0, 0, W, H);
-    const colors = ["#6366f1", "#0ea5e9", "#16a34a", "#d97706", "#dc2626"];
-    const gw = W / BANDS.length;
+    p.el.querySelector(".bands-title").hidden = false;
+    const { ctx, W, H } = prepCanvas(cv, 96);
     const table = p.el.querySelector("table.bandtable"); table.hidden = false;
+    const left = 30, bottom = 14, pw = W - left - 4, ph = H - bottom - 6;
+    const yMax = 0.6;
+    ctx.font = "9px system-ui, sans-serif"; ctx.strokeStyle = "rgba(128,128,128,0.2)"; ctx.fillStyle = cssVar("--muted") || "#888";
+    for (let i = 0; i <= 3; i++) {
+      const y = 6 + ph - ph * i / 3;
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(W - 4, y); ctx.stroke();
+      ctx.textAlign = "right"; ctx.fillText(`${Math.round(yMax * 100 * i / 3)}%`, left - 3, y + 3);
+    }
+    const gw = pw / BANDS.length;
     BANDS.forEach((name, i) => {
       const vals = b.rel[name] || [];
       const nums = vals.filter(Number.isFinite); // null = channel without contact
@@ -227,29 +277,42 @@
           td.title = Number.isFinite(abs[k]) ? `absolute ${abs[k].toFixed(3)} (log10 µV²)` : "no contact";
         });
       }
-      const h = Math.max(2, mean * (H - 18 * devicePixelRatio));
-      ctx.fillStyle = colors[i];
-      ctx.fillRect(i * gw + gw * 0.2, H - 14 * devicePixelRatio - h, gw * 0.6, h);
-      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue("--muted");
-      ctx.font = `${10 * devicePixelRatio}px system-ui`; ctx.textAlign = "center";
-      ctx.fillText(`${name} ${(mean * 100).toFixed(0)}%`, i * gw + gw / 2, H - 3 * devicePixelRatio);
+      const h = Math.max(2, Math.min(1, mean / yMax) * ph);
+      const x = left + i * gw + gw * 0.2;
+      ctx.fillStyle = BAND_COLORS[i];
+      ctx.beginPath(); ctx.roundRect(x, 6 + ph - h, gw * 0.6, h, 3); ctx.fill();
+      ctx.fillStyle = cssVar("--ink") || "#333"; ctx.textAlign = "center";
+      ctx.fillText(`${(mean * 100).toFixed(0)}%`, x + gw * 0.3, 6 + ph - h - 3);
+      ctx.fillStyle = cssVar("--muted") || "#888";
+      ctx.fillText(name, x + gw * 0.3, H - 2);
     });
   }
+  // raw EEG as the app's chart: the four channels overlaid in their colours
+  // on one autoscaled µV axis, last 10 s
   function drawRaw(p, e) {
     const cv = p.el.querySelector("canvas.raw"); cv.hidden = false;
-    const maxLen = 256 * 4;
+    p.el.querySelector(".raw-title").hidden = false;
+    const maxLen = 256 * 10;
     e.x.forEach((arr, i) => { p.raw[i].push(...arr); if (p.raw[i].length > maxLen) p.raw[i].splice(0, p.raw[i].length - maxLen); });
-    const ctx = cv.getContext("2d");
-    const W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = 70 * devicePixelRatio;
-    ctx.clearRect(0, 0, W, H);
-    const laneH = H / 4;
+    const { ctx, W, H } = prepCanvas(cv, 150);
+    const all = p.raw.flat().filter(Number.isFinite);
+    if (all.length < 2) return;
+    // scale on the middle 98 % so one blink does not flatten everything
+    const sorted = all.slice().sort((a, b) => a - b);
+    let lo = sorted[Math.floor(sorted.length * 0.01)], hi = sorted[Math.ceil(sorted.length * 0.99) - 1];
+    if (hi - lo < 20) { const mid = (hi + lo) / 2; lo = mid - 10; hi = mid + 10; }
+    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const ax = axes(ctx, W, H, { left: 36, bottom: 12, yMin: lo, yMax: hi, yUnit: "µV", seconds: 10, yTicks: 4, xTicks: 5 });
     p.raw.forEach((arr, i) => {
       if (arr.length < 2) return;
-      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-      const sd = Math.sqrt(arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length) || 1;
-      ctx.beginPath(); ctx.strokeStyle = "#4f46e5"; ctx.lineWidth = devicePixelRatio;
-      arr.forEach((v, k) => { const x = k / maxLen * W, y = laneH * i + laneH / 2 - ((v - mean) / (4 * sd)) * laneH / 2; k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
-      ctx.stroke();
+      ctx.beginPath(); ctx.strokeStyle = EEG_COLORS[i]; ctx.lineWidth = 1; ctx.globalAlpha = 0.9;
+      const n = arr.length, offset = maxLen - n;
+      for (let k = 0; k < n; k++) {
+        const v = arr[k]; if (!Number.isFinite(v)) continue;
+        const x = ax.x0 + ax.pw * (offset + k) / maxLen, y = ax.y0 + ax.ph * (1 - (v - lo) / (hi - lo));
+        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke(); ctx.globalAlpha = 1;
     });
   }
   function aggregate(a) {
