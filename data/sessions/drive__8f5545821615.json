@@ -106,6 +106,6 @@
  "usable": true,
  "format": "muselog",
  "preview": "drive__8f5545821615.svg",
- "date_source": "recording",
- "date": "2026-10-27T16:00:45"
+ "date_source": "folder date (device clock disagreed)",
+ "date": "2025-10-18T16:00:45"
 }

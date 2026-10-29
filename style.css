@@ -84,6 +84,8 @@ footer ul { padding-left: 18px; }
 .mood .moodtext { font-size: 12px; color: var(--muted); }
 .checkin { font-size: 12px; color: var(--muted); margin-top: 6px; }
 table.checkins td { white-space: nowrap; }
+table.shares td { vertical-align: top; }
+table.shares .moodlog-chip { display: inline-block; margin: 1px 2px 1px 0; }
 
 /* the hidden attribute must win over the display rules above */
 [hidden] { display: none !important; }
