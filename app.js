@@ -738,7 +738,7 @@
   }
   async function load() {
     try {
-      const [idx, pj] = await Promise.all([fetch("data/index.json").then(r => r.json()), fetch("projects.json").then(r => r.json())]);
+      const [idx, pj] = await Promise.all([fetch("data/index.json", { cache: "no-store" }).then(r => r.json()), fetch("projects.json", { cache: "no-store" }).then(r => r.json())]);
       projects = pj.projects || []; sessions = idx.sessions || [];
       totals(sessions); months(sessions); renderProjects(sessions); render();
       $("built").textContent = `Catalogue built ${idx.built}. Sessions whose contact field was not streamed are judged by amplitude alone.`;
