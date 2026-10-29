@@ -644,7 +644,8 @@
 
   // ---------------- the record: past recordings ----------------
   const fmtDate = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
-  const monthKey = s => s.slice(0, 7);
+  const localIso = s => { const d = new Date(s); if (isNaN(d) || !/[Z+]|-\d{2}:\d{2}$/.test(String(s).slice(10))) return String(s); const p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; };
+  const monthKey = s => localIso(s).slice(0, 7);
   let projects = [], sessions = [], catalogued = [], streamed = [];
   // sessions people streamed and chose to keep: from the relay, else the deploy-time snapshot
   async function loadStreamed() {
@@ -666,15 +667,19 @@
     } catch {}
     return [];
   }
+  const utc = d => (typeof d === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(d)) ? d + "Z" : d;
   function tagStreamed(list, base) {
     for (const s of list) {
       s.source = "stream";
+      s.date = utc(s.date);
+      if (s.stream) s.stream.ended_at = utc(s.stream.ended_at);
+      for (const d of s.devices || []) { d.date = utc(d.date); d.start = utc(d.start); d.end = utc(d.end); }
       for (const d of s.devices || []) if (d.preview) d.preview_url = (base ? base + "/" : "") + "record/previews/" + d.preview;
     }
     return list;
   }
   function combine() {
-    sessions = [...catalogued, ...streamed].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    sessions = [...catalogued, ...streamed].sort((a, b) => localIso(a.date || "").localeCompare(localIso(b.date || "")));
   }
   async function reloadStreamed() {
     streamed = await loadStreamed();
@@ -771,7 +776,7 @@
     const minutes = list.reduce((n, s) => n + s.minutes, 0);
     const usable = list.filter(s => s.devices.some(d => d.usable)).length;
     const withPulse = list.filter(s => s.devices.some(d => d.pulse && d.pulse.valid >= 2)).length;
-    const first = list[0]?.date?.slice(0, 10) || "—", last = list[list.length - 1]?.date?.slice(0, 10) || "—";
+    const first = localIso(list[0]?.date || "").slice(0, 10) || "—", last = localIso(list[list.length - 1]?.date || "").slice(0, 10) || "—";
     $("totals").innerHTML = [
       [list.length, "recording sessions"], [devFiles, "headband files"], [(minutes / 60).toFixed(1), "hours recorded"],
       [usable, "sessions with usable EEG"], [withPulse, "sessions with a pulse"], [`${first} → ${last}`, "first to last"]
