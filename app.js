@@ -492,11 +492,16 @@
       case "eeg": drawRaw(ensure(msg), msg); break;
     }
   }
+  // the Collective's own relay, used when none is configured and none serves the page
+  const DEFAULT_RELAY = "wss://cyborg-collective-relay.onrender.com/live";
   function relayUrl() {
     const q = new URLSearchParams(location.search).get("relay");
     try {
       if (q) { localStorage.setItem("collective.relay", q); return q; }
-      return localStorage.getItem("collective.relay") || "";
+      const saved = localStorage.getItem("collective.relay") || "";
+      // a secure page cannot open an insecure socket: drop such a leftover
+      if (saved && location.protocol === "https:" && /^ws:/.test(saved)) { localStorage.removeItem("collective.relay"); return ""; }
+      return saved;
     } catch { return q || ""; }
   }
   // when the relay itself serves this page, its sockets live on the same origin
@@ -513,7 +518,7 @@
   async function connect() {
     let url = relayUrl();
     if (!url) url = await sameOriginRelay();
-    if (!url) { linkEl.textContent = "no relay configured on this page yet."; return; }
+    if (!url) url = DEFAULT_RELAY;
     let ws;
     try { ws = new WebSocket(url); } catch { linkEl.textContent = "relay address invalid."; return; }
     linkEl.textContent = "connecting to the relay…";
@@ -531,7 +536,7 @@
     const rows = $("checkin-rows"), note = $("checkin-note");
     if (!rows) return;
     let list = null, source = "";
-    const relay = relayUrl();
+    const relay = relayUrl() || DEFAULT_RELAY;
     const bases = [];
     if (/^https?:$/.test(location.protocol)) bases.push("checkins");
     if (relay) bases.push(relay.replace(/^ws/, "http").replace(/\/live\/?$/, "/checkins"));
@@ -582,7 +587,7 @@
     const rows = $("share-rows"), note = $("share-note");
     if (!rows) return;
     let list = null, source = "";
-    const relay = relayUrl();
+    const relay = relayUrl() || DEFAULT_RELAY;
     const bases = [];
     if (/^https?:$/.test(location.protocol)) bases.push("shares");
     if (relay) bases.push(relay.replace(/^ws/, "http").replace(/\/live\/?$/, "/shares"));
