@@ -17,7 +17,8 @@
     el.innerHTML = `
       <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier"></span><span class="badge dev"></span></h3>
       <div class="said"><span class="pseud" hidden></span><span class="chip activity" hidden></span></div>
-      <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><span class="moodtext"></span></div>
+      <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><div class="moodside"><span class="moodchip"></span><span class="moodtext"></span></div></div>
+      <div class="moodlog" hidden></div>
       <div class="facts"><span class="fact model"></span><span class="fact batt"></span><span class="fact since"></span><span class="fact auxq"></span></div>
       <div class="dots">${CH.map(c => `<div class="dot" data-ch="${c}"><i></i>${c}</div>`).join("")}</div>
       <div class="est"><b>—</b><small></small></div>
@@ -54,12 +55,24 @@
     if (m.activity) { act.textContent = m.activity; act.hidden = false; } else act.hidden = true;
     if (m.mood && m.mood.arousal) {
       mood.hidden = false;
-      drawMood(mood.querySelector("canvas"), m.mood.arousal, m.mood.valence);
+      const col = moodColor(m.mood.arousal, m.mood.valence);
+      drawMood(mood.querySelector("canvas"), m.mood.arousal, m.mood.valence, col);
+      const chip = mood.querySelector(".moodchip");
+      chip.textContent = m.mood.phrase || moodPhrase(m.mood.arousal, m.mood.valence);
+      chip.style.background = col; chip.style.color = moodInk(m.mood.arousal);
       mood.querySelector(".moodtext").textContent =
-        `self-rated mood · arousal ${m.mood.arousal}/9 · valence ${m.mood.valence}/9${m.mood.word ? ` · “${m.mood.word}”` : ""}`;
+        `self-rated · ${m.mood.valence}/9 pleasant · ${m.mood.arousal}/9 awake${m.mood.word ? ` · “${m.mood.word}”` : ""}`;
     } else mood.hidden = true;
+    if (Array.isArray(m.mood_history)) setMoodLog(p, m.mood_history);
   }
-  function drawMood(cv, arousal, valence) {
+  // words and colour for a grid position: valence (how pleasant) sets the hue
+  // red → green, arousal (how awake) sets the brightness dim → bright
+  const valenceWord = v => v <= 2 ? "rough" : v <= 4 ? "low" : v === 5 ? "okay" : v <= 7 ? "good" : "great";
+  const arousalWord = a => a <= 2 ? "sleepy" : a <= 4 ? "foggy" : a === 5 ? "steady" : a <= 7 ? "alert" : "wired";
+  const moodPhrase = (a, v) => `feeling ${valenceWord(v)} and ${arousalWord(a)}`;
+  const moodColor = (a, v) => `hsl(${Math.round((v - 1) / 8 * 130)} 65% ${Math.round(30 + (a - 1) / 8 * 25)}%)`;
+  const moodInk = a => (a >= 6 ? "#111" : "#fff");
+  function drawMood(cv, arousal, valence, col) {
     const s = cv.width, ctx = cv.getContext("2d"), cell = s / 9;
     ctx.clearRect(0, 0, s, s);
     ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--line") || "#ccc";
@@ -68,8 +81,23 @@
       ctx.beginPath(); ctx.moveTo(i * cell + 0.5, 0); ctx.lineTo(i * cell + 0.5, s); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, i * cell + 0.5); ctx.lineTo(s, i * cell + 0.5); ctx.stroke();
     }
-    ctx.fillStyle = "#4f46e5";
+    ctx.fillStyle = col || "#4f46e5";
     ctx.fillRect((valence - 1) * cell + 1, (9 - arousal) * cell + 1, cell - 1, cell - 1);
+  }
+  // every mood the person stated during this share, as coloured chips with the time
+  function setMoodLog(p, history) {
+    const el = p.el.querySelector(".moodlog");
+    if (!history || history.length < 2) { el.hidden = true; return; }
+    el.hidden = false; el.innerHTML = "";
+    const lab = document.createElement("span"); lab.className = "moodlog-label"; lab.textContent = "mood log:"; el.appendChild(lab);
+    for (const h of history.slice(-12)) {
+      const c = document.createElement("span");
+      c.className = "moodlog-chip";
+      c.style.background = moodColor(h.arousal, h.valence); c.style.color = moodInk(h.arousal);
+      const t = h.ts ? new Date(h.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+      c.textContent = `${t} ${h.phrase || moodPhrase(h.arousal, h.valence)}${h.word ? ` “${h.word}”` : ""}`;
+      el.appendChild(c);
+    }
   }
   function fmtCheckin(c) {
     const r = c.self_rating, parts = [];
