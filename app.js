@@ -173,6 +173,7 @@
   const hsiColor = v => (v === 1 ? "#16a34a" : v === 2 ? "#d97706" : v == null ? "#9ca3af" : "#dc2626");
   const hsiWord = v => (v === 1 ? "good" : v === 2 ? "ok" : v == null ? "no data" : "poor");
   function setQuality(p, q) {
+    p.hsi = q.hsi || null;
     for (const c of CH) {
       const g = p.el.querySelector(`.horseshoe .el[data-ch="${c}"]`);
       const v = q.hsi ? q.hsi[c] : undefined;
@@ -328,7 +329,11 @@
     const maxLen = 256 * 10;
     e.x.forEach((arr, i) => { p.raw[i].push(...arr); if (p.raw[i].length > maxLen) p.raw[i].splice(0, p.raw[i].length - maxLen); });
     const { ctx, W, H } = prepCanvas(cv, 150);
-    const all = p.raw.flat().filter(Number.isFinite);
+    // scale on the channels in contact; a channel off the scalp sits near a
+    // rail and would squash the others, so it is drawn dimmed instead
+    const inContact = CH.map(c => !p.hsi || p.hsi[c] == null || p.hsi[c] <= 2);
+    const pool = p.raw.filter((_, i) => inContact[i]);
+    const all = (pool.length ? pool : p.raw).flat().filter(Number.isFinite);
     if (all.length < 2) return;
     // scale on the middle 98 % so one blink does not flatten everything
     const sorted = all.slice().sort((a, b) => a - b);
@@ -338,7 +343,7 @@
     const ax = axes(ctx, W, H, { left: 36, bottom: 12, yMin: lo, yMax: hi, yUnit: "µV", seconds: 10, yTicks: 4, xTicks: 5 });
     p.raw.forEach((arr, i) => {
       if (arr.length < 2) return;
-      ctx.beginPath(); ctx.strokeStyle = EEG_COLORS[i]; ctx.lineWidth = 1; ctx.globalAlpha = 0.9;
+      ctx.beginPath(); ctx.strokeStyle = EEG_COLORS[i]; ctx.lineWidth = 1; ctx.globalAlpha = inContact[i] ? 0.9 : 0.3;
       const n = arr.length, offset = maxLen - n;
       for (let k = 0; k < n; k++) {
         const v = arr[k]; if (!Number.isFinite(v)) continue;
