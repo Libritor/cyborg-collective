@@ -65,7 +65,7 @@
       <div class="reason"></div>
       <div class="hr"></div>
       <div class="checkin" hidden></div>
-      <div class="chart-title raw-title" hidden>EEG raw · last 10 s · µV
+      <div class="chart-title raw-title" hidden>EEG · last 10 s · band-passed 0.7–35 Hz · one lane per channel
         <span class="legend">${CH.map((c, i) => `<i style="background:${EEG_COLORS[i]}"></i>${c}`).join("")}</span></div>
       <canvas class="raw" height="150" hidden></canvas>
       <div class="chart-title bands-title" hidden>Band powers · relative · mean of channels in contact</div>
@@ -321,34 +321,86 @@
       ctx.fillText(name, x + gw * 0.3, H - 2);
     });
   }
-  // raw EEG as the app's chart: the four channels overlaid in their colours
-  // on one autoscaled µV axis, last 10 s
+  // raw EEG drawn like a clinical strip: each channel in its own lane in its
+  // colour, band-passed 0.7–35 Hz so drift and mains noise do not bury the
+  // rhythms, one min/max column per pixel so nothing aliases, one µV scale
+  // shared by the lanes, last 10 s. A channel off the scalp is dimmed.
+  const FS = 256, EEG_SECONDS = 10;
+  function biquad(type, fc, fs, q = Math.SQRT1_2) {
+    const w = 2 * Math.PI * fc / fs, cw = Math.cos(w), sw = Math.sin(w), al = sw / (2 * q);
+    const a0 = 1 + al, a1 = -2 * cw, a2 = 1 - al;
+    let b0, b1, b2;
+    if (type === "hp") { b0 = (1 + cw) / 2; b1 = -(1 + cw); b2 = (1 + cw) / 2; }
+    else { b0 = (1 - cw) / 2; b1 = 1 - cw; b2 = (1 - cw) / 2; }
+    return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0, x1: 0, x2: 0, y1: 0, y2: 0 };
+  }
+  function runBiquad(f, x) {
+    const y = f.b0 * x + f.b1 * f.x1 + f.b2 * f.x2 - f.a1 * f.y1 - f.a2 * f.y2;
+    f.x2 = f.x1; f.x1 = x; f.y2 = f.y1; f.y1 = y;
+    return y;
+  }
   function drawRaw(p, e) {
     const cv = p.el.querySelector("canvas.raw"); cv.hidden = false;
     p.el.querySelector(".raw-title").hidden = false;
-    const maxLen = 256 * 10;
-    e.x.forEach((arr, i) => { p.raw[i].push(...arr); if (p.raw[i].length > maxLen) p.raw[i].splice(0, p.raw[i].length - maxLen); });
-    const { ctx, W, H } = prepCanvas(cv, 150);
-    // scale on the channels in contact; a channel off the scalp sits near a
-    // rail and would squash the others, so it is drawn dimmed instead
+    const maxLen = FS * EEG_SECONDS;
+    p.filt = p.filt || CH.map(() => ({ hp: biquad("hp", 0.7, FS), lp: biquad("lp", 35, FS), primed: false }));
+    e.x.forEach((arr, i) => {
+      const f = p.filt[i];
+      for (const v of arr) {
+        if (!Number.isFinite(v)) { p.raw[i].push(NaN); continue; }
+        if (!f.primed) { f.hp.x1 = f.hp.x2 = v; f.primed = true; } // start the high-pass at the signal's level
+        p.raw[i].push(runBiquad(f.lp, runBiquad(f.hp, v)));
+      }
+      if (p.raw[i].length > maxLen) p.raw[i].splice(0, p.raw[i].length - maxLen);
+    });
+
+    const { ctx, W, H } = prepCanvas(cv, 200);
+    const left = 44, right = 8, bottom = 12, pw = W - left - right, laneH = (H - bottom) / CH.length;
     const inContact = CH.map(c => !p.hsi || p.hsi[c] == null || p.hsi[c] <= 2);
-    const pool = p.raw.filter((_, i) => inContact[i]);
-    const all = (pool.length ? pool : p.raw).flat().filter(Number.isFinite);
-    if (all.length < 2) return;
-    // scale on the middle 98 % so one blink does not flatten everything
-    const sorted = all.slice().sort((a, b) => a - b);
-    let lo = sorted[Math.floor(sorted.length * 0.01)], hi = sorted[Math.ceil(sorted.length * 0.99) - 1];
-    if (hi - lo < 20) { const mid = (hi + lo) / 2; lo = mid - 10; hi = mid + 10; }
-    const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
-    const ax = axes(ctx, W, H, { left: 36, bottom: 12, yMin: lo, yMax: hi, yUnit: "µV", seconds: 10, yTicks: 4, xTicks: 5 });
+    // one scale for every lane: the 95th percentile of |x| over the last 5 s
+    // of the channels in contact, so a blink does not rescale the strip
+    const spreads = p.raw.map((arr, i) => {
+      if (!inContact[i]) return null;
+      const v = arr.slice(-FS * 5).filter(Number.isFinite).map(Math.abs).sort((a, b) => a - b);
+      return v.length < 50 ? null : v[Math.floor(v.length * 0.95)];
+    }).filter(x => x != null);
+    const A = Math.max(20, spreads.length ? Math.max(...spreads) * 1.25 : 50); // half-range per lane, µV
+
+    const grid = "rgba(128,128,128,0.2)", muted = cssVar("--muted") || "#888";
+    ctx.font = "9px system-ui, sans-serif"; ctx.strokeStyle = grid; ctx.lineWidth = 1;
+    for (let s = 0; s <= EEG_SECONDS; s += 2) {
+      const x = left + pw * s / EEG_SECONDS;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H - bottom); ctx.stroke();
+      ctx.fillStyle = muted; ctx.textAlign = "center"; ctx.fillText(`${s - EEG_SECONDS}`, x, H - 2);
+    }
+    ctx.textAlign = "right"; ctx.fillText("s", W - 1, H - 2);
+    CH.forEach((c, i) => {
+      const top = i * laneH, mid = top + laneH / 2;
+      ctx.strokeStyle = grid; ctx.beginPath(); ctx.moveTo(left, top + laneH); ctx.lineTo(W - right, top + laneH); ctx.stroke();
+      ctx.fillStyle = EEG_COLORS[i]; ctx.textAlign = "right"; ctx.font = "bold 10px system-ui, sans-serif";
+      ctx.fillText(c, left - 6, mid + 3);
+      ctx.font = "9px system-ui, sans-serif"; ctx.fillStyle = muted;
+      ctx.fillText(`±${A.toFixed(0)}`, left - 6, mid + 13);
+      if (i === 0) { ctx.textAlign = "left"; ctx.fillText("µV, 0.7–35 Hz", left + 3, 9); }
+      if (!inContact[i]) { ctx.textAlign = "left"; ctx.fillStyle = muted; ctx.fillText("no contact", left + 3, mid - laneH / 2 + 9 + (i === 0 ? 10 : 0)); }
+    });
+
+    const cols = Math.max(1, Math.floor(pw));
     p.raw.forEach((arr, i) => {
-      if (arr.length < 2) return;
-      ctx.beginPath(); ctx.strokeStyle = EEG_COLORS[i]; ctx.lineWidth = 1; ctx.globalAlpha = inContact[i] ? 0.9 : 0.3;
-      const n = arr.length, offset = maxLen - n;
-      for (let k = 0; k < n; k++) {
-        const v = arr[k]; if (!Number.isFinite(v)) continue;
-        const x = ax.x0 + ax.pw * (offset + k) / maxLen, y = ax.y0 + ax.ph * (1 - (v - lo) / (hi - lo));
-        k ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      const n = arr.length; if (n < 2) return;
+      const top = i * laneH, mid = top + laneH / 2, amp = laneH / 2 - 3, offset = maxLen - n;
+      ctx.beginPath(); ctx.strokeStyle = EEG_COLORS[i]; ctx.lineWidth = 1; ctx.globalAlpha = inContact[i] ? 0.95 : 0.25;
+      let prevMax = null;
+      for (let px = 0; px < cols; px++) {
+        const s0 = Math.floor(px * maxLen / cols) - offset, s1 = Math.max(s0 + 1, Math.floor((px + 1) * maxLen / cols) - offset);
+        let lo = Infinity, hi = -Infinity;
+        for (let k = Math.max(0, s0); k < Math.min(n, s1); k++) { const v = arr[k]; if (v < lo) lo = v; if (v > hi) hi = v; }
+        if (!Number.isFinite(lo)) { prevMax = null; continue; }
+        const x = left + px + 0.5;
+        const yHi = mid - Math.max(-1, Math.min(1, hi / A)) * amp, yLo = mid - Math.max(-1, Math.min(1, lo / A)) * amp;
+        if (prevMax === null) ctx.moveTo(x, yHi); else ctx.lineTo(x, yHi);
+        ctx.lineTo(x, yLo);
+        prevMax = yLo;
       }
       ctx.stroke(); ctx.globalAlpha = 1;
     });
