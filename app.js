@@ -185,9 +185,11 @@
   setInterval(() => { for (const p of people.values()) if (p.device?.since) p.el.querySelector(".fact.since").textContent = `sharing for ${fmtSince(p.device.since)}`; }, 15000);
   function setImu(p, m) {
     const el = p.el.querySelector(".imu"); el.hidden = false;
-    const f = v => (v == null ? "—" : v.toFixed(2));
+    // fixed-width numbers (always signed, two decimals) so the line never
+    // changes length between updates
+    const f = v => (v == null ? "   —  " : (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2).padStart(5, " "));
     const g = m.gyro || [], a = m.accel || [];
-    el.textContent = `motion · gyro ${f(g[0])} / ${f(g[1])} / ${f(g[2])} °/s · accel ${f(a[0])} / ${f(a[1])} / ${f(a[2])} g`;
+    el.textContent = `motion · gyro ${f(g[0])} ${f(g[1])} ${f(g[2])} °/s · accel ${f(a[0])} ${f(a[1])} ${f(a[2])} g`;
   }
   function setOptics(p, o) {
     const el = p.el.querySelector(".optics"); el.hidden = false;
@@ -251,6 +253,9 @@
     });
   }
   function aggregate(a) {
+    // the relay served this page with a stamp of its script and stylesheet;
+    // when the relay reports a different one, the page has changed: reload
+    if (window.ASSET_V && a.asset_v && a.asset_v !== window.ASSET_V) { location.reload(); return; }
     $("n").textContent = a.n;
     $("usable").textContent = a.n ? `${a.usable_n} / ${a.n}` : "—";
     $("alpha").textContent = a.rel_alpha_mean == null ? "—" : (a.rel_alpha_mean * 100).toFixed(0) + "%";

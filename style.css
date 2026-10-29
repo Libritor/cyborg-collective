@@ -34,7 +34,7 @@ section > .sub { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
 .tile b { display: block; font-size: 22px; }
 .tile span { color: var(--muted); font-size: 12px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
 .empty { color: var(--muted); padding: 18px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); margin-left: 6px; vertical-align: middle; }
 .dots { display: flex; gap: 10px; margin: 8px 0; font-size: 12px; color: var(--muted); }
@@ -106,3 +106,7 @@ table.bandtable th:first-child, table.bandtable td:first-child { text-align: lef
 .horseshoe { width: 156px; height: 86px; display: block; margin: 6px 0 0; color: var(--ink); }
 .horseshoe text { font: 9px system-ui, sans-serif; fill: var(--muted); }
 .horseshoe .el[hidden] { display: none; }
+
+/* one line each, always: the numbers are fixed width */
+.imu, .optics, .hr { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.imu { font-variant-numeric: tabular-nums; letter-spacing: 0; }
