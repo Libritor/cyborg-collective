@@ -611,7 +611,8 @@
     const fmtLen = s => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
     for (const s of list) {
       const tr = document.createElement("tr");
-      const when = s.started_at ? new Date(s.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      // the relay stamps in UTC; rows kept before it said so carry no offset
+      const when = s.started_at ? new Date(utc(s.started_at)).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
       const cells = [
         when, s.name || s.pseudonym || "", s.activity || "", fmtLen(s.duration_s || 0), tierLabel(s.tier),
       ];
