@@ -86,3 +86,11 @@ table.checkins td { white-space: nowrap; }
 
 /* the hidden attribute must win over the display rules above */
 [hidden] { display: none !important; }
+
+/* facts about the kit, per-channel band table, motion and optics lines */
+.facts { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
+.facts .fact:empty { display: none; }
+table.bandtable { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 4px; font-variant-numeric: tabular-nums; }
+table.bandtable th, table.bandtable td { padding: 1px 4px; text-align: right; border: 0; }
+table.bandtable th:first-child, table.bandtable td:first-child { text-align: left; color: var(--muted); font-weight: 500; }
+.imu, .optics { font-size: 12px; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }

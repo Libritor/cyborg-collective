@@ -18,12 +18,17 @@
       <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier"></span><span class="badge dev"></span></h3>
       <div class="said"><span class="pseud" hidden></span><span class="chip activity" hidden></span></div>
       <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><span class="moodtext"></span></div>
+      <div class="facts"><span class="fact model"></span><span class="fact batt"></span><span class="fact since"></span><span class="fact auxq"></span></div>
       <div class="dots">${CH.map(c => `<div class="dot" data-ch="${c}"><i></i>${c}</div>`).join("")}</div>
       <div class="est"><b>—</b><small></small></div>
       <div class="reason"></div>
       <div class="hr"></div>
       <div class="checkin" hidden></div>
       <canvas class="bands" height="70" hidden></canvas>
+      <table class="bandtable" hidden><thead><tr><th>rel. power</th>${CH.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>${BANDS.map(b => `<tr data-band="${b}"><td>${b}</td>${CH.map(() => "<td>—</td>").join("")}</tr>`).join("")}</tbody></table>
+      <div class="imu" hidden></div>
+      <div class="optics" hidden></div>
       <canvas class="raw" height="70" hidden></canvas>`;
     el.querySelector(".name").textContent = p.pseudonym;
     el.querySelector(".tier").textContent = tierLabel(p.tier);
@@ -111,8 +116,45 @@
   }
   function setHr(p, h) {
     p.el.querySelector(".hr").textContent = h.ok
-      ? `♥ ${Math.round(h.bpm)} bpm · RMSSD ${Math.round(h.rmssd_ms)} ms · ${h.source}`
-      : `♥ detecting beats (${h.beats} found, ${h.source})`;
+      ? `♥ ${Math.round(h.bpm)} bpm · RMSSD ${Math.round(h.rmssd_ms)} ms · SDNN ${Math.round(h.sdnn_ms)} ms · ${h.beats} beats/10 s · from ${h.source}`
+      : `♥ detecting beats (${h.beats} found in 10 s, need 6) · from ${h.source}`;
+  }
+  function fmtSince(ms) {
+    const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+    return s < 60 ? `${s} s` : s < 3600 ? `${Math.floor(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+  }
+  // facts about the kit: model, battery, how long the window has been open,
+  // and the aux electrode's signal-derived quality when one is plugged in
+  function setDevice(p, d) {
+    p.device = d;
+    const el = p.el;
+    el.querySelector(".fact.model").textContent = d.model ? d.model : "";
+    el.querySelector(".fact.batt").textContent = d.battery == null ? "" : `battery ${d.battery}%`;
+    el.querySelector(".fact.since").textContent = d.since ? `sharing for ${fmtSince(d.since)}` : "";
+    const aux = (d.aux || []).map(a => `${a.channel === "AUX_L" ? "AUX L" : "AUX R"} ${a.hsi === 1 ? "good" : a.hsi === 2 ? "ok" : "poor"} (derived, ${Math.round(a.std_uv)} µV)`);
+    el.querySelector(".fact.auxq").textContent = aux.join(" · ");
+  }
+  setInterval(() => { for (const p of people.values()) if (p.device?.since) p.el.querySelector(".fact.since").textContent = `sharing for ${fmtSince(p.device.since)}`; }, 15000);
+  function setImu(p, m) {
+    const el = p.el.querySelector(".imu"); el.hidden = false;
+    const f = v => (v == null ? "—" : v.toFixed(2));
+    const g = m.gyro || [], a = m.accel || [];
+    el.textContent = `motion · gyro ${f(g[0])} / ${f(g[1])} / ${f(g[2])} °/s · accel ${f(a[0])} / ${f(a[1])} / ${f(a[2])} g`;
+  }
+  function setOptics(p, o) {
+    const el = p.el.querySelector(".optics"); el.hidden = false;
+    const parts = [];
+    if (o.sites) {
+      const names = { left_outer: "L out", left_inner: "L in", right_inner: "R in", right_outer: "R out" };
+      for (const [k, v] of Object.entries(o.sites)) {
+        if (v && v.ratio != null) parts.push(`${names[k] || k} 850/730 ${v.ratio.toFixed(3)}`);
+      }
+    }
+    if (o.ppg) {
+      const pp = Object.entries(o.ppg).filter(([, v]) => v != null).map(([k, v]) => `${k} ${Math.round(v)}`);
+      if (pp.length) parts.push(`PPG ${pp.join(" · ")}`);
+    }
+    el.textContent = parts.length ? `optics · ${parts.join(" · ")}` : "optics · no optical data on this model";
   }
   function drawBands(p, b) {
     const cv = p.el.querySelector("canvas.bands"); cv.hidden = false;
@@ -121,10 +163,20 @@
     ctx.clearRect(0, 0, W, H);
     const colors = ["#6366f1", "#0ea5e9", "#16a34a", "#d97706", "#dc2626"];
     const gw = W / BANDS.length;
+    const table = p.el.querySelector("table.bandtable"); table.hidden = false;
     BANDS.forEach((name, i) => {
       const vals = b.rel[name] || [];
       const nums = vals.filter(Number.isFinite); // null = channel without contact
       const mean = nums.length ? nums.reduce((x, y) => x + y, 0) / nums.length : 0;
+      const row = table.querySelector(`tr[data-band="${name}"]`);
+      if (row) {
+        const abs = (b.abs && b.abs[name]) || [];
+        CH.forEach((_, k) => {
+          const td = row.children[k + 1];
+          td.textContent = Number.isFinite(vals[k]) ? `${Math.round(vals[k] * 100)}%` : "—";
+          td.title = Number.isFinite(abs[k]) ? `absolute ${abs[k].toFixed(3)} (log10 µV²)` : "no contact";
+        });
+      }
       const h = Math.max(2, mean * (H - 18 * devicePixelRatio));
       ctx.fillStyle = colors[i];
       ctx.fillRect(i * gw + gw * 0.2, H - 14 * devicePixelRatio - h, gw * 0.6, h);
@@ -162,15 +214,21 @@
         for (const p of msg.people) {
           const q = ensure(p);
           setProfile(q, p);
+          if (p.last?.device) setDevice(q, p.last.device);
           if (p.last?.quality) setQuality(q, p.last.quality);
           if (p.last?.arousal) setArousal(q, p.last.arousal);
           if (p.last?.hr) setHr(q, p.last.hr);
           if (p.last?.bands) drawBands(q, p.last.bands);
+          if (p.last?.imu) setImu(q, p.last.imu);
+          if (p.last?.optics) setOptics(q, p.last.optics);
           if (p.last?.checkin) setCheckin(q, p.last.checkin);
         }
         break;
       case "join": case "presence": ensure(msg); break;
       case "profile": setProfile(ensure(msg), msg); break;
+      case "device": setDevice(ensure(msg), msg); break;
+      case "imu": setImu(ensure(msg), msg); break;
+      case "optics": setOptics(ensure(msg), msg); break;
       case "checkin": setCheckin(ensure(msg), msg); if (msg.publish) loadCheckins(); break;
       case "checkins_changed": loadCheckins(); break;
       case "leave": remove(msg.pseudonym); break;
