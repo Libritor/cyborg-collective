@@ -89,6 +89,6 @@
  "usable": true,
  "format": "muselog",
  "preview": "drive__729130c7fed0.svg",
- "date_source": "recording",
- "date": "2026-02-14T18:21:55.282000"
+ "date_source": "name (device clock disagreed)",
+ "date": "2026-02-22T18:21:55"
 }
