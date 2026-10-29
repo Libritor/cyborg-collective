@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1793256579">
+<link rel="stylesheet" href="style.css?v=1793257278">
 </head>
 <body>
 <header class="top">
@@ -28,12 +28,12 @@
   </div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty">Nobody is sharing right now. The record below is always here.</div>
-  <p class="status more">The relay keeps nothing of the signal; this page shows what arrives while the tab is open. A summary of a share (when, how long, activity, moods stated, summary numbers) is kept only when the person left that switch on, and is listed under The record below. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. This page listens to the Collective's relay (<code>cyborg-collective-relay.onrender.com</code>); to point it at another, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
+  <p class="status more">The relay keeps nothing of the signal unless the person left “keep this share” on in the app; then what they streamed, at the tier they chose, is kept and listed under The record below with its summary (when, how long, activity, moods stated, contact, bands, pulse), and they can remove it from their phone. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. This page listens to the Collective's relay (<code>cyborg-collective-relay.onrender.com</code>); to point it at another, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
 </section>
 
 <section id="record">
   <h2>The record</h2>
-  <p class="sub">Every recording the phone's recorder has made, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner.</p>
+  <p class="sub">Every recording the phone's recorder has made, and every live share a person chose to keep, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner, or, for a kept share, with the relay until the person removes it.</p>
   <div class="tiles" id="totals"></div>
   <div class="card">
     <div class="bars" id="months"></div>
@@ -75,9 +75,9 @@
   <ul>
     <li>Live: when fewer than 3 of 4 electrodes are in contact the app sends <i>no claim</i>, and that is what is shown.</li>
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
-    <li>The relay keeps no signal. It keeps a share's log and published check-ins only when the person chose so, and either can be removed from their phone. Raw recordings stay with the person who made them.</li>
+    <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
   </ul>
 </footer>
-<script src="app.js?v=1793256579"></script>
+<script src="app.js?v=1793257278"></script>
 </body>
 </html>

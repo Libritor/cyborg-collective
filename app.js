@@ -483,6 +483,7 @@
       case "checkin": setCheckin(ensure(msg), msg); if (msg.publish) loadCheckins(); break;
       case "checkins_changed": loadCheckins(); break;
       case "shares_changed": loadShares(); break;
+      case "record_changed": reloadStreamed(); break;
       case "leave": remove(msg.pseudonym); break;
       case "aggregate": aggregate(msg); break;
       case "quality": setQuality(ensure(msg), msg); break;
@@ -644,7 +645,41 @@
   // ---------------- the record: past recordings ----------------
   const fmtDate = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
   const monthKey = s => s.slice(0, 7);
-  let projects = [], sessions = [];
+  let projects = [], sessions = [], catalogued = [], streamed = [];
+  // sessions people streamed and chose to keep: from the relay, else the deploy-time snapshot
+  async function loadStreamed() {
+    const relay = relayUrl() || DEFAULT_RELAY;
+    const bases = [];
+    if (/^https?:$/.test(location.protocol)) bases.push("record");
+    bases.push(relay.replace(/^ws/, "http").replace(/\/live\/?$/, "/record"));
+    for (const b of bases) {
+      try {
+        const r = await fetch(b, { cache: "no-store" });
+        if (!r.ok) continue;
+        const j = await r.json();
+        if (Array.isArray(j.sessions)) return tagStreamed(j.sessions, b.replace(/\/?record$/, ""));
+      } catch {}
+    }
+    try {
+      const r = await fetch("data/record.json", { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); return tagStreamed(j.sessions || [], (j.relay ? "https://" + j.relay : "")); }
+    } catch {}
+    return [];
+  }
+  function tagStreamed(list, base) {
+    for (const s of list) {
+      s.source = "stream";
+      for (const d of s.devices || []) if (d.preview) d.preview_url = (base ? base + "/" : "") + "record/previews/" + d.preview;
+    }
+    return list;
+  }
+  function combine() {
+    sessions = [...catalogued, ...streamed].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  }
+  async function reloadStreamed() {
+    streamed = await loadStreamed();
+    combine(); buildRecord();
+  }
   function projectOf(dateIso) {
     const d = (dateIso || "").slice(0, 10);
     for (const p of projects) { if (p.stamps && p.stamps.includes(d)) return p; }
@@ -655,7 +690,12 @@
   function projectFor(s) {
     if (s.project_folder) {
       let p = projects.find(x => x.id === "folder:" + s.project_folder);
-      if (!p) { p = { id: "folder:" + s.project_folder, name: s.project_folder, folder: true, from: "", to: "", summary: "A shared folder of the lab's recordings, catalogued as found; participant names replaced by pseudonyms.", links: [] }; projects.push(p); }
+      if (!p) {
+        const summary = s.source === "stream"
+          ? "Sessions people streamed to the Collective and chose to keep, at the tier they shared; each can be removed from their phone."
+          : "A shared folder of the lab's recordings, catalogued as found; participant names replaced by pseudonyms.";
+        p = { id: "folder:" + s.project_folder, name: s.project_folder, folder: true, from: "", to: "", summary, links: [] }; projects.push(p);
+      }
       return p;
     }
     return projectOf(s.date);
@@ -680,8 +720,9 @@
       const cf = best ? cleanFrac(best) : null;
       const pulse = devs.map(d => d.pulse).find(x => x && x.valid >= 2);
       const tr = document.createElement("tr"); tr.className = "row";
+      const who = s.source === "stream" ? `${escapeHtml(s.stream?.name || s.stream?.pseudonym || "someone")} · ` : "";
       tr.innerHTML = `<td>${fmtDate(s.date)}</td><td>${p ? p.name : "<span class='status'>untagged</span>"}</td>
-        <td>${s.minutes}</td><td>${devs.map(d => d.tag).join(", ")}${best && !best.hsi_streamed ? "<span class='badge'>no contact field</span>" : ""}</td>
+        <td>${s.minutes}</td><td>${who}${devs.map(d => d.tag).join(", ")}${s.source === "stream" ? `<span class='badge'>streamed · ${tierLabel(s.stream?.tier)}</span>` : ""}${best && !best.hsi_streamed ? "<span class='badge'>no contact field</span>" : ""}</td>
         <td>${cf == null ? "—" : `<span class="q"><i style="width:${Math.round(cf * 100)}%"></i></span> ${Math.round(cf * 100)}%`}</td>
         <td>${pulse ? `${Math.round(pulse.bpm_mean)} bpm` : "—"}</td>`;
       tr.onclick = () => toggleDetail(tr, s, devs);
@@ -706,9 +747,12 @@
       if (dev.pulse) kv.push(["pulse", `${dev.pulse.bpm_mean.toFixed(0)} ± ${(dev.pulse.bpm_sd ?? 0).toFixed(0)} bpm on ${dev.pulse.valid}/${dev.pulse.windows} windows (${dev.pulse.channel})`]);
       if (dev.gyro_rms != null) kv.push(["head rotation (gyro rms)", dev.gyro_rms.toFixed(0)]);
       if (dev.battery) kv.push(["battery", `${dev.battery[0]}% → ${dev.battery[1]}%`]);
-      const prev = dev.preview ? `<img class="preview" src="data/previews/${dev.preview}" alt="band powers and clean-epoch mask over time">` : "";
+      if (dev.estimate && dev.estimate.windows) kv.push(["activation estimate", dev.estimate.mean != null ? `${Math.round(dev.estimate.mean * 100)}% over ${Math.round((dev.estimate.usable_fraction || 0) * 100)}% usable windows` : `no claim (${Math.round((dev.estimate.usable_fraction || 0) * 100)}% usable)`]);
+      if (dev.truncated) kv.push(["kept", "the capture reached its size limit; the summary covers what was kept"]);
+      const prev = dev.preview ? `<img class="preview" src="${dev.preview_url || `data/previews/${dev.preview}`}" alt="band powers and contact over time">` : "";
       return `<div style="margin:6px 0 12px"><b>${dev.tag}</b> <span class="status">${dev.file}</span><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;margin-top:6px">${prev}<div class="kv">${kv.map(([k, v]) => `<div><b>${k}</b><br>${v}</div>`).join("")}</div></div></div>`;
-    }).join("") + (s.manifest ? `<div class="status">manifest: participant ${s.manifest.participant ?? "—"}, consent ${s.manifest.consent ?? "—"}${s.events != null ? `, ${s.events} events` : ""}</div>` : "");
+    }).join("") + (s.manifest ? `<div class="status">manifest: participant ${s.manifest.participant ?? "—"}, consent ${s.manifest.consent ?? "—"}${s.events != null ? `, ${s.events} events` : ""}</div>` : "")
+      + (s.source === "stream" ? `<div class="status">streamed live by ${escapeHtml(s.stream?.name || s.stream?.pseudonym || "someone")} at the ${tierLabel(s.stream?.tier)} tier${s.stream?.activity ? ` while ${escapeHtml(s.stream.activity)}` : ""}; ${(s.stream?.mood_history || []).length} mood${(s.stream?.mood_history || []).length === 1 ? "" : "s"} stated; ended: ${escapeHtml(s.stream?.reason || "")}. Kept at the person's choice; they can remove it from their phone.</div>` : "");
     d.appendChild(td);
     tr.after(d);
   }
@@ -733,6 +777,12 @@
       [usable, "sessions with usable EEG"], [withPulse, "sessions with a pulse"], [`${first} → ${last}`, "first to last"]
     ].map(([b, s]) => `<div class="tile"><b>${b}</b><span>${s}</span></div>`).join("");
   }
+  function escapeHtml(v) { return String(v).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+  // (re)build totals, the month bars, the filters and the rows from `sessions`
+  function buildRecord() {
+    for (const id of ["f-project", "f-month"]) { const sel = $(id); while (sel.options.length > 1) sel.remove(1); }
+    totals(sessions); months(sessions); renderProjects(sessions); render();
+  }
   function renderProjects(list) {
     const fp = $("f-project");
     for (const s of list) projectFor(s);          // registers the folder projects
@@ -743,9 +793,9 @@
   }
   async function load() {
     try {
-      const [idx, pj] = await Promise.all([fetch("data/index.json", { cache: "no-store" }).then(r => r.json()), fetch("projects.json", { cache: "no-store" }).then(r => r.json())]);
-      projects = pj.projects || []; sessions = idx.sessions || [];
-      totals(sessions); months(sessions); renderProjects(sessions); render();
+      const [idx, pj, st] = await Promise.all([fetch("data/index.json", { cache: "no-store" }).then(r => r.json()), fetch("projects.json", { cache: "no-store" }).then(r => r.json()), loadStreamed()]);
+      projects = pj.projects || []; catalogued = idx.sessions || []; streamed = st || [];
+      combine(); buildRecord();
       $("built").textContent = `Catalogue built ${idx.built}. Sessions whose contact field was not streamed are judged by amplitude alone.`;
       for (const id of ["f-project", "f-month", "f-usable"]) $(id).onchange = render;
     } catch (e) {
