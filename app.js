@@ -77,7 +77,9 @@
       <div class="chart-title optics-title" hidden>Optics · last 20 s
         <span class="legend"><i style="background:#ef5350"></i>730 nm<i style="background:#42a5f5"></i>850 nm</span></div>
       <canvas class="optics-chart" height="90" hidden></canvas>
-      <div class="optics" hidden></div>`;
+      <div class="optics" hidden></div>
+      <div class="chart-title wear-title" hidden>Wearables · switched on by the person, each named by its source</div>
+      <div class="wearables" hidden></div>`;
     el.querySelector(".name").textContent = p.pseudonym;
     el.querySelector(".tier").textContent = tierLabel(p.tier);
     el.querySelector(".dev").textContent = p.device || "";
@@ -226,6 +228,47 @@
     setAux(p, d.aux);
   }
   setInterval(() => { for (const p of people.values()) if (p.device?.since) p.el.querySelector(".fact.since").textContent = `sharing for ${fmtSince(p.device.since)}`; }, 15000);
+  // other wearables the person switched on: a heart-rate strap (live), an
+  // Oura ring (the day's summaries), Ray-Ban Meta glasses (captures)
+  function setWearable(p, m) {
+    p.wear = p.wear || {};
+    p.wear[m.source] = m;
+    const el = p.el.querySelector(".wearables"); el.hidden = false;
+    p.el.querySelector(".wear-title").hidden = false;
+    el.innerHTML = "";
+    const row = (label, text, img) => {
+      const d = document.createElement("div"); d.className = "wear-row";
+      const b = document.createElement("b"); b.textContent = label + " ";
+      d.appendChild(b); d.appendChild(document.createTextNode(text));
+      if (img) { const i = document.createElement("img"); i.src = img; i.alt = "latest capture"; d.appendChild(i); }
+      el.appendChild(d);
+    };
+    const hm = s => (s ? new Date(s).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "");
+    for (const [src, w] of Object.entries(p.wear)) {
+      if (src === "hr_strap") {
+        row("♥ strap", w.contact === false
+          ? `${w.device || ""}: no contact`
+          : `${w.device || ""}: ${w.bpm != null ? w.bpm + " bpm" : "—"}${w.rmssd_ms != null ? ` · RMSSD ${Math.round(w.rmssd_ms)} ms · SDNN ${Math.round(w.sdnn_ms)} ms (60-s RR)` : ` · HRV after ${Math.max(0, 20 - (w.rr_count_60s || 0))} more beats`}${w.contact === true ? " · contact ok" : ""}`);
+      } else if (src === "oura") {
+        const parts = [];
+        if (w.sleep_score != null) parts.push(`sleep ${w.sleep_score}`);
+        if (w.readiness_score != null) parts.push(`readiness ${w.readiness_score}`);
+        if (w.activity_score != null) parts.push(`activity ${w.activity_score}`);
+        if (w.resting_hr != null) parts.push(`resting HR ${w.resting_hr}`);
+        if (w.avg_hrv_ms != null) parts.push(`HRV ${Math.round(w.avg_hrv_ms)} ms`);
+        if (w.total_sleep_min != null) parts.push(`slept ${(w.total_sleep_min / 60).toFixed(1)} h`);
+        if (w.steps != null) parts.push(`${w.steps.toLocaleString()} steps`);
+        if (w.stress) parts.push(`stress: ${w.stress}`);
+        if (w.latest_hr_bpm != null) parts.push(`latest HR ${w.latest_hr_bpm} at ${hm(w.latest_hr_at)}`);
+        row(`Oura ${w.day || ""}`, parts.join(" · ") || "no data for the day yet");
+      } else if (src === "rayban") {
+        row("Ray-Ban Meta", `${w.photos ?? 0} photos · ${w.videos ?? 0} videos${w.last_captured_at ? ` · last ${hm(w.last_captured_at)}` : ""}`,
+          w.thumbnail_png ? `data:image/png;base64,${w.thumbnail_png}` : null);
+      } else {
+        row(src, JSON.stringify(w).slice(0, 160));
+      }
+    }
+  }
   // motion as the app shows it: a tile per axis, X red / Y green / Z blue
   function setImu(p, m) {
     const el = p.el.querySelector(".imu"); el.hidden = false;
@@ -428,8 +471,10 @@
           if (p.last?.imu) setImu(q, p.last.imu);
           if (p.last?.optics) setOptics(q, p.last.optics);
           if (p.last?.checkin) setCheckin(q, p.last.checkin);
+          for (const [src, w] of Object.entries(p.last?.wearables || {})) setWearable(q, { ...w, source: src });
         }
         break;
+      case "wearable": setWearable(ensure(msg), msg); break;
       case "join": case "presence": ensure(msg); break;
       case "profile": setProfile(ensure(msg), msg); break;
       case "device": setDevice(ensure(msg), msg); break;
