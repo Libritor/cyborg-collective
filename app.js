@@ -482,6 +482,7 @@
       case "optics": setOptics(ensure(msg), msg); break;
       case "checkin": setCheckin(ensure(msg), msg); if (msg.publish) loadCheckins(); break;
       case "checkins_changed": loadCheckins(); break;
+      case "shares_changed": loadShares(); break;
       case "leave": remove(msg.pseudonym); break;
       case "aggregate": aggregate(msg); break;
       case "quality": setQuality(ensure(msg), msg); break;
@@ -573,6 +574,67 @@
       : "Nobody has published a check-in yet.";
   }
   loadCheckins();
+
+  // ---------------- the share log ----------------
+  // Shares the person allowed to be logged: from the relay (same origin or
+  // configured), else from data/shares.json exported at deploy time.
+  async function loadShares() {
+    const rows = $("share-rows"), note = $("share-note");
+    if (!rows) return;
+    let list = null, source = "";
+    const relay = relayUrl();
+    const bases = [];
+    if (/^https?:$/.test(location.protocol)) bases.push("shares");
+    if (relay) bases.push(relay.replace(/^ws/, "http").replace(/\/live\/?$/, "/shares"));
+    for (const b of bases) {
+      try {
+        const r = await fetch(b, { cache: "no-store" });
+        if (!r.ok) continue;
+        const j = await r.json();
+        if (Array.isArray(j.shares)) { list = j.shares; source = "relay"; break; }
+      } catch {}
+    }
+    if (!list) {
+      try {
+        const r = await fetch("data/shares.json", { cache: "no-store" });
+        if (r.ok) { const j = await r.json(); list = Array.isArray(j) ? j : (j.shares || []); source = "last export"; }
+      } catch {}
+    }
+    if (!list) { note.textContent = "no share log available on this page yet."; return; }
+    rows.innerHTML = "";
+    const fmtLen = s => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
+    for (const s of list) {
+      const tr = document.createElement("tr");
+      const when = s.started_at ? new Date(s.started_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+      const cells = [
+        when, s.name || s.pseudonym || "", s.activity || "", fmtLen(s.duration_s || 0), tierLabel(s.tier),
+      ];
+      for (const v of cells) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+      // moods stated during the share, as coloured chips with the time
+      const tdm = document.createElement("td");
+      for (const h of (s.mood_history || []).slice(-8)) {
+        const c = document.createElement("span");
+        c.className = "moodlog-chip";
+        c.style.background = moodColor(h.arousal, h.valence); c.style.color = moodInk(h.arousal);
+        const t = h.ts ? new Date(h.ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+        c.textContent = `${t} ${h.phrase || moodPhrase(h.arousal, h.valence)}${h.word ? ` “${h.word}”` : ""}`;
+        tdm.appendChild(c); tdm.appendChild(document.createTextNode(" "));
+      }
+      if (!tdm.firstChild) tdm.textContent = "—";
+      tr.appendChild(tdm);
+      const rest = [
+        s.estimate_mean != null ? `${Math.round(s.estimate_mean * 100)}% (${Math.round((s.usable_fraction || 0) * 100)}% usable)` : (s.windows ? `no claim (${Math.round((s.usable_fraction || 0) * 100)}% usable)` : "—"),
+        s.hr_mean != null ? `${Math.round(s.hr_mean)} bpm` : "—",
+        s.reason || "",
+      ];
+      for (const v of rest) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
+      rows.appendChild(tr);
+    }
+    note.textContent = list.length
+      ? `${list.length} logged share${list.length === 1 ? "" : "s"} · ${source}. Estimate = mean of the usable 2-s windows the page showed; pulse = mean of the heart-rate readings that were ok.`
+      : "No share has been logged yet.";
+  }
+  loadShares();
 
   // ---------------- the record: past recordings ----------------
   const fmtDate = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
@@ -669,14 +731,10 @@
   function renderProjects(list) {
     const fp = $("f-project");
     for (const s of list) projectFor(s);          // registers the folder projects
-    $("projects-list").innerHTML = projects.map(p => {
-      const n = list.filter(s => projectFor(s)?.id === p.id);
-      const mins = n.reduce((a, s) => a + s.minutes, 0);
+    // projects remain as tags and as the filter's options; the section is gone
+    for (const p of projects) {
       const o = document.createElement("option"); o.value = p.id; o.textContent = p.name; fp.appendChild(o);
-      const links = (p.links || []).filter(l => l[1]).map(l => `<a href="${l[1]}">${l[0]}</a>`).join(" · ");
-      const when = p.folder ? (n.length ? `${n.map(s => s.date.slice(0, 10)).sort()[0]} to ${n.map(s => s.date.slice(0, 10)).sort().slice(-1)[0]}` : "") : `${p.from} to ${p.to}`;
-      return `<div class="card project"><h3>${p.name}</h3><div class="when">${when}</div><p>${p.summary}</p><div class="n">${n.length} sessions, ${(mins / 60).toFixed(1)} h${links ? " · " + links : ""}</div></div>`;
-    }).join("");
+    }
   }
   async function load() {
     try {

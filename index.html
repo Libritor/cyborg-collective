@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1793238817">
+<link rel="stylesheet" href="style.css?v=1793239634">
 </head>
 <body>
 <header class="top">
@@ -13,7 +13,7 @@
   <p class="tag">A window the person opens, not a feed that is taken. Live headbands when someone chooses to share; the record of every recording behind them, always.</p>
 </header>
 <nav>
-  <a href="#live">Live</a><a href="#checkins">Check-ins</a><a href="#record">The record</a><a href="#projects">Projects</a><a href="#about">About</a>
+  <a href="#live">Live</a><a href="#checkins">Check-ins</a><a href="#shares">Shares</a><a href="#record">The record</a>
 </nav>
 <main>
 
@@ -28,7 +28,7 @@
   </div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty">Nobody is sharing right now. The record below is always here.</div>
-  <p class="status more">The relay keeps nothing of the signal; this page shows what arrives while the tab is open. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. To point the page at a relay, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
+  <p class="status more">The relay keeps nothing of the signal; this page shows what arrives while the tab is open. A share is logged below (when, how long, activity, moods stated, summary numbers) only when the person left that switch on. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. To point the page at a relay, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
 </section>
 
 <section id="checkins">
@@ -39,6 +39,16 @@
     <tbody id="checkin-rows"></tbody>
   </table>
   <p class="status more" id="checkin-note">loading…</p>
+</section>
+
+<section id="shares">
+  <h2>Shares</h2>
+  <p class="sub">Every live share the person allowed to be logged: when, how long, at which tier, what they were doing, every mood they stated while the window was open, and the summary numbers the page showed. Never the signal. Each person can remove theirs from their phone.</p>
+  <table class="sessions shares">
+    <thead><tr><th>when</th><th>who</th><th>doing</th><th>length</th><th>tier</th><th>moods stated</th><th>estimate (usable)</th><th>pulse</th><th>ended</th></tr></thead>
+    <tbody id="share-rows"></tbody>
+  </table>
+  <p class="status more" id="share-note">loading…</p>
 </section>
 
 <section id="record">
@@ -62,29 +72,16 @@
   <p class="status more" id="built"></p>
 </section>
 
-<section id="projects">
-  <h2>Projects</h2>
-  <p class="sub">What the recordings were for. Tags are by date; the same headband and recorder ran through all of them.</p>
-  <div class="projects" id="projects-list"></div>
-</section>
 
-<section id="about">
-  <h2>About</h2>
-  <div class="card">
-    <p>Alexander Vicol, University of Toronto (MEng ECE, MannLab Canada), with Steve Mann. This page is the public face of a year of wearable brain sensing on consumer hardware: the Muse headband, a phone that records it, and an XR headset that uses it. The idea behind it is Mann's Cyborg Collective: people who sense themselves, and share on their own terms.</p>
-    <p>Three rules hold everywhere on this page. Every number carries the contact quality it was measured under, and when the electrodes were not in contact the page says so instead of guessing. The activation estimate is a band-power ratio against the person's own baseline; it is not a measure of emotion, stress or health and is never called one. Nothing leaves a phone unless its owner opened the window, and what left is receipted on that phone.</p>
-    <p>Code: <a href="https://github.com/Libritor/eyecam">eyecam</a> (the eye as a camera on a headset, public), <a href="https://github.com/Libritor/HealthLogProtocol">HealthLogProtocol</a> (consented health records with provenance, public); MuseLog and Cocaine Buzzkill on request.</p>
-  </div>
-</section>
 </main>
 <footer>
   <b>How this page is honest</b>
   <ul>
     <li>Live: when fewer than 3 of 4 electrodes are in contact the app sends <i>no claim</i>, and that is what is shown.</li>
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
-    <li>The relay keeps nothing; the record holds summaries only. Raw recordings stay with the person who made them.</li>
+    <li>The relay keeps no signal. It keeps a share's log and published check-ins only when the person chose so, and either can be removed from their phone. Raw recordings stay with the person who made them.</li>
   </ul>
 </footer>
-<script src="app.js?v=1793238817"></script>
+<script src="app.js?v=1793239634"></script>
 </body>
 </html>
