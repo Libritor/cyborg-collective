@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1793301817">
+<link rel="stylesheet" href="style.css?v=1793322849">
 </head>
 <body>
 <header class="top">
@@ -19,12 +19,13 @@
 
 <section id="live">
   <h2>Live now</h2>
-  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. <span id="link" class="status">connecting…</span></p>
+  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. Cameras appear here too, when the computer they hang off opens its gateway: the picture comes from that computer to this browser, not through the relay. <span id="link" class="status">connecting…</span></p>
   <div class="tiles">
     <div class="tile"><b id="n">0</b><span>people sharing now</span></div>
     <div class="tile"><b id="usable">—</b><span>with usable contact</span></div>
     <div class="tile"><b id="alpha">—</b><span>pooled relative alpha</span></div>
     <div class="tile"><b id="arousal">—</b><span>pooled activation estimate (usable only)</span></div>
+    <div class="tile"><b id="cams">0</b><span>cameras live</span></div>
   </div>
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty">Nobody is sharing right now. The record below is always here.</div>
@@ -66,6 +67,14 @@
     <tbody id="share-rows"></tbody>
   </table>
   <p class="status more" id="share-note">loading…</p>
+
+  <h3>Camera recordings</h3>
+  <p class="sub">What the cameras recorded, as ROS 2 bags (MCAP): one bag per hour per camera, JPEG frames on a <code>sensor_msgs/msg/CompressedImage</code> topic stamped in wall-clock time, with rosbag2's <code>metadata.yaml</code> beside each. The files stay on the computer the cameras hang off; they are listed and download from there while its gateway is on.</p>
+  <table class="sessions bags">
+    <thead><tr><th>started</th><th>camera</th><th>topic</th><th>length</th><th>frames</th><th>size</th><th>download</th></tr></thead>
+    <tbody id="bag-rows"></tbody>
+  </table>
+  <p class="status more" id="bag-note">loading…</p>
 </section>
 
 
@@ -75,9 +84,11 @@
   <ul>
     <li>Live: when fewer than 3 of 4 electrodes are in contact the app sends <i>no claim</i>, and that is what is shown.</li>
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
+    <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
   </ul>
 </footer>
-<script src="app.js?v=1793301817"></script>
+<script src="video-rtc.js?v=1793322849"></script>
+<script src="app.js?v=1793322849"></script>
 </body>
 </html>

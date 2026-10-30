@@ -133,3 +133,18 @@ canvas.optics-chart { width: 100%; height: 90px; display: block; border-radius: 
 .wear-row b { font-weight: 600; }
 .wear-row img { display: block; width: 120px; max-width: 100%; border-radius: 6px; margin-top: 4px; border: 1px solid var(--line); }
 
+
+/* cameras: the picture from the computer they hang off, opened by this browser */
+.card.camera .cam { margin-top: 10px; }
+.cam-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.cam-head b { color: var(--ink); font-size: 13px; }
+.cam-head select { margin-left: auto; font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+.cam-view { position: relative; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
+camera-stream { display: block; width: 100%; height: 100%; }
+camera-stream video { display: block; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.cam-off { display: flex; align-items: center; justify-content: center; height: 100%; color: #9ca3af; font-size: 13px; }
+.cam-rec { margin-top: 4px; font-size: 12px; }
+.camnote { margin: 10px 0 0; }
+table.bags td { vertical-align: top; }
+table.bags a { white-space: nowrap; }
+@media (max-width: 600px) { table.bags th:nth-child(3), table.bags td:nth-child(3) { display: none; } }
