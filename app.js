@@ -86,7 +86,6 @@
     return el;
   }
   function ensure(msg) {
-    if (msg.kind === "camera") return ensureCamera(msg);
     let p = people.get(msg.pseudonym);
     if (!p) {
       p = { pseudonym: msg.pseudonym, tier: msg.tier, device: msg.device, raw: CH.map(() => []) };
@@ -169,8 +168,6 @@
   function remove(pseudonym) {
     const p = people.get(pseudonym);
     if (!p) return;
-    if (p.players) for (const id of [...p.players.keys()]) stopPlayer(p, id);
-    if (gateways.delete(pseudonym)) scheduleBags();
     p.el.remove(); people.delete(pseudonym);
     if (people.size === 0) empty.hidden = false;
   }
@@ -451,102 +448,11 @@
       ctx.stroke(); ctx.globalAlpha = 1;
     });
   }
-  // ---------------- cameras: a card from the computer the cameras hang off ----------------
-  // The gateway says where its video is served from (an https address) and
-  // which cameras are on; this browser opens the stream there directly, so
-  // the picture never passes through the relay and nothing of it is kept.
-  const QUALITY_ORDER = ["sd", "hd"];
-  const gateways = new Map(); // pseudonym -> base address, for the bag listing under The record
-  const fmtBytes = b => (b >= 1e9 ? `${(b / 1e9).toFixed(2)} GB` : b >= 1e6 ? `${(b / 1e6).toFixed(0)} MB` : `${Math.round(b / 1e3)} kB`);
-  function cameraCard(p) {
-    const el = document.createElement("section");
-    el.className = "card camera";
-    el.innerHTML = `
-      <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier">cameras</span><span class="badge dev"></span></h3>
-      <div class="facts"><span class="fact where"></span><span class="fact since"></span></div>
-      <div class="cams"></div>
-      <p class="status camnote">Live picture from the computer these cameras hang off, fetched by this browser from that computer's own gateway; the relay carries only this card and the Collective keeps none of the picture. Its recordings (ROS 2 bags) are listed under The record while the gateway is on.</p>`;
-    el.querySelector(".name").textContent = "Cameras";
-    el.querySelector(".dev").textContent = p.device || "";
-    return el;
-  }
-  function ensureCamera(msg) {
-    let p = people.get(msg.pseudonym);
-    if (!p) {
-      p = { pseudonym: msg.pseudonym, kind: "camera", tier: "camera", device: msg.device, name: msg.name,
-            since: msg.since, players: new Map(), cams: new Map() };
-      p.el = cameraCard(p); grid.appendChild(p.el); people.set(msg.pseudonym, p); empty.hidden = true;
-    }
-    return p;
-  }
-  function setCamera(p, m) {
-    p.base = m.base;
-    if (m.owner) p.name = m.owner;
-    p.el.querySelector(".name").textContent = "Cameras";
-    let host = m.base; try { host = new URL(m.base).host; } catch {}
-    p.el.querySelector(".fact.where").textContent = `served from ${host}`;
-    if (p.since) p.el.querySelector(".fact.since").textContent = `gateway on for ${fmtSince(p.since * 1000)}`;
-    const wrap = p.el.querySelector(".cams");
-    const seen = new Set();
-    for (const c of m.cameras || []) {
-      seen.add(c.id);
-      let blk = wrap.querySelector(`.cam[data-id="${c.id}"]`);
-      if (!blk) {
-        blk = document.createElement("div"); blk.className = "cam"; blk.dataset.id = c.id;
-        blk.innerHTML = `<div class="cam-head"><b class="cam-label"></b><span class="cam-facts"></span><select class="cam-q" title="picture size"></select></div>
-          <div class="cam-view"></div><div class="cam-rec status"></div>`;
-        wrap.appendChild(blk);
-        blk.querySelector(".cam-q").onchange = () => showCamera(p, c.id, blk.querySelector(".cam-q").value, true);
-      }
-      blk.querySelector(".cam-label").textContent = c.label || c.id;
-      const sel = blk.querySelector(".cam-q");
-      const qualities = Object.keys(c.streams || {}).sort((a, b) => QUALITY_ORDER.indexOf(a) - QUALITY_ORDER.indexOf(b));
-      const want = sel.value && qualities.includes(sel.value) ? sel.value : qualities[0];
-      sel.innerHTML = qualities.map(q => { const s = c.streams[q]; return `<option value="${q}">${s.height ? `${s.height}p` : q}</option>`; }).join("");
-      sel.value = want || ""; sel.hidden = qualities.length < 2;
-      const facts = [c.model, c.online ? "on" : "off", c.viewers != null ? `${c.viewers} watching` : "",
-                     c.since ? `on for ${fmtSince(c.since)}` : ""].filter(Boolean);
-      blk.querySelector(".cam-facts").textContent = facts.join(" · ");
-      const r = c.recording;
-      blk.querySelector(".cam-rec").textContent = r
-        ? `recorded as ${r.format || "ROS 2 bag"}${r.topic ? ` · ${r.topic}` : ""}${r.fps ? ` · ${r.fps} fps` : ""}${r.bags != null ? ` · ${r.bags} bag${r.bags === 1 ? "" : "s"}` : ""}${r.bytes ? ` · ${fmtBytes(r.bytes)}` : ""} · kept on the camera's own computer`
-        : "not recorded";
-      p.cams.set(c.id, c);
-      showCamera(p, c.id, want, false);
-    }
-    for (const blk of [...wrap.querySelectorAll(".cam")]) if (!seen.has(blk.dataset.id)) { stopPlayer(p, blk.dataset.id); blk.remove(); }
-    gateways.set(p.pseudonym, m.base);
-    scheduleBags();
-  }
-  function stopPlayer(p, id) {
-    const pl = p.players.get(id);
-    if (pl) { pl.el.remove(); p.players.delete(id); }
-  }
-  // (re)open a camera's stream only when its address changes: the card is
-  // refreshed every few seconds and the picture must not restart with it
-  function showCamera(p, id, quality, force) {
-    const c = p.cams.get(id), blk = p.el.querySelector(`.cam[data-id="${id}"]`), view = blk.querySelector(".cam-view");
-    const st = c.streams && c.streams[quality];
-    if (!c.online || !st) {
-      stopPlayer(p, id); view.innerHTML = `<div class="cam-off">${c.online ? "no stream offered" : "camera off"}</div>`; return;
-    }
-    const url = `${p.base.replace(/^http/, "ws")}/api/ws?src=${encodeURIComponent(st.src)}`;
-    const cur = p.players.get(id);
-    if (cur && cur.url === url && !force) return;
-    stopPlayer(p, id); view.innerHTML = "";
-    const el = document.createElement("camera-stream");
-    el.mode = "mse,hls,mp4"; el.media = "video"; el.visibilityThreshold = 0.1;
-    el.src = url;
-    view.appendChild(el);
-    p.players.set(id, { el, url });
-  }
-
   function aggregate(a) {
     // the relay served this page with a stamp of its script and stylesheet;
     // when the relay reports a different one, the page has changed: reload
     if (window.ASSET_V && a.asset_v && a.asset_v !== window.ASSET_V) { location.reload(); return; }
     $("n").textContent = a.n;
-    if ($("cams")) $("cams").textContent = a.cameras ?? 0;
     $("usable").textContent = a.n ? `${a.usable_n} / ${a.n}` : "—";
     $("alpha").textContent = a.rel_alpha_mean == null ? "—" : (a.rel_alpha_mean * 100).toFixed(0) + "%";
     $("arousal").textContent = a.arousal_mean == null ? "—" : (a.arousal_mean * 100).toFixed(0) + "%";
@@ -555,7 +461,6 @@
     switch (msg.t) {
       case "snapshot":
         for (const p of msg.people) {
-          if (p.kind === "camera") { const q = ensureCamera(p); if (p.last?.camera) setCamera(q, p.last.camera); continue; }
           const q = ensure(p);
           setProfile(q, p);
           if (p.last?.device) setDevice(q, p.last.device);
@@ -570,7 +475,6 @@
         }
         break;
       case "wearable": setWearable(ensure(msg), msg); break;
-      case "camera": setCamera(ensureCamera(msg), msg); break;
       case "join": case "presence": ensure(msg); break;
       case "profile": setProfile(ensure(msg), msg); break;
       case "device": setDevice(ensure(msg), msg); break;
@@ -738,52 +642,6 @@
       : "No share has been logged yet.";
   }
   loadShares();
-
-  // ---------------- camera recordings: ROS 2 bags on the camera's own computer ----------------
-  // Listed from each gateway on the page while it is on (GET <base>/bags); the
-  // files stay there and download from there. Nothing is copied to the relay.
-  let bagsTimer = 0;
-  function scheduleBags() { clearTimeout(bagsTimer); bagsTimer = setTimeout(loadBags, 800); }
-  const fmtLenS = s => (s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`);
-  async function loadBags() {
-    const rows = $("bag-rows"), note = $("bag-note");
-    if (!rows) return;
-    const all = [];
-    let reachable = 0;
-    for (const [who, base] of gateways) {
-      try {
-        const r = await fetch(`${base}/bags`, { cache: "no-store" });
-        if (!r.ok) continue;
-        const j = await r.json();
-        reachable++;
-        for (const b of j.bags || []) all.push({ ...b, who, base });
-      } catch {}
-    }
-    all.sort((a, b) => (b.start || 0) - (a.start || 0));
-    rows.innerHTML = "";
-    for (const b of all.slice(0, 200)) {
-      const tr = document.createElement("tr");
-      const cells = [
-        b.start ? new Date(b.start).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "",
-        b.camera || "", b.topic || "",
-        b.end && b.start ? fmtLenS((b.end - b.start) / 1000) + (b.recording ? " so far" : "") : (b.recording ? "recording…" : ""),
-        b.messages != null ? String(b.messages) : "", b.bytes != null ? fmtBytes(b.bytes) : "",
-      ];
-      for (const v of cells) { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }
-      const td = document.createElement("td");
-      const a = document.createElement("a"); a.href = `${b.base}/bags/${b.path}`; a.textContent = b.recording ? "mcap (so far)" : "mcap"; td.appendChild(a);
-      if (b.metadata) { td.appendChild(document.createTextNode(" · ")); const a2 = document.createElement("a"); a2.href = `${b.base}/bags/${b.metadata}`; a2.textContent = "metadata.yaml"; td.appendChild(a2); }
-      tr.appendChild(td);
-      rows.appendChild(tr);
-    }
-    note.textContent = gateways.size === 0
-      ? "Listed while a camera gateway is on; the bags stay on the camera's own computer and download from there."
-      : reachable === 0 ? "The camera gateway did not answer; its bags are listed when it does."
-      : all.length ? `${all.length} bag${all.length === 1 ? "" : "s"} · ROS 2 bag files (MCAP; sensor_msgs/msg/CompressedImage, JPEG frames); open with ros2 bag play or Foxglove. Kept on the camera's own computer, oldest removed when its space runs out.`
-      : "No recordings yet.";
-  }
-  setInterval(() => { if (gateways.size) loadBags(); }, 60000);
-  loadBags();
 
   // ---------------- the record: past recordings ----------------
   const fmtDate = s => { const d = new Date(s); return isNaN(d) ? s : d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); };
