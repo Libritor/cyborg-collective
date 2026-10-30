@@ -466,7 +466,7 @@
       <div class="facts"><span class="fact where"></span><span class="fact since"></span></div>
       <div class="cams"></div>
       <p class="status camnote">Live picture from the computer these cameras hang off, fetched by this browser from that computer's own gateway; the relay carries only this card and the Collective keeps none of the picture. Its recordings (ROS 2 bags) are listed under The record while the gateway is on.</p>`;
-    el.querySelector(".name").textContent = p.name ? `${p.name}'s cameras` : p.pseudonym;
+    el.querySelector(".name").textContent = "Cameras";
     el.querySelector(".dev").textContent = p.device || "";
     return el;
   }
@@ -481,7 +481,8 @@
   }
   function setCamera(p, m) {
     p.base = m.base;
-    if (m.owner) { p.name = m.owner; p.el.querySelector(".name").textContent = `${m.owner}'s cameras`; }
+    if (m.owner) p.name = m.owner;
+    p.el.querySelector(".name").textContent = "Cameras";
     let host = m.base; try { host = new URL(m.base).host; } catch {}
     p.el.querySelector(".fact.where").textContent = `served from ${host}`;
     if (p.since) p.el.querySelector(".fact.since").textContent = `gateway on for ${fmtSince(p.since * 1000)}`;
