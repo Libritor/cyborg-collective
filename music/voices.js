@@ -87,8 +87,16 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   // unity again and the compressor keeps the operating point it had, which is
   // what stops the trim from re-balancing the band (voices near the threshold
   // would otherwise lose their makeup gain).
+  //
+  // The curve itself has gain too, and it changed shape: a 0.85-peak sine comes
+  // through tanh at drive 1 with a fundamental of 0.726 and through this atan
+  // curve at 0.936 -- 2.2 dB hotter. OUT_TRIM below was calibrated on the old
+  // level (mix peak near -2 dBFS, which is the margin its own comment is about),
+  // so the difference is taken back here instead of quietly spending the
+  // headroom: without it the mix measured -1.21 dBFS, 0.31 dB under the ceiling.
+  const CURVE_MAKEUP = 0.775;
   const makeUp = ctx.createGain();
-  makeUp.gain.value = 1 / MIX_TRIM;
+  makeUp.gain.value = (1 / MIX_TRIM) * CURVE_MAKEUP;
   const compressor = ctx.createDynamicsCompressor();
   compressor.threshold.value = -18;
   compressor.knee.value = 12;
