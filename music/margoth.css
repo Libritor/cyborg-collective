@@ -417,6 +417,14 @@ main > section + section { margin-top: 26px; }
 .mg-choice[data-stale="true"] { opacity: .6; }
 .mg-choice > span { color: var(--faint); margin-left: 6px; }
 
+/* a seat whose chosen head has gone: the choice is remembered, so say what is
+   actually driving instead of showing a chip that cannot light */
+.mg-seat-lost {
+  margin: 2px 0 0;
+  font: 11px/1.4 var(--mono);
+  color: var(--warm);
+}
+
 /* ----------------------------------------------------------------- the keys */
 .mg-keys {
   display: flex;

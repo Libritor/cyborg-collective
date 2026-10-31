@@ -345,6 +345,19 @@ function renderDrivers() {
     const host = el(`seat-${seat}`);
     if (!host) continue;
     const inForce = resolvedSeat(relay ? relay.sharers(Date.now() / 1000) : [], seats[seat]);
+    // A seat whose chosen head has gone keeps the choice but cannot honour it.
+    // The status line is no place to say so -- the relay's own state overwrites
+    // it every few seconds -- so the seat says it, and stays said.
+    const lost = seats[seat] !== AUTO && seats[seat] !== PAGE
+      && inForce !== seats[seat] ? seats[seat] : null;
+    let lostNote = null;
+    if (lost) {
+      // `el` in this file is getElementById, not a tag factory: a seat note has to
+      // be built the long way round
+      lostNote = document.createElement("p");
+      lostNote.className = "mg-seat-lost";
+      lostNote.textContent = `${lost} has gone · following ${seatSentence(inForce, options)}`;
+    }
     host.replaceChildren(...options.map((option) => {
       const chip = document.createElement("button");
       chip.type = "button";
@@ -363,6 +376,7 @@ function renderDrivers() {
       chip.addEventListener("click", () => chooseSeat(seat, option.id));
       return chip;
     }));
+    if (lostNote) host.appendChild(lostNote);
   }
 }
 

@@ -3,7 +3,7 @@
 
 import {
   KEYS, LEAD_RANGE, PENTATONIC, MAX_VOICES,
-  isMajorQuality, pentatonicNotes, harmonicAmplitudes, patchFrom, DEFAULT_PATCH,
+  isMajorQuality, pentatonicFamily, pentatonicNotes, harmonicAmplitudes, patchFrom, DEFAULT_PATCH,
 } from "./lead.js";
 import {
   AUTO, PAGE, SEATS, seatOptions, viewsForSeat, resolvedSeat, seatSentence,
@@ -35,10 +35,19 @@ check(KEYS.every(([, degree], i) => degree === i), "and they run up the scale in
 console.log("pentatonic");
 // every quality the generator can emit has to take one side or the other
 const majorByQuality = Object.keys(QUALITY).filter(isMajorQuality);
-check(majorByQuality.join(",") === "maj,maj7,sus4,sus2",
-  `major qualities are exactly the ones with a major third or none (${majorByQuality.join(",")})`);
+check(majorByQuality.join(",") === "maj,maj7",
+  `major qualities are exactly the ones with a major third (${majorByQuality.join(",")})`);
 check(!isMajorQuality("min") && !isMajorQuality("minmaj7") && !isMajorQuality("dim"),
   "min, minmaj7 and dim all take the minor pentatonic");
+check(pentatonicFamily("sus4") === "sus" && pentatonicFamily("sus2") === "sus",
+  "a sus chord takes neither: it has no third to decide with");
+const sus = pentatonicNotes({ root: 60, quality: "sus4" });
+const susPcs = sus.notes.map((m) => (m - 60 + 120) % 12).filter((pc, i, all) => all.indexOf(pc) === i);
+check(!susPcs.includes(4) && !susPcs.includes(3),
+  `and its pentatonic has no third in it (${susPcs.join(",")})`);
+check(susPcs.includes(5) && susPcs.includes(7),
+  "while keeping both notes the chord is actually made of (the 4 and the 5)");
+check(sus.name === "C4 sus pentatonic", `the strip calls it what it is (${sus.name})`);
 
 const am = pentatonicNotes({ root: 57, quality: "min" });
 check(am.notes.length === 10, `a chord always yields ten keys (${am.notes.length})`);

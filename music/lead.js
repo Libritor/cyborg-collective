@@ -28,6 +28,11 @@ export const LEAD_RANGE = Object.freeze([57, 92]);   // A3 .. G#6
 export const PENTATONIC = Object.freeze({
   minor: Object.freeze([0, 3, 5, 7, 10]),
   major: Object.freeze([0, 2, 4, 7, 9]),
+  // A sus chord has no third to decide with, and the major pentatonic's third
+  // sits a semitone above the sus4's fourth -- an avoid note on the one bar the
+  // strip is meant to fit. So a sus takes a pentatonic with no third at all:
+  // 1 2 4 5 b7, which contains both chord members and nothing that rubs them.
+  sus: Object.freeze([0, 2, 5, 7, 10]),
 });
 
 export const MAX_VOICES = 6;
@@ -36,17 +41,17 @@ const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const mtof = (midi) => 440 * 2 ** ((midi - 69) / 12);
 
-/**
- * Which pentatonic a chord takes. The rule is the quality's own name: anything
- * starting `maj` is major, minor-major included in the minor family because its
- * third is minor, and a sus chord has no third to decide with so it takes the
- * major pentatonic (the brighter reading of an ambiguous chord).
- */
-export function isMajorQuality(quality) {
+/** Which pentatonic family a chord quality takes: "major", "minor" or "sus". */
+export function pentatonicFamily(quality) {
   const q = String(quality || "min");
-  if (q === "sus4" || q === "sus2") return true;
-  if (q === "minmaj7") return false;
-  return q.startsWith("maj");
+  if (q === "sus4" || q === "sus2") return "sus";
+  if (q === "minmaj7") return "minor";     // its third is minor
+  return q.startsWith("maj") ? "major" : "minor";
+}
+
+/** The same question as a flag, for callers that only need the major reading. */
+export function isMajorQuality(quality) {
+  return pentatonicFamily(quality) === "major";
 }
 
 /**
@@ -57,8 +62,8 @@ export function isMajorQuality(quality) {
 export function pentatonicNotes(chord, range = LEAD_RANGE) {
   const [lo, hi] = range;
   const root = num(chord && chord.root) ?? 57;
-  const major = isMajorQuality(chord && chord.quality);
-  const intervals = major ? PENTATONIC.major : PENTATONIC.minor;
+  const family = pentatonicFamily(chord && chord.quality);
+  const intervals = PENTATONIC[family];
   const rootPc = ((root % 12) + 12) % 12;
   // the lowest root at or above the bottom of the range
   const base = lo + (((rootPc - lo) % 12) + 12) % 12;
@@ -75,8 +80,9 @@ export function pentatonicNotes(chord, range = LEAD_RANGE) {
   }
   return {
     notes,
-    major,
-    name: `${noteName(base)} ${major ? "major" : "minor"} pentatonic`,
+    family,
+    major: family === "major",
+    name: `${noteName(base)} ${family === "sus" ? "sus" : family} pentatonic`,
   };
 }
 
