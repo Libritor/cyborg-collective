@@ -25,12 +25,27 @@ const DRUM_SENDS = Object.freeze({
   kick: 0, snare: 0.35, hatC: 0.1, hatO: 0.1, tomL: 0.2, tomH: 0.2,
 });
 
+// Odd-harmonic distortion, measured on a 0.85-peak sine at the voice sum's own
+// operating point (the sum peaks at 0.85 inside the curve's domain):
+//
+//   tanh(x*k)   k=1.0 -> 5.1%   k=1.5 -> 9.8%   k=2.17 -> 15.8%   k=2.79 -> 20.6%
+//   atan ratio  k=1.0 -> 4.5%   k=1.5 -> 8.0%   k=2.17 -> 12.1%   k=2.79 -> 15.2%
+//
+// The old curve drove tanh to 1+saturation, so at C 0.86 it sat at 15.8% and at
+// full pressure 20.6%: on a drum-heavy mix that is not warmth, it is the cheap
+// diode sound. The amount now maps to a capped drive through atan, which
+// saturates later, so full pressure lands near 10% -- audible grit, no fizz.
+const SATURATION_GAIN = 0.35;   // drive = 1 .. 1.7 across saturation 0 .. 2
+const MAX_DRIVE = 1.7;
+
 function saturationCurve(amount) {
   const points = 1024;
+  const drive = Math.min(MAX_DRIVE, 1 + SATURATION_GAIN * Math.max(0, amount));
+  const norm = Math.atan(drive);          // so a full-scale sample maps to ±1
   const curve = new Float32Array(points);
   for (let i = 0; i < points; i += 1) {
     const x = (i / (points - 1)) * 2 - 1;
-    curve[i] = Math.tanh(x * (1 + amount));
+    curve[i] = Math.atan(x * drive) / norm;
   }
   return curve;
 }
@@ -61,6 +76,12 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   input.gain.value = MIX_TRIM;
   const shaper = ctx.createWaveShaper();
   shaper.curve = null;              // a null curve passes the signal through
+  // the curve last installed, so an unchanged saturation is not re-swapped
+  let lastSaturation = null;
+  // A nonlinearity on saw waves folds every harmonic above Nyquist back as
+  // inharmonic grit, which is most of what "cheap diode" sounds like. 'none' is
+  // the Web Audio default; 4x is the standard cure and costs little.
+  shaper.oversample = "4x";
   // Compensation: the trim above exists only to put the mix inside the curve's
   // [-1, 1] domain, so the level is restored straight after it. Small signals are
   // unity again and the compressor keeps the operating point it had, which is
@@ -362,8 +383,14 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
     if (typeof t.leadDelayFb === "number") {
       feedback.gain.setTargetAtTime(t.leadDelayFb, time, GLIDE_S);
     }
-    if (typeof t.saturation === "number") {
-      shaper.curve = saturationCurve(t.saturation);
+    if (typeof t.saturation === "number" && t.saturation !== lastSaturation) {
+      // Rebuilding only on change does two things: a curve swap is a step change
+      // in the transfer function, so swapping it every bar while C holds still
+      // puts a discontinuity in the mix once a bar; and at zero saturation the
+      // shaper is taken out of circuit entirely rather than colouring a calm bar
+      // with the curve's own 5% of odd harmonics.
+      lastSaturation = t.saturation;
+      shaper.curve = t.saturation <= 0.01 ? null : saturationCurve(t.saturation);
     }
   }
 

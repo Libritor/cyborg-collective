@@ -112,14 +112,15 @@ const CSS = `
 /* Balls and lines: one disc per thing, one straight line per dependency, and the
    text knocked out of whatever line happens to pass behind it. */
 .mgu-graph { margin: 0; overflow-x: auto; }
-/* The graph grows with the page, but only so far: past ~1200px the 11px labels
-   would render larger than the panel's own text. It centres in whatever column
-   it is given rather than hugging the left edge. */
+/* Each graph carries its own floor (80% of its drawn width, set from nodes.js's
+   box) and scrolls inside its figure below that, so the diagram is never
+   squeezed into unreadable type. The ceiling stops a very wide screen inflating
+   it: at 1200px an 11px label renders ~13px, which is the panel's own text size
+   -- past that the drawing would out-shout the panel it sits in. */
 .mgu-graph-svg {
   display: block;
   width: 100%;
   max-width: 1200px;
-  min-width: 520px;
   height: auto;
   margin-inline: auto;
 }
@@ -410,6 +411,9 @@ function drawGraph(host, graph, summary) {
   const svg = host.svg;
   svg.setAttribute("viewBox", `0 0 ${graph.width} ${graph.height}`);
   svg.setAttribute("aria-label", summary);
+  // the floor is the graph's own: 80% of the width it was drawn at, so a narrow
+  // column scrolls the diagram rather than shrinking its labels to nothing
+  svg.style.minWidth = `${Math.round(graph.width * 0.8)}px`;
 
   const key = `${graph.nodes.map((n) => `${n.id}|${n.kind}|${n.place}|${n.label}|${n.note}|${n.x},${n.y},${n.r}`).join(";")}`
     + `#${graph.edges.map((e) => `${e.from}>${e.to}`).join(",")}`;

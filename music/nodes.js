@@ -34,7 +34,10 @@ import {
 import { WEIGHT_DEFAULTS } from "./conditioner.js";
 
 export const GRAPH = Object.freeze({
-  width: 820,
+  // Laid out at 980 so that in the panel's ~1200px column the labels render at
+  // roughly the size they are drawn (scale ~1.2, 11px -> 13px against a 12px
+  // panel). A narrower box would be scaled up past that.
+  width: 980,
   ballR: 9,
   hubR: 11,          // C is the hub the three terms meet at
   labelGap: 15,      // text starts this far right of a "right" ball's centre...
@@ -43,7 +46,7 @@ export const GRAPH = Object.freeze({
                      // block, so 32 gives every stacked pair real air
   textDown: 14,      // a value's baseline sits this far under the ball's centre
   top: 16,
-  columns: [26, 176, 326, 476, 626],
+  columns: [26, 234, 442, 650, 858],
 });
 
 // The harmonic row: balls shoulder to shoulder, labels under them, this bar's
@@ -51,10 +54,13 @@ export const GRAPH = Object.freeze({
 // lost below those. The band positions are constants so the box can be measured
 // from the content instead of guessed.
 const HARMONY = Object.freeze({
-  base: 560,
+  // 720 wide: the walk sits in roughly a 720px column, so the steps render at
+  // their drawn size rather than being scaled up (short families) or down
+  // (the ten-step one). maxW lets four steps fill that 720 without clamping.
+  base: 720,
   gap: 20,
   minW: 56,
-  maxW: 132,
+  maxW: 190,
   step: { y: 42, r: 13, label: 14, value: 11 },
   chord: { y: 112, r: 9, label: 13, value: 12 },
   lost: { y: 162, r: 7, label: 13 },
