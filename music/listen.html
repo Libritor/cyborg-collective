@@ -33,9 +33,23 @@
   <div class="mg-level"><div id="meter"><div id="meterbar"></div></div><span id="meter-text">—</span></div>
 </section>
 
+<section class="mg-seats" id="seats" aria-label="who drives the band">
+  <div class="mg-seat" data-seat="band">
+    <p class="mg-seat-head"><span class="mg-seat-role">band</span><span class="mg-seat-note">the parameters the backing track is generated from</span></p>
+    <div class="mg-seat-choices" id="seat-band" role="radiogroup" aria-label="who drives the backing track"></div>
+  </div>
+  <div class="mg-seat" data-seat="patch">
+    <p class="mg-seat-head"><span class="mg-seat-role">lead patch</span><span class="mg-seat-note">the wavetable the lead plays</span></p>
+    <div class="mg-seat-choices" id="seat-patch" role="radiogroup" aria-label="who shapes the lead patch"></div>
+  </div>
+  <div class="mg-seat mg-seat-keys">
+    <p class="mg-seat-head"><span class="mg-seat-role">lead keys</span><span class="mg-seat-note" id="keys-note">a pentatonic of the current chord</span></p>
+    <div class="mg-keys" id="keys" role="group" aria-label="play the lead"></div>
+  </div>
+</section>
+
 <main>
   <section id="mount" aria-label="the instrument"></section>
-  <section id="cast" aria-label="wizards" hidden></section>
   <section class="mg-params" id="params" aria-labelledby="params-h">
     <h2 id="params-h">what the numbers mean</h2>
     <p class="mg-params-sub">Every parameter the panel prints, and the rule it feeds. The balls

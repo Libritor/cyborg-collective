@@ -18,9 +18,13 @@ import { createVoices } from "./voices.js";
 import { createLoop } from "./loop.js";
 import { playEvent } from "./arrange.js";
 import { createUI, mountParameters } from "./ui.js";
+import { KEYS, LEAD_RANGE, createLeadPatch, patchFrom, pentatonicNotes } from "./lead.js";
+import {
+  AUTO, PAGE, seatOptions, viewsForSeat, resolvedSeat, seatSentence,
+} from "./drivers.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle, encodeWav } from "./idle.js";
-import { ladderRows, timbreRows, voiceRows, parameterFor } from "./explain.js";
+import { ladderRows, timbreRows, voiceRows, parameterFor, noteName } from "./explain.js";
 import {
   concentrationParts, concentrationFromParts, partsFromConcentration,
   getConcentrationWeights, setConcentrationWeights, WEIGHT_DEFAULTS,
@@ -77,6 +81,13 @@ let relay = null;
 let gen = null;
 let castKey = "";        // the panel's own key: refused heads never reach onSharers
 let castAt = 0;
+let lead = null;         // the pentatonic patch, built with the audio context
+let lastBarFull = null;  // the whole bar, for the chord the keys play over
+let keysNow = [];        // the ten midi notes the key strip is holding
+const heldKeys = new Map();   // keycap -> sounding voice
+// Two seats, filled from the cast. "auto" is everyone in contact, `page` is the
+// sliders, and a pseudonym is that head alone.
+const seats = { band: AUTO, patch: AUTO };
 
 const idleStamp = params.get("idle");
 const relayUrl = params.get("relay");
@@ -106,7 +117,35 @@ function soloControls(parts = partsFromConcentration(state.C)) {
 function currentControls() {
   if (!relay) return soloControls(lastParts || partsFromConcentration(state.C));
   const at = Date.now() / 1000;
-  return aggregate(relay.sharers(at), at);
+  const views = relay.sharers(at);
+  const seat = resolvedSeat(views, seats.band);
+  if (seat === PAGE) return soloControls(lastParts || partsFromConcentration(state.C));
+  const chosen = viewsForSeat(views, seat);
+  // nobody left in the seat the page claims to follow: the generator's own answer
+  // to an empty room is the vamp, and inventing a head would be a lie
+  return aggregate(chosen, at);
+}
+
+/**
+ * What the lead patch is shaped by. A named head gives its own beta and
+ * steadiness; "auto" is the consensus the band votes, which carries the four
+ * ladder signals and no per-head beta; "this page" is the sliders' own terms.
+ */
+function patchSource() {
+  const at = Date.now() / 1000;
+  if (!relay) return soloControls();
+  const views = relay.sharers(at);
+  const seat = resolvedSeat(views, seats.patch);
+  if (seat === PAGE) return soloControls();
+  if (seat === AUTO) return aggregate(views, at);
+  return viewsForSeat(views, seat)[0] || soloControls();
+}
+
+/** Push the chosen muse's signals into the wavetable, once a bar. */
+function applyPatch() {
+  if (!lead) return;
+  const patch = lead.setPatch(patchFrom(patchSource()));
+  window.__audio.patch = patch;
 }
 
 /**
@@ -193,6 +232,7 @@ function headRowOf(view) {
 function onBar(event) {
   window.__audio.bars += 1;
   const bar = event.data;
+  lastBarFull = bar;
   window.__audio.lastBar = {
     index: bar.index, tempo: event.tempo, family: bar.family, vamp: bar.vamp,
     chord: bar.chords[0] ? bar.chords[0].label : null,
@@ -224,7 +264,9 @@ function onBar(event) {
 
   ui.bar(event);
   ui.signals(lastSignals);
-  if (relay) renderCast();
+  renderKeys();
+  applyPatch();
+  if (relay) renderDrivers();
 }
 
 /**
@@ -266,71 +308,194 @@ function meter() {
     : `${window.__audio.rms.toFixed(1)} / ${window.__audio.peak.toFixed(1)} dBFS`;
   if (relay && performance.now() - castAt > 400) {
     castAt = performance.now();
-    renderCast();
+    renderDrivers();
+    if (seats.band !== AUTO || seats.patch !== AUTO) applyPatch();
   }
   requestAnimationFrame(meter);
 }
 
-// ------------------------------------------------------------------- the cast
-
-function renderCast() {
-  const host = el("cast");
-  const rows = relay.all();
-  const roles = relay.roles();
-  const byPseudonym = new Map();
+// --------------------------------------------------------------- who drives
+/**
+ * The two seats and the key strip, under the transport. The chips are the
+ * roster: a head that is not opened to the music still appears, marked, because
+ * "you are refused" is information the sharer needs; but only admitted heads can
+ * be handed a seat.
+ */
+function renderDrivers() {
+  const rows = relay ? relay.all() : [];
+  const roles = relay ? relay.roles() : {};
   for (const [role, pseudonym] of Object.entries(roles)) {
     if (!pseudonym) continue;
-    if (!byPseudonym.has(pseudonym)) byPseudonym.set(pseudonym, []);
-    byPseudonym.get(pseudonym).push(role);
+    const row = rows.find((r) => r.pseudonym === pseudonym);
+    if (row) row.role = role;
   }
-
   window.__audio.cast = rows.map((r) => ({
     pseudonym: r.pseudonym, name: r.name, label: r.label,
     admitted: r.admitted, playable: r.playable, stale: r.stale, age: r.age,
-    roles: byPseudonym.get(r.pseudonym) ?? [],
+    role: r.role ?? null,
   }));
   window.__audio.roles = roles;
 
-  // onSharers only fires when the *admitted* cast changes, so a head that is
-  // refused never reaches it. That is the one head the panel must show -- it is
-  // how "not opened to the music" becomes visible -- so the panel keeps its own
-  // key and the caller polls it.
-  const key = rows.map((r) => `${r.pseudonym}:${r.admitted}:${r.stale}:${(byPseudonym.get(r.pseudonym) ?? []).join("+")}`).join("|");
+  const options = seatOptions(rows);
+  const key = seatKeyOf(rows);
   if (key === castKey) return;
   castKey = key;
 
-  host.hidden = rows.length === 0;
-  host.replaceChildren(...rows.map((r) => {
-    const row = document.createElement("div");
-    row.className = "wizard";
-    row.dataset.stale = String(r.stale === true);
-    row.dataset.pseudonym = r.pseudonym;
+  for (const seat of ["band", "patch"]) {
+    const host = el(`seat-${seat}`);
+    if (!host) continue;
+    const inForce = resolvedSeat(relay ? relay.sharers(Date.now() / 1000) : [], seats[seat]);
+    host.replaceChildren(...options.map((option) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "mg-choice";
+      chip.setAttribute("role", "radio");
+      chip.setAttribute("aria-checked", String(inForce === option.id));
+      chip.dataset.kind = option.kind;
+      chip.dataset.choice = option.id;
+      chip.dataset.stale = String(option.stale === true);
+      chip.disabled = option.kind === "refused";
+      chip.title = `${seat}: ${option.note}`;
+      chip.append(document.createTextNode(option.label));
+      const note = document.createElement("span");
+      note.textContent = option.note;
+      chip.appendChild(note);
+      chip.addEventListener("click", () => chooseSeat(seat, option.id));
+      return chip;
+    }));
+  }
+}
 
-    const who = document.createElement("span");
-    who.className = "who";
-    who.textContent = r.name || r.pseudonym;
-    row.appendChild(who);
+/** A stable key for the seat chips, so the poll does not rebuild them per frame. */
+function seatKeyOf(rows) {
+  return [
+    rows.map((r) => `${r.pseudonym}:${r.admitted}:${r.stale}:${r.role ?? ""}`).join("|"),
+    seats.band, seats.patch,
+  ].join("#");
+}
 
-    for (const role of byPseudonym.get(r.pseudonym) ?? []) {
-      const tag = document.createElement("span");
-      tag.className = "role";
-      tag.textContent = role;
-      row.appendChild(tag);
-    }
-    if (!r.admitted) {
-      const refused = document.createElement("span");
-      refused.className = "refused";
-      refused.textContent = r.label;
-      row.appendChild(refused);
-    }
-    if (r.stale) {
-      const stale = document.createElement("span");
-      stale.className = "refused";
-      stale.textContent = "stale";
-      row.appendChild(stale);
-    }
-    return row;
+/** Hand a seat to a chip. The choice is memory-only: a page reload is a new room. */
+function chooseSeat(seat, choice) {
+  if (seats[seat] === choice) return;
+  seats[seat] = choice;
+  castKey = "";                       // force the chips to redraw
+  renderDrivers();
+  const views = relay ? relay.sharers(Date.now() / 1000) : [];
+  const options = seatOptions(relay ? relay.all() : []);
+  const inForce = resolvedSeat(views, choice);
+  if (inForce !== choice) {
+    say(`${seat}: ${choice} has gone, so ${seatSentence(inForce, options)} is driving`);
+  } else {
+    say(`${seat}: ${seatSentence(inForce, options)}`);
+  }
+  applyPatch();
+}
+
+/**
+ * The key strip: ten midi notes from the chord in the bar, labelled so a hand can
+ * find them. It is rebuilt when the chord changes, not on every frame.
+ */
+function renderKeys() {
+  const host = el("keys");
+  if (!host) return;
+  const chord = lastBarFull && Array.isArray(lastBarFull.chords) && lastBarFull.chords[0]
+    ? lastBarFull.chords[0]
+    : null;
+  const scale = pentatonicNotes(chord, LEAD_RANGE);
+  keysNow = scale.notes;
+  const note = el("keys-note");
+  if (note) {
+    note.textContent = chord
+      ? `${scale.name} · ${chord.label} in the bar`
+      : `${scale.name} · no chord yet`;
+  }
+  host.replaceChildren(...KEYS.map(([letter], index) => {
+    const key = document.createElement("button");
+    key.type = "button";
+    key.className = "mg-key";
+    key.dataset.key = letter;
+    key.dataset.index = String(index);
+    key.dataset.down = "false";
+    const cap = document.createElement("b");
+    cap.textContent = letter;
+    const pitch = document.createElement("span");
+    pitch.textContent = keysNow[index] == null ? "—" : noteName(keysNow[index]);
+    key.append(cap, pitch);
+    // a click sounds it briefly; holding a pointer is the keyboard's job
+    key.addEventListener("pointerdown", (event) => {
+      event.preventDefault();
+      const voice = strike(index);
+      if (!voice) return;
+      setTimeout(() => releaseVoice(voice, index), 320);
+    });
+    return key;
   }));
+  // the strip is rebuilt when the chord moves, which happens while keys are held:
+  // put the lights back on whatever is still sounding
+  for (const held of heldKeys.values()) paintKey(held.index, true);
+}
+
+function paintKey(index, down) {
+  const host = el("keys");
+  const key = host && host.querySelector(`[data-index="${index}"]`);
+  if (key) key.dataset.down = String(down);
+}
+
+/** The band steps back while a soloist plays: -5.2 dB, 40 ms in, 250 ms out. */
+const DUCK = 0.55;
+function duckBand(on) {
+  const duck = loop && loop.voices.buses.duck;
+  if (!duck || !ctx) return;
+  const t = ctx.currentTime;
+  duck.gain.cancelScheduledValues(t);
+  duck.gain.setValueAtTime(duck.gain.value, t);
+  duck.gain.linearRampToValueAtTime(on ? DUCK : 1, t + (on ? 0.04 : 0.25));
+}
+
+/** Sound one key of the strip. */
+function strike(index) {
+  if (!lead || !ctx || ctx.state !== "running") return null;
+  const midi = keysNow[index];
+  if (midi == null) return null;
+  const first = lead.voices === 0;
+  const voice = lead.hold(midi);
+  paintKey(index, true);
+  if (first) duckBand(true);
+  window.__audio.keys = {
+    last: midi,
+    total: (window.__audio.keys ? window.__audio.keys.total : 0) + 1,
+    voices: lead.voices,
+  };
+  return voice;
+}
+
+/**
+ * Release the voice that was actually struck, not the note the strip holds *now*.
+ * The chord moves while a key is down -- the strip is rebuilt every bar -- and
+ * re-deriving the midi from the new strip released nothing, leaving notes
+ * sounding until the voice allocator stole them: measured, five keys released and
+ * three voices still playing.
+ */
+function releaseVoice(voice, index) {
+  if (voice) voice.release();
+  if (index != null) paintKey(index, false);
+  if (lead && lead.voices === 0) duckBand(false);
+}
+
+/** Release by keycap index, for the pointer and the page's own handle. */
+function lift(index) {
+  for (const [key, held] of heldKeys) {
+    if (held.index === index) {
+      heldKeys.delete(key);
+      releaseVoice(held.voice, held.index);
+      return;
+    }
+  }
+}
+
+/** The scene the keyboard plays over: the chord in the current bar, if any. */
+function currentChord() {
+  return lastBarFull && Array.isArray(lastBarFull.chords) ? lastBarFull.chords[0] || null : null;
 }
 
 // ------------------------------------------------------------------ wav export
@@ -400,15 +565,15 @@ async function boot() {
     relay = createRelay({
       url: relayUrl === "1" ? DEFAULT_RELAY : relayUrl,
       allow: (params.get("allow") || "").split(",").map((s) => s.trim()).filter(Boolean),
-      onSharers: () => renderCast(),
-      onLeave: (pseudonym, why) => { renderCast(); say(`${pseudonym} left: ${why}`); },
-      onStale: (pseudonym) => { renderCast(); say(`${pseudonym} went quiet: the band hands over`); },
+      onSharers: () => renderDrivers(),
+      onLeave: (pseudonym, why) => { renderDrivers(); applyPatch(); say(`${pseudonym} left: ${why}`); },
+      onStale: (pseudonym) => { renderDrivers(); applyPatch(); say(`${pseudonym} went quiet: the band hands over`); },
       onStatus: ({ state: relayState, url }) => {
         window.__audio.relayState = relayState;
         say(`relay ${relayState} · ${url}`);
       },
     });
-    renderCast();
+    renderDrivers();
   }
 
   loop = createLoop({
@@ -425,6 +590,17 @@ async function boot() {
   analyser.fftSize = 2048;
   levelData = new Float32Array(analyser.fftSize);
   loop.voices.master.connect(analyser);
+
+  // The lead is mixed after the band's compressor, not into the voice sum: the
+  // compressor holds the total near its ceiling, so a soloist mixed upstream is
+  // compressed back to nothing (measured: 1.1 dB of RMS for a five-voice lead,
+  // with the sum driven to 1.32). The band's duck does the work instead -- see
+  // duckBand() below.
+  lead = createLeadPatch(ctx);
+  lead.out.connect(loop.voices.master);
+  renderKeys();
+  renderDrivers();
+  applyPatch();
   requestAnimationFrame(meter);
 
   // the panel knows the weights before it knows a bar, so the sliders read the
@@ -525,6 +701,38 @@ document.addEventListener("keydown", (event) => {
   grab();
 });
 
+// The pentatonic keyboard: ten caps, one row of a computer. Same guard as Space,
+// so a control with focus keeps its own keys, and no key repeats a note that is
+// already sounding under the same finger.
+const keyOf = (event) => String(event.key || "").toLowerCase();
+
+document.addEventListener("keydown", (event) => {
+  if (event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isTypingTarget(event.target)) return;
+  const key = keyOf(event);
+  const index = KEYS.findIndex(([cap]) => cap === key);
+  if (index < 0 || heldKeys.has(key)) return;
+  const voice = strike(index);
+  if (!voice) return;
+  event.preventDefault();
+  heldKeys.set(key, { index, voice });
+});
+
+document.addEventListener("keyup", (event) => {
+  const key = keyOf(event);
+  const held = heldKeys.get(key);
+  if (!held) return;
+  heldKeys.delete(key);
+  releaseVoice(held.voice, held.index);
+});
+
+// A window that loses focus never sends the keyup, which would leave a note
+// sounding until it is stolen. Let go of everything.
+window.addEventListener("blur", () => {
+  for (const held of heldKeys.values()) releaseVoice(held.voice, held.index);
+  heldKeys.clear();
+});
+
 // A hidden tab throttles timers to ~1 Hz, which starves a 120 ms lookahead. The
 // loop suspends the context and reanchors the grid; this only reports it.
 document.addEventListener("visibilitychange", () => {
@@ -540,8 +748,14 @@ document.addEventListener("visibilitychange", () => {
 
 // The page's own handle on the pieces, for the browser gates.
 window.__margoth = {
-  state, get idle() { return idle; }, get relay() { return relay; },
+  state, seats, chooseSeat, get idle() { return idle; }, get relay() { return relay; },
   get loop() { return loop; }, grab, exportWav, ui,
+  get lead() { return lead; },
+  get patch() { return lead ? lead.patch : null; },
+  get keys() { return keysNow.slice(); },
+  get chord() { return currentChord(); },
+  get pentatonic() { return pentatonicNotes(currentChord(), LEAD_RANGE).name; },
+  strike, lift, releaseAll: () => { for (const held of heldKeys.values()) releaseVoice(held.voice, held.index); heldKeys.clear(); },
   get weights() { return getConcentrationWeights(); },
   setWeights: (next) => applyWeights(next),
   sweep: () => relay && relay.sweep(),

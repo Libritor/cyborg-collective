@@ -105,11 +105,20 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   compressor.release.value = 0.25;
   const master = ctx.createGain();
   master.gain.value = OUT_TRIM;
+  // The duck sits between the compressor and the fader, and exists for one
+  // reason: the compressor holds the total near its own ceiling, so a soloist
+  // mixed upstream can add level all day and only be compressed back -- measured,
+  // a five-voice lead raised the master RMS by 1.1 dB while pushing the voice sum
+  // from 0.72 to 1.32, i.e. past the waveshaper's domain. A page that plays over
+  // the band pulls this down a few dB, and the lead is mixed after it.
+  const duck = ctx.createGain();
+  duck.gain.value = 1;
 
   input.connect(shaper);
   shaper.connect(makeUp);
   makeUp.connect(compressor);
-  compressor.connect(master);
+  compressor.connect(duck);
+  duck.connect(master);
   master.connect(ctx.destination);
 
   // -------------------------------------------------------------------- buses
@@ -408,7 +417,7 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
     // `sum` is the voice mix before the shaper. It is exposed so the level going
     // into a [-1,1] curve can be measured instead of assumed; the three sends are
     // the effect buses.
-    buses: { sum: input, reverb: reverbIn, chorus: chorusIn, delay: delayIn },
+    buses: { sum: input, duck, reverb: reverbIn, chorus: chorusIn, delay: delayIn },
     master,
   };
 }
