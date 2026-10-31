@@ -37,6 +37,24 @@ export const PENTATONIC = Object.freeze({
 
 export const MAX_VOICES = 6;
 
+/**
+ * The patch with no headband: the C dial stands in for the head. Its position is
+ * read as beta (brightness), its complement as alpha (the odd/even morph), and
+ * steadiness with it, so dragging the one dial visibly sweeps the wave from
+ * hollow-and-dark to full-and-bright. It is the same mapping as patchFrom, fed a
+ * stand-in head -- a choice, like the rest of the patch, but a stated one.
+ */
+export function patchFromSlider(C) {
+  const value = Math.min(1, Math.max(0, Number.isFinite(C) ? C : 0.45));
+  return patchFrom({
+    alphaShare: 1 - value,
+    betaShare: value,
+    steadiness: value,
+    arousal: value,
+    motion: 0.15,
+  });
+}
+
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const mtof = (midi) => 440 * 2 ** ((midi - 69) / 12);
@@ -108,6 +126,50 @@ export function harmonicAmplitudes(patch = {}, count = 16) {
   return out;
 }
 
+/**
+ * A waveform, drawn from the patch's own harmonics: the sum of the sine terms the
+ * wavetable is built from, normalised by the worst-case sum so the trace can
+ * never leave its box. This is the shape the oscillators are playing, not an
+ * illustration of one.
+ */
+export function waveformPath(amplitudes, { width = 132, height = 52, points = 96 } = {}) {
+  const amps = amplitudes || [];
+  let worst = 0;
+  for (let n = 1; n < amps.length; n += 1) worst += Math.abs(amps[n]);
+  const norm = worst > 0 ? 1 / worst : 1;
+  const mid = height / 2;
+  const swing = height / 2 - 2;
+  const parts = [];
+  for (let i = 0; i <= points; i += 1) {
+    const t = i / points;
+    let sum = 0;
+    for (let n = 1; n < amps.length; n += 1) sum += amps[n] * Math.sin(2 * Math.PI * n * t);
+    const x = (t * width).toFixed(2);
+    const y = (mid - sum * norm * swing).toFixed(2);
+    parts.push(`${i === 0 ? "M" : "L"} ${x} ${y}`);
+  }
+  return parts.join(" ");
+}
+
+/**
+ * The scale as a ladder: ten notes, x by position, y by pitch. The shape is the
+ * pentatonic itself -- two small steps and a wide one -- so a glance shows whether
+ * the strip is a minor pentatonic or the sus scale with no third.
+ */
+export function scaleLadder(notes, { width = 132, height = 52 } = {}) {
+  const list = Array.isArray(notes) ? notes : [];
+  if (!list.length) return { d: "", dots: [] };
+  const lo = Math.min(...list);
+  const hi = Math.max(...list);
+  const span = Math.max(1, hi - lo);
+  const dots = list.map((midi, i) => ({
+    x: (4 + (i * (width - 8)) / Math.max(1, list.length - 1)),
+    y: (height - 5 - ((midi - lo) / span) * (height - 10)),
+  }));
+  const d = dots.map((dot, i) => `${i === 0 ? "M" : "L"} ${dot.x.toFixed(1)} ${dot.y.toFixed(1)}`).join(" ");
+  return { d, dots };
+}
+
 export const DEFAULT_PATCH = Object.freeze({
   morph: 0.4, brightness: 0.6, drive: 0.4, detune: 6, jitter: 0,
 });
@@ -140,50 +202,79 @@ export function patchFrom(source = {}) {
  * enough to be born in a page. The patch is rebuilt on the oscillators when the
  * muse moves, including under sounding notes, so a held chord keeps up.
  *
- * `level` (1.1) and the ceiling (0.7) are why the lead is mixed *after* the band's compressor
+ * `level` (0.92) and the ceiling (0.95) are why the lead is mixed *after* the band's compressor
  * (the page connects `out` to the fader, and pulls the band's duck down while a
  * key is held). Mixed into the voice sum instead, the compressor held the total
  * and the lead could not be heard: measured, five voices at level 1.5 moved the
- * master RMS 1.1 dB while driving the sum to 1.32. 1.1 puts one note above the
- * band's own RMS once the duck has stepped the band back, and the ceiling keeps
- * ten fingers inside the mix's headroom: measured, five voices peak at -1.3 dBFS
- * with eleven of headroom left.
+ * master RMS 1.1 dB while driving the sum to 1.32. 0.92 puts one note above the
+ * band's own RMS once the duck has stepped the band back, and leaves the ceiling
+ * to catch transients rather than notes: measured, one key peaks at 0.65 and six
+ * silent keys at 0.79, so the curve is transparent instead of flattening a chord
+ * (at 1.1 the six-key case sat on the flat top for 7.6% of its samples).
  */
-export const LEAD_CEILING = 0.7;
+export const LEAD_CEILING = 0.95;
+/**
+ * How far above the ceiling a signal may sit before the shaper's own [-1, 1] input
+ * domain clamps it. A WaveShaper curve covers ±1 and *hard-clamps* anything past
+ * it -- the same trap the band's saturator had -- and six voices sum to about ±6,
+ * so a curve drawn for a single voice was clamping every chord into a square wave.
+ * The signal is scaled into the domain and back out again, which puts the real
+ * soft ceiling at ±HEADROOM.
+ */
+export const LEAD_HEADROOM = 8;
 
 /**
- * A soft ceiling for the lead's own output: y = c·tanh(x/c), which is unity for
- * small signals and flattens near c. Below it a single note is untouched; above
- * it, five keys held at once lean on the curve instead of pushing the voice sum
- * past the waveshaper's [-1, 1] domain (measured at 1.32 without it).
+ * A soft ceiling for the lead's own output: y = c·tanh(x/c), unity for small
+ * signals and flattening near c, drawn over a domain of ±headroom so nothing can
+ * reach the clamp.
+ *
+ * c is 0.95, not 0.7: measured, a single note's attack already peaks at 0.69, so a
+ * 0.7 ceiling was flattening every chord -- 326 of 2048 samples sat on the flat top
+ * with six keys down. At 0.95 the curve is transparent for one note and only leans
+ * on transients, and 0.95 before the fader is 0.475 after it, which the mix can
+ * afford: the ducked band peaks at 0.41.
  */
-export function ceilingCurve(ceiling = LEAD_CEILING, points = 1024) {
+export function ceilingCurve({ ceiling = LEAD_CEILING, headroom = LEAD_HEADROOM, points = 2048 } = {}) {
   const curve = new Float32Array(points);
+  const scale = ceiling / headroom;
   for (let i = 0; i < points; i += 1) {
     const x = (i / (points - 1)) * 2 - 1;
-    curve[i] = ceiling * Math.tanh(x / ceiling);
+    curve[i] = scale * Math.tanh((x * headroom) / ceiling);
   }
   return curve;
 }
 
-export function createLeadPatch(ctx, { level = 1.1 } = {}) {
+export function createLeadPatch(ctx, { level = 0.92, headroom = LEAD_HEADROOM } = {}) {
   const out = ctx.createGain();          // the page connects to this
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.Q.value = 0.8;
   filter.frequency.value = 2600;
-  const voiceBus = ctx.createGain();     // the whole patch's level, pre-ceiling
-  voiceBus.gain.value = level;
+  const voiceBus = ctx.createGain();     // level, and polyphony compensation
+  const into = ctx.createGain();         // scales the signal into the curve's domain
+  into.gain.value = 1 / headroom;
   const limiter = ctx.createWaveShaper();
-  limiter.curve = ceilingCurve();
+  limiter.curve = ceilingCurve({ headroom });
   limiter.oversample = "2x";
+  const outOf = ctx.createGain();        // ...and the domain's scale back out
+  outOf.gain.value = headroom;
   filter.connect(voiceBus);
-  voiceBus.connect(limiter);
-  limiter.connect(out);
+  voiceBus.connect(into);
+  into.connect(limiter);
+  limiter.connect(outOf);
+  outOf.connect(out);
 
   let patch = { ...DEFAULT_PATCH };
   let wave = null;
   let voices = [];
+
+  // A chord of six is not six times as loud: the bus follows 1/sqrt(n), the usual
+  // polyphonic compromise between one note at full level and a chord that slams.
+  const setBus = () => {
+    const gain = level / Math.sqrt(Math.max(1, voices.length));
+    voiceBus.gain.setTargetAtTime(gain, ctx.currentTime, 0.02);
+  };
+  setBus();
 
   const build = () => {
     const imag = harmonicAmplitudes(patch);
@@ -205,6 +296,7 @@ export function createLeadPatch(ctx, { level = 1.1 } = {}) {
       try { osc.stop(t + 0.22); } catch { /* already stopped */ }
     }
     voices = voices.filter((v) => v !== voice);
+    setBus();
   };
 
   const start = (midi, at = ctx.currentTime) => {
@@ -230,6 +322,7 @@ export function createLeadPatch(ctx, { level = 1.1 } = {}) {
     voices = voices.concat(voice);
     // steal the oldest rather than refuse a key: ten keys, six voices
     while (voices.length > MAX_VOICES) stop(voices[0], ctx.currentTime);
+    setBus();
     return voice;
   };
 

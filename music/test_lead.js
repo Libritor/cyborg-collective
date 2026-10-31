@@ -2,8 +2,9 @@
 // No audio and no DOM. Run: node music/test_lead.js -> "PASS <n> assertions".
 
 import {
-  KEYS, LEAD_RANGE, PENTATONIC, MAX_VOICES,
-  isMajorQuality, pentatonicFamily, pentatonicNotes, harmonicAmplitudes, patchFrom, DEFAULT_PATCH,
+  KEYS, LEAD_RANGE, PENTATONIC, MAX_VOICES, LEAD_CEILING, LEAD_HEADROOM,
+  isMajorQuality, pentatonicFamily, pentatonicNotes, harmonicAmplitudes, patchFrom,
+  patchFromSlider, waveformPath, scaleLadder, ceilingCurve, DEFAULT_PATCH,
 } from "./lead.js";
 import {
   AUTO, PAGE, SEATS, seatOptions, viewsForSeat, resolvedSeat, seatSentence, seatStatus,
@@ -120,6 +121,53 @@ check(unit.every((key) => Number.isFinite(wild[key]) && wild[key] >= 0 && wild[k
   && Number.isFinite(wild.detune) && wild.detune >= 0 && wild.detune <= 12,
 `out-of-range signals clamp into each field's own range (${Object.entries(wild).map(([k, v]) => `${k} ${v.toFixed(2)}`).join(", ")})`);
 check(MAX_VOICES === 6, `six voices for ten keys (${MAX_VOICES})`);
+
+// ------------------------------------------------------------------ the glyphs
+console.log("glyphs");
+const ampsForGlyph = harmonicAmplitudes({ morph: 0.4, brightness: 0.6 });
+const wave = waveformPath(ampsForGlyph, { width: 168, height: 60, points: 120 });
+const waveY = wave.split("L ").slice(1).map((pair) => Number(pair.split(" ")[1]));
+check(wave.startsWith("M 0.00 30.00"), `the trace starts at the midpoint (${wave.slice(0, 14)})`);
+check(waveY.length === 120, `and has one point per sample (${waveY.length})`);
+check(waveY.every((y) => y >= 2 && y <= 58),
+  `every point stays inside the box, so nothing is drawn on the border (${Math.min(...waveY)}..${Math.max(...waveY)})`);
+const loud = waveformPath(harmonicAmplitudes({ morph: 0, brightness: 1 }), { width: 168, height: 60, points: 120 });
+check(loud !== wave, "a different patch draws a different wave");
+const sineOnly = waveformPath(harmonicAmplitudes({ morph: 0, brightness: 0 }, 16), { width: 100, height: 40, points: 8 });
+check(sineOnly.split("L ").slice(1).length === 8,
+  `a tiny trace still respects its point count (${sineOnly.split("L ").slice(1).length})`);
+
+const ladder = scaleLadder(pentatonicNotes({ root: 57, quality: "min" }).notes, { width: 168, height: 60 });
+check(ladder.dots.length === 10, `the ladder has a rung per key (${ladder.dots.length})`);
+check(ladder.dots.every((dot, i) => i === 0 || dot.x > ladder.dots[i - 1].x), "rungs run left to right");
+check(ladder.dots.every((dot, i) => i === 0 || dot.y < ladder.dots[i - 1].y),
+  "and higher notes sit higher, so the shape is the scale");
+check(ladder.dots.every((dot) => dot.y >= 4 && dot.y <= 56), "inside its own box");
+check(scaleLadder([]).dots.length === 0, "an empty scale draws nothing");
+
+// the ceiling: unity at low level, bounded above, and never reaching the clamp
+const curve = ceilingCurve();
+const at = (x) => {
+  const u = (x / LEAD_HEADROOM + 1) / 2;
+  const i = Math.round(u * (curve.length - 1));
+  return curve[Math.max(0, Math.min(curve.length - 1, i))] * LEAD_HEADROOM;
+};
+check(Math.abs(at(0.2) - 0.2) < 0.02, `small signals pass through the ceiling untouched (0.2 -> ${at(0.2).toFixed(3)})`);
+check(at(LEAD_HEADROOM) <= LEAD_CEILING + 1e-6 && at(LEAD_HEADROOM) > LEAD_CEILING * 0.95,
+  `a signal at the edge of the domain is pressed to the ceiling, not clamped flat (${at(LEAD_HEADROOM).toFixed(3)})`);
+// a limiter is monotone, not strictly rising: near the ceiling the steps vanish
+check(at(0.5) < at(1) && at(1) < at(2) && at(2) <= at(4) + 1e-6 && at(4) <= at(7) + 1e-6,
+  `the curve never falls, so it is a limiter and not a clip (${[0.5, 1, 2, 4, 7].map((x) => at(x).toFixed(3)).join(" ")})`);
+check(at(0.5) < 0.5 && at(0.5) > 0.3, `halfway in is compressed, not crushed (0.5 -> ${at(0.5).toFixed(3)})`);
+
+// the solo patch: the dial stands in for a head
+const low = patchFromSlider(0);
+const high = patchFromSlider(1);
+check(low.morph === 1 && high.morph < 0.1, `C at zero is as hollow as the wave gets (${low.morph} / ${high.morph.toFixed(2)})`);
+check(low.brightness < 0.4 && high.brightness === 1, "and C at one is as bright as it gets");
+check(patchFromSlider(undefined).brightness > 0, "no dial reading still yields a patch");
+check(["morph", "brightness", "drive", "detune", "jitter"].every((key) => Number.isFinite(patchFromSlider(0.5)[key])),
+  "and every field is a number at every position");
 
 // ------------------------------------------------------------------ the seats
 console.log("seats");

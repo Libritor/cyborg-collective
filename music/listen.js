@@ -18,7 +18,10 @@ import { createVoices } from "./voices.js";
 import { createLoop } from "./loop.js";
 import { playEvent } from "./arrange.js";
 import { createUI, mountParameters } from "./ui.js";
-import { KEYS, LEAD_RANGE, createLeadPatch, patchFrom, pentatonicNotes } from "./lead.js";
+import {
+  KEYS, LEAD_RANGE, createLeadPatch, patchFrom, patchFromSlider, pentatonicNotes,
+  harmonicAmplitudes, waveformPath, scaleLadder,
+} from "./lead.js";
 import {
   AUTO, PAGE, seatOptions, viewsForSeat, resolvedSeat, seatSentence, seatStatus,
 } from "./drivers.js";
@@ -130,25 +133,24 @@ function currentControls() {
 }
 
 /**
- * What the lead patch is shaped by. A named head gives its own beta and
- * steadiness; "auto" is the consensus the band votes, which carries the four
- * ladder signals and no per-head beta; "this page" is the sliders' own terms.
+ * Push the chosen muse's signals into the wavetable.
+ *
+ * A named head gives its own beta and steadiness; "auto" is the consensus the band
+ * votes, which carries the four ladder signals and no per-head beta; "this page"
+ * -- and any page with no headband at all -- reads the C dial as a stand-in head,
+ * so the trace still moves when the only hand in the room is the visitor's.
  */
-function patchSource() {
-  const at = Date.now() / 1000;
-  if (!relay) return soloControls();
-  const views = relay.sharers(at);
-  const seat = resolvedSeat(views, seats.patch);
-  if (seat === PAGE) return soloControls();
-  if (seat === AUTO) return aggregate(views, at);
-  return viewsForSeat(views, seat)[0] || soloControls();
-}
-
-/** Push the chosen muse's signals into the wavetable, once a bar. */
 function applyPatch() {
   if (!lead) return;
-  const patch = lead.setPatch(patchFrom(patchSource()));
+  const at = Date.now() / 1000;
+  const views = relay ? relay.sharers(at) : [];
+  const seat = resolvedSeat(views, seats.patch);
+  const head = (!relay || seat === PAGE)
+    ? null
+    : (seat === AUTO ? aggregate(views, at) : viewsForSeat(views, seat)[0] || null);
+  const patch = lead.setPatch(head ? patchFrom(head) : patchFromSlider(state.C));
   window.__audio.patch = patch;
+  renderWaveGlyph(patch);
 }
 
 /**
@@ -344,6 +346,11 @@ function renderDrivers() {
   if (key === castKey) return;
   castKey = key;
 
+  const heads = rows.filter((r) => r.admitted && !r.stale);
+  const chosenView = relay
+    ? relay.sharers(Date.now() / 1000).find((v) => v.pseudonym === resolvedSeat(relay.sharers(Date.now() / 1000), seats.band))
+    : null;
+  renderHeadGlyph(chosenView);
   const SEAT_WORDS = {
     band: { verb: "driving the band", alone: "the sliders drive the band" },
     patch: { verb: "shaping the lead", alone: "the sliders shape the lead" },
@@ -379,17 +386,82 @@ function renderDrivers() {
     // With nobody connected there is nothing to choose between, so the chips go
     // and one sentence says what is driving instead. A row offering "Everyone"
     // and "These sliders" when they are the same thing is not a choice.
-    const heads = rows.filter((r) => r.admitted && !r.stale).length;
     const refused = rows.filter((r) => !r.admitted).length;
-    host.hidden = heads === 0;
+    host.hidden = heads.length === 0;
     const stateLine = el(`seat-${seat}-state`);
     if (stateLine) {
       stateLine.textContent = lostNote
         ? lostNote.textContent
-        : seatStatus(inForce, options, { heads, refused, ...SEAT_WORDS[seat] });
+        : seatStatus(inForce, options, { heads: heads.length, refused, ...SEAT_WORDS[seat] });
       stateLine.dataset.lost = String(!!lostNote);
     }
   }
+}
+
+// -------------------------------------------------------------------- glyphs
+// Three drawings, each of the thing it controls rather than a decoration: the
+// chosen head with its four electrodes lit by their real contact codes, the
+// waveform the wavetable is actually built from, and the shape of the scale.
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgNode(tag, attrs = {}) {
+  const node = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
+  return node;
+}
+
+/** The head: a headband arc, the skull, and AF7/AF8/TP9/TP10 where they sit. */
+function renderHeadGlyph(head) {
+  const host = el("band-glyph");
+  if (!host) return;
+  const svg = svgNode("svg", { viewBox: "0 0 168 60" });
+  const codes = (head && head.hsi) || {};
+  svg.appendChild(svgNode("path", { class: "mg-arc", "data-on": String(!!head), d: "M 44 22 A 40 40 0 0 1 124 22" }));
+  svg.appendChild(svgNode("circle", { class: "mg-head", "data-on": String(!!head), cx: 84, cy: 32, r: 19 }));
+  // the four channels, at the corners of the forehead and the temples
+  for (const [channel, x, y] of [["AF7", 71, 26], ["AF8", 97, 26], ["TP9", 68, 38], ["TP10", 100, 38]]) {
+    const code = codes[channel];
+    const lit = code === 1 || code === 2;
+    svg.appendChild(svgNode("circle", {
+      class: "mg-elec",
+      "data-known": String(code != null),
+      "data-lit": String(lit),
+      cx: x, cy: y, r: 3.4,
+    }));
+  }
+  host.replaceChildren(svg);
+}
+
+/** The wave the lead is actually built from, drawn from its harmonics. */
+function renderWaveGlyph(patch) {
+  const host = el("patch-glyph");
+  if (!host) return;
+  const width = 168;
+  const height = 60;
+  const amps = harmonicAmplitudes(patch || {});
+  const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}` });
+  svg.appendChild(svgNode("line", { class: "mg-mid", x1: 0, y1: height / 2, x2: width, y2: height / 2 }));
+  svg.appendChild(svgNode("path", { class: "mg-wave", d: waveformPath(amps, { width, height, points: 120 }) }));
+  host.replaceChildren(svg);
+}
+
+/** The scale as a ladder: the staff of notes the keys are holding. */
+function renderScaleGlyph() {
+  const host = el("keys-glyph");
+  if (!host) return;
+  const width = 168;
+  const height = 60;
+  const { d, dots } = scaleLadder(keysNow, { width, height });
+  const svg = svgNode("svg", { viewBox: `0 0 ${width} ${height}` });
+  if (d) svg.appendChild(svgNode("path", { class: "mg-ladder", d }));
+  const root = keysNow.length ? ((keysNow[0] % 12) + 12) % 12 : -1;
+  dots.forEach((dot, index) => {
+    const isRoot = keysNow.length && ((keysNow[index] % 12) + 12) % 12 === root && index < 5;
+    svg.appendChild(svgNode("circle", {
+      class: "mg-ladder-dot", "data-root": String(!!isRoot), cx: dot.x, cy: dot.y, r: 2.6,
+    }));
+  });
+  host.replaceChildren(svg);
 }
 
 /** A stable key for the seat chips, so the poll does not rebuild them per frame. */
@@ -432,6 +504,7 @@ function renderKeys() {
     : null;
   const scale = pentatonicNotes(chord, LEAD_RANGE);
   keysNow = scale.notes;
+  renderScaleGlyph();
   const note = el("keys-note");
   if (note) {
     note.textContent = chord
@@ -470,8 +543,8 @@ function paintKey(index, down) {
   if (key) key.dataset.down = String(down);
 }
 
-/** The band steps back while a soloist plays: -5.2 dB, 40 ms in, 250 ms out. */
-const DUCK = 0.55;
+/** The band steps back while a soloist plays: -6 dB, 40 ms in, 250 ms out. */
+const DUCK = 0.5;
 function duckBand(on) {
   const duck = loop && loop.voices.buses.duck;
   if (!duck || !ctx) return;
@@ -701,6 +774,7 @@ el("transport").addEventListener("pointerup", () => {
 el("c").addEventListener("input", (event) => {
   state.C = Number(event.target.value);
   el("c-out").textContent = state.C.toFixed(2);
+  applyPatch();          // the trace follows the dial as it moves
 });
 el("bpm").addEventListener("input", (event) => {
   state.bpm = Number(event.target.value);

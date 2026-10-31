@@ -33,24 +33,36 @@
   <div class="mg-level"><div id="meter"><div id="meterbar"></div></div><span id="meter-text">—</span></div>
 </section>
 
-<section class="mg-seats" id="seats" aria-label="who drives the band">
-  <div class="mg-seat" data-seat="band">
-    <p class="mg-seat-head"><span class="mg-seat-role">who drives the band</span><span class="mg-seat-note">the parameters the backing track is generated from</span></p>
-    <div class="mg-seat-choices" id="seat-band" role="radiogroup" aria-label="who drives the band"></div>
-    <p class="mg-seat-state" id="seat-band-state" aria-live="polite"></p>
-  </div>
-  <div class="mg-seat" data-seat="patch">
-    <p class="mg-seat-head"><span class="mg-seat-role">who shapes the lead</span><span class="mg-seat-note">the wavetable the keys play</span></p>
-    <div class="mg-seat-choices" id="seat-patch" role="radiogroup" aria-label="who shapes the lead"></div>
-    <p class="mg-seat-state" id="seat-patch-state" aria-live="polite"></p>
-  </div>
-  <div class="mg-seat mg-seat-keys">
-    <p class="mg-seat-head"><span class="mg-seat-role">play the lead</span><span class="mg-seat-note" id="keys-note">a pentatonic of the chord in the bar</span></p>
-    <div class="mg-keys" id="keys" role="group" aria-label="play the lead"></div>
+<main>
+<section class="mg-stage" id="stage" aria-labelledby="stage-h">
+  <h2 class="mg-stage-title" id="stage-h">the desk</h2>
+  <p class="mg-stage-sub">Who plays what. The head on the left drives the backing track, the head in
+     the middle morphs the lead's wavetable, and the keys on the right are yours.</p>
+  <div class="mg-stage-grid">
+    <article class="mg-card">
+      <div class="mg-glyph" id="band-glyph" aria-hidden="true"></div>
+      <h3 class="mg-card-title">who drives the band</h3>
+      <p class="mg-card-gloss">its pressure opens the device ladder, sets the hats and every timbre</p>
+      <div class="mg-seat-choices" id="seat-band" role="radiogroup" aria-label="who drives the band"></div>
+      <p class="mg-seat-state" id="seat-band-state" aria-live="polite"></p>
+    </article>
+    <article class="mg-card">
+      <div class="mg-glyph" id="patch-glyph" aria-hidden="true"></div>
+      <h3 class="mg-card-title">who shapes the lead</h3>
+      <p class="mg-card-gloss">the trace above is the wave it makes: odd harmonics hollow it, beta brightens it</p>
+      <div class="mg-seat-choices" id="seat-patch" role="radiogroup" aria-label="who shapes the lead"></div>
+      <p class="mg-seat-state" id="seat-patch-state" aria-live="polite"></p>
+    </article>
+    <article class="mg-card">
+      <div class="mg-glyph" id="keys-glyph" aria-hidden="true"></div>
+      <h3 class="mg-card-title">play the lead</h3>
+      <p class="mg-card-gloss">ten keys in a pentatonic that follows the chord in the bar</p>
+      <div class="mg-keys" id="keys" role="group" aria-label="play the lead"></div>
+      <p class="mg-seat-state" id="keys-note"></p>
+    </article>
   </div>
 </section>
 
-<main>
   <section id="mount" aria-label="the instrument"></section>
   <section class="mg-params" id="params" aria-labelledby="params-h">
     <h2 id="params-h">what the numbers mean</h2>
