@@ -134,11 +134,18 @@ const CSS = `
   stroke: var(--mgu-accent);
   fill: color-mix(in srgb, var(--mgu-accent) 14%, var(--mgu-panel));
 }
-.mgu-node[data-live="true"] { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--mgu-cold) 45%, transparent)); }
-.mgu-node[data-live="true"][data-kind="voice"] { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--mgu-accent) 50%, transparent)); }
+/* the glow belongs to the disc: a filter on the group would blur the 11px
+   labels along with it and undo the knockout halo below */
+.mgu-node[data-live="true"] .mgu-ball {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--mgu-cold) 45%, transparent));
+}
+.mgu-node[data-live="true"][data-kind="voice"] .mgu-ball {
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--mgu-accent) 50%, transparent));
+}
 
 .mgu-node[data-state="current"] .mgu-ball { stroke: var(--mgu-accent); stroke-width: 2; }
-.mgu-node[data-state="armed"] .mgu-ball { stroke: var(--mgu-warm); stroke-width: 2; }
+/* the open chord is dashed whether or not the chain is standing on it, so a
+   family whose open chord is the current step keeps both readings */
 .mgu-node[data-open="true"] .mgu-ball {
   stroke: var(--mgu-accent); stroke-width: 1.6; stroke-dasharray: 4 3;
   animation: mgu-dash 1.2s linear infinite;
@@ -149,6 +156,11 @@ const CSS = `
   stroke: var(--mgu-warm); stroke-dasharray: 4 3; opacity: .8;
 }
 .mgu-node[data-ahead="true"] .mgu-ball-value { fill: var(--mgu-warm); }
+/* armed is the loudest thing that can be true of a step, so it is declared last:
+   an armed open chord reads warm, not gold */
+.mgu-node[data-state="armed"] .mgu-ball {
+  stroke: var(--mgu-warm); stroke-width: 2; stroke-dasharray: none; animation: none;
+}
 
 .mgu-edge {
   fill: none; stroke: var(--mgu-line); stroke-width: 1;
@@ -444,16 +456,18 @@ function drawGraph(host, graph, summary) {
       group.setAttribute("data-ahead", "false");
       const disc = svgEl("circle", { class: "mgu-ball", cx: node.x, cy: node.y, r: node.r });
       const below = node.place === "below";
-      // "right": the name above the line, the number below it, so a horizontal
-      // edge never has to run through either. "below": both under the ball.
+      // "right": the name above the ball's line, the number below it, so a
+      // horizontal edge never has to run through either. "below": both under the
+      // ball. The inset is nodes.js's, not this file's.
+      const inset = graph.labelGap || 15;
       const label = svgEl("text", {
         class: "mgu-ball-label",
-        x: below ? node.x : node.x + node.r + 6,
+        x: below ? node.x : node.x + inset,
         y: below ? node.y + node.r + 14 : node.y - 3,
       });
       const value = svgEl("text", {
         class: "mgu-ball-value",
-        x: below ? node.x : node.x + node.r + 6,
+        x: below ? node.x : node.x + inset,
         y: below ? node.y + node.r + 25 : node.y + 11,
       });
       if (below) {

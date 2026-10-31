@@ -37,9 +37,11 @@ export const GRAPH = Object.freeze({
   width: 820,
   ballR: 9,
   hubR: 11,          // C is the hub the three terms meet at
-  labelGap: 15,      // text starts this far right of a "right" ball's centre
-  valueRight: 126,   // ...and a value ends here, right-aligned
-  rowH: 26,
+  labelGap: 15,      // text starts this far right of a "right" ball's centre...
+  rowH: 32,          // ...and rows are pitched to hold two lines of text: a name
+                     // above the ball's line and a value below it, 28px of type
+                     // block, so 32 gives every stacked pair real air
+  textDown: 14,      // a value's baseline sits this far under the ball's centre
   top: 16,
   columns: [26, 176, 326, 476, 626],
 });
@@ -326,8 +328,11 @@ export function signalGraph(mix = {}, bar = {}, { parts = null, weights = null }
     into("register", "voice:lead"),
   ];
 
-  const bottom = nodes.reduce((max, node) => Math.max(max, node.y + node.r), 0);
-  return { width: GRAPH.width, height: Math.round(bottom + 12), nodes, edges };
+  const bottom = nodes.reduce((max, node) => Math.max(max,
+    node.y + node.r + (node.place === "below" ? 25 : GRAPH.textDown)), 0);
+  return {
+    width: GRAPH.width, height: Math.round(bottom + 8), nodes, edges, labelGap: GRAPH.labelGap,
+  };
 }
 
 // -------------------------------------------------------------------- harmony
@@ -392,7 +397,9 @@ export function harmonyGraph(bar = {}, chain = null, family = null) {
       kind: "chord", label: "waiting for a bar", value: DASH, note: "no bar yet",
       live: false, state: null, open: false, ahead: false,
     };
-    return { width: HARMONY.base, height: STEP_HEIGHT, nodes: [waiting], edges: [] };
+    return {
+      width: HARMONY.base, height: STEP_HEIGHT, nodes: [waiting], edges: [], labelGap: GRAPH.labelGap,
+    };
   }
 
   if (at.vamp || !labels.length) {
@@ -405,7 +412,9 @@ export function harmonyGraph(bar = {}, chain = null, family = null) {
       value: at.vamp ? "root pedal" : "transition",
       note: at.vamp ? "no harmony" : "the family closed",
     };
-    return { width: HARMONY.base, height: STEP_HEIGHT, nodes: [vamp], edges: [] };
+    return {
+      width: HARMONY.base, height: STEP_HEIGHT, nodes: [vamp], edges: [], labelGap: GRAPH.labelGap,
+    };
   }
 
   const entries = stepEntries(family, labels);
@@ -507,5 +516,5 @@ export function harmonyGraph(bar = {}, chain = null, family = null) {
   }
 
   const height = rejected.length ? LOST_HEIGHT : chords.length ? CHORD_HEIGHT : STEP_HEIGHT;
-  return { width, height, nodes, edges };
+  return { width, height, nodes, edges, labelGap: GRAPH.labelGap };
 }

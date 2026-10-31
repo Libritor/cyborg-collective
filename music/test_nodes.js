@@ -106,6 +106,15 @@ const ordered = [...byColumn.values()].every((column) => column
   .every((node, i) => i === 0 || node.y > column[i - 1].y));
 check(ordered, "rows within a column run strictly down the page, in the listed order");
 
+// A "right" ball prints a name above its line and a value below it: a 25px type
+// block. At a 26px pitch consecutive rows overlapped by 1px -- measured in the
+// browser -- so the pitch and the box height are both pinned here.
+const ys = [...new Set(hot.nodes.filter((n) => n.x === GRAPH.columns[0]).map((n) => n.y))].sort((a, b) => a - b);
+const pitches = ys.slice(1).map((y, i) => y - ys[i]);
+check(pitches.every((p) => p >= 30), `stacked balls are pitched apart (${pitches.join(",")})`);
+const lowest = Math.max(...hot.nodes.map((n) => n.y + (n.place === "below" ? 25 : GRAPH.textDown)));
+check(lowest <= hot.height, `and the box is tall enough for the last row's value (${lowest} <= ${hot.height})`);
+
 // ----------------------------------------------------------- signal: weights
 console.log("weights");
 const intoC = hot.edges.filter((edge) => edge.to === "C");
