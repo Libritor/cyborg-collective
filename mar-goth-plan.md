@@ -261,6 +261,12 @@ sines, gated 180 ms; hats 6 detuned squares ≥6 kHz; bass two saws ±7 cents + 
 + chorus; lead pulse 25% + saw, lowpass 4 kHz. Master: compressor (3:1, 8 ms) and
 a −1 dBFS safety gain.
 
+> **Superseded by `music/kit.js`.** The step 1–4 build settled the numbers there,
+> and that file is the single source for hit synthesis — the kick falls 120→44 Hz
+> (a sine that starts at 58 Hz has no click to speak of), the snare gate is 150 ms,
+> and the grammar never emits `clap` or `rim`, so the kit is six hits. The bus
+> topology and the impulse above survived unchanged.
+
 ## 8. UI: the chain is the instrument
 
 `<section id="music">` — "The Chains of Margoth and the Wizards of SixthSense":

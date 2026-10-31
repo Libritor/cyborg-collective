@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>queued</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+         background: #111; color: #ddd; margin: 2rem; }
+  h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #999; }
+  #status { font-weight: 700; }
+  .ok { color: #6c6; }
+  .fail { color: #e66; }
+  #log { padding-left: 1.2rem; }
+  #log li { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>MarGoth audio gates</h1>
+<p id="status">running…</p>
+<ol id="log"></ol>
+<script type="module" src="./test_audio.js"></script>
+</body>
+</html>
