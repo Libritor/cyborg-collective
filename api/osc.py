@@ -8,6 +8,7 @@ address, all-float arguments, indexed with ``(address, index)`` rules.
 
 from __future__ import annotations
 
+import errno
 import socket
 import struct
 import time
@@ -82,6 +83,7 @@ class OscEmitter:
         self.sent = 0
         self.frames = 0
         self.errors = 0
+        self.dropped = 0
         self._last_error_log = 0.0
         self._on_error = None
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -150,8 +152,13 @@ class OscEmitter:
                 self._sock.sendto(encode_message(address, values), (self.host, self.port))
                 count += 1
             except OSError as exc:
-                self.errors += 1
-                self._log_error(f"osc send failed for {address}: {exc}")
+                if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK, errno.ENOBUFS):
+                    # UDP is lossy by nature: a full send buffer is a dropped
+                    # datagram, not a fault worth warning about every tick
+                    self.dropped += 1
+                else:
+                    self.errors += 1
+                    self._log_error(f"osc send failed for {address}: {exc}")
         self.sent += count
         self.frames += 1
         return count

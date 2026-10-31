@@ -26,9 +26,14 @@ import threading
 import time
 from pathlib import Path
 
+from capture import CaptureWriter, list_captures
+from relay import RelayHub
+
 API_DIR = Path(__file__).resolve().parent
 SERVER = API_DIR / "server.py"
 
+# ports are chosen at run time so a demo (simulate.py + server.py) may hold the
+# usual ones without colliding: see free_port() in main()
 HTTP_PORT = 8789
 WS_PORT = 8790
 OSC_PORT = 5001
@@ -236,7 +241,15 @@ def wait_for(fn, timeout=20.0, interval=0.1):
     return last
 
 
+def free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
 def main():
+    global HTTP_PORT, WS_PORT, OSC_PORT
+    HTTP_PORT, WS_PORT, OSC_PORT = free_port(), free_port(), free_port()
     workdir = Path(tempfile.mkdtemp(prefix="cc-api-test-"))
     captures = workdir / "captures"
     captures.mkdir()
@@ -245,6 +258,7 @@ def main():
     process = None
 
     print(f"workdir {workdir}")
+    print(f"ports http={HTTP_PORT} ws={WS_PORT} osc={OSC_PORT}")
     start_fake_relay(WS_PORT, stop)
     if not wait_tcp(WS_PORT):
         print("FAIL fake relay never accepted a connection")
@@ -387,6 +401,10 @@ def main():
         check(status == 400 and "error" in body, "bad channel is a 400 JSON error")
         status, body = get_json(HTTP_PORT, "/api/v1/sessions/nope/nope")
         check(status == 404 and body.get("error") == "unknown stamp", "unknown stamp is a 404")
+
+        print("regressions")
+        _check_capture_rotation(workdir)
+        _check_eeg_rate()
         return _report(workdir)
     finally:
         stop.set()
@@ -397,6 +415,49 @@ def main():
             except subprocess.TimeoutExpired:
                 process.kill()
         log.close()
+
+
+def _check_capture_rotation(workdir):
+    """Interleaved sharers must land in one file each, not one file per frame.
+
+    Regression: rotating whenever the pseudonym changed shredded a two-sharer
+    capture into hundreds of 5-frame files.
+    """
+    directory = workdir / "rotation"
+    writer = CaptureWriter(directory)
+    frame = {"t": "eeg", "pseudonym": "a", "x": [[0.0] * 8] * 4}
+    for index in range(200):
+        writer.write("a" if index % 2 == 0 else "b", frame)
+    writer.close()
+    captures = list_captures(directory)
+    check(len(captures) == 2, f"interleaved sharers produce one file each ({len(captures)})")
+    check(all(c["frames"] == 100 for c in captures),
+          "each interleaved file holds only its own frames")
+
+    limited = workdir / "rotation-limit"
+    small = CaptureWriter(limited, rotate_bytes=2048)
+    for _ in range(60):
+        small.write("a", frame)
+    small.close()
+    files = list_captures(limited)
+    check(len(files) > 1, f"a pseudonym still rotates past rotate_bytes ({len(files)} files)")
+    check(all(c["sharers"] == ["a"] for c in files), "rotated files stay with their pseudonym")
+
+
+def _check_eeg_rate():
+    """eeg_hz is samples per second per channel, not summed over channels.
+
+    Regression: summing all four channel rows reported 4x the real rate
+    (1024 Hz for a 256 Hz stream).
+    """
+    hub = RelayHub("ws://unused.invalid/live")
+    eeg = {"t": "eeg", "pseudonym": "rate", "x": [[0.0] * 32 for _ in range(4)]}
+    hub.handle_message(eeg)
+    time.sleep(0.125)
+    hub.handle_message(dict(eeg))
+    rate = hub.sharers()[0]["eeg_hz"]
+    check(rate is not None and 200 <= rate <= 320,
+          f"eeg_hz reports the per-channel rate ({round(rate or 0, 1)} for 32 samples / 0.125 s)")
 
 
 def _up(port):

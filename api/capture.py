@@ -5,8 +5,10 @@ only way to own the history is to record it while it arrives:
 
     {"recv_ts": 1793414821.927, "frame": {...upstream frame verbatim...}}
 
-One file per pseudonym, rotated when the pseudonym changes or the file passes
-``rotate_bytes`` (a raw-tier sharer is roughly 16 MB/hour).
+One file per pseudonym, kept open and rotated when that file passes
+``rotate_bytes`` (a raw-tier sharer is roughly 16 MB/hour). Several sharers
+stream at once, so the writer holds one handle each -- rotating on "the
+pseudonym changed" would shred a capture into one file per interleaved frame.
 """
 
 from __future__ import annotations
@@ -36,14 +38,12 @@ def sanitize(pseudonym):
 
 
 class CaptureWriter:
-    """Append-only JSONL writer with rotation. Never raises into the socket loop."""
+    """Append-only JSONL writer, one open file per pseudonym. Never raises."""
 
     def __init__(self, path, rotate_bytes=64 * 1024 * 1024):
         self.dir = Path(path)
         self.rotate_bytes = int(rotate_bytes)
-        self._fh = None
-        self._pseudonym = None
-        self._bytes = 0
+        self._files = {}          # pseudonym -> {"fh": file, "bytes": int}
         self.written = 0
         self.failed = 0
         self._last_error_log = 0.0
@@ -61,52 +61,52 @@ class CaptureWriter:
             self._on_error(message)
 
     def _open(self, pseudonym):
-        self._close_file()
+        self._close_one(pseudonym)
         self.dir.mkdir(parents=True, exist_ok=True)
-        name = f"{sanitize(pseudonym)}__{utc_stamp(time.time())}.jsonl"
-        path = self.dir / name
-        if path.exists():  # same second, same person: do not clobber
-            base = path.with_suffix("")
-            n = 1
-            while path.exists():
-                path = base.with_name(f"{base.name}-{n}.jsonl")
-                n += 1
-        self._fh = path.open("a", encoding="utf-8")
-        self._pseudonym = pseudonym
-        self._bytes = 0
+        base = f"{sanitize(pseudonym)}__{utc_stamp(time.time())}"
+        path = self.dir / f"{base}.jsonl"
+        n = 1
+        while path.exists():        # same second, same person: never clobber
+            path = self.dir / f"{base}-{n}.jsonl"
+            n += 1
+        handle = path.open("a", encoding="utf-8")
+        self._files[pseudonym] = {"fh": handle, "bytes": 0}
+        return self._files[pseudonym]
 
-    def _close_file(self):
-        if self._fh is not None:
+    def _close_one(self, pseudonym):
+        entry = self._files.pop(pseudonym, None)
+        if entry is not None:
             try:
-                self._fh.close()
+                entry["fh"].close()
             except OSError:
                 pass
-        self._fh = None
 
     # ----------------------------------------------------------------------- API
-    @property
-    def path(self):
-        return Path(self._fh.name) if self._fh is not None else None
+    def paths(self):
+        """The files currently open, for logging."""
+        return [Path(entry["fh"].name) for entry in self._files.values()]
 
     def write(self, pseudonym, frame):
         """Append one frame (plus its receive time) and flush."""
         try:
-            if self._fh is None or pseudonym != self._pseudonym:
-                self._open(pseudonym)
-            elif self._bytes >= self.rotate_bytes:
-                self._open(pseudonym)
+            entry = self._files.get(pseudonym)
+            if entry is None or entry["bytes"] >= self.rotate_bytes:
+                entry = self._open(pseudonym)
             line = json.dumps({"recv_ts": time.time(), "frame": frame},
                               ensure_ascii=False, separators=(",", ":")) + "\n"
-            self._fh.write(line)
-            self._fh.flush()
-            self._bytes += len(line.encode("utf-8"))
+            handle = entry["fh"]
+            handle.write(line)
+            handle.flush()
+            entry["bytes"] += len(line.encode("utf-8"))
             self.written += 1
         except (OSError, TypeError, ValueError) as exc:
             self.failed += 1
+            self._close_one(pseudonym)
             self._log_error(f"capture write failed: {exc}")
 
     def close(self):
-        self._close_file()
+        for pseudonym in list(self._files):
+            self._close_one(pseudonym)
 
 
 def read_frames(path):
@@ -171,8 +171,12 @@ def find_capture(directory, capture_id):
     """The summary for one capture id, or None."""
     if not _SAFE.fullmatch(str(capture_id) or ""):
         return None
+    name = f"{capture_id}.jsonl"
+    path = Path(directory) / name
+    if not path.is_file():
+        return None
     for entry in list_captures(directory):
-        if entry["id"] == capture_id:
+        if entry["file"] == name:
             return entry
     return None
 

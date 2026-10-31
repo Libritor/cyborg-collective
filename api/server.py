@@ -461,9 +461,10 @@ async def capture_features(request):
             kind = frame.get("t")
             if kind == "eeg":
                 rows = frame.get("x") if isinstance(frame.get("x"), list) else []
-                samples = sum(len(row) for row in rows if isinstance(row, list))
-                if last_eeg_ts is not None and entry["recv_ts"] > last_eeg_ts and samples:
-                    rate = samples / (entry["recv_ts"] - last_eeg_ts)
+                widths = [len(row) for row in rows if isinstance(row, list)]
+                per_channel = sum(widths) / len(widths) if widths else 0
+                if last_eeg_ts is not None and entry["recv_ts"] > last_eeg_ts and per_channel:
+                    rate = per_channel / (entry["recv_ts"] - last_eeg_ts)
                     eeg_hz = rate if eeg_hz is None else (0.2 * rate + 0.8 * eeg_hz)
                 last_eeg_ts = entry["recv_ts"]
                 continue

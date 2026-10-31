@@ -229,11 +229,13 @@ class RelayHub:
         if not isinstance(rows, list):
             return
         state["last"]["eeg"] = message
-        samples = sum(len(row) for row in rows if isinstance(row, list))
+        # fs is per channel: average the channel lengths, never their sum
+        widths = [len(row) for row in rows if isinstance(row, list)]
+        per_channel = sum(widths) / len(widths) if widths else 0
         now = time.time()
         previous = state["last_eeg_ts"]
-        if previous is not None and now > previous and samples:
-            hz = samples / (now - previous)
+        if previous is not None and now > previous and per_channel:
+            hz = per_channel / (now - previous)
             current = state["eeg_hz"]
             state["eeg_hz"] = hz if current is None else (0.2 * hz + 0.8 * current)
         state["last_eeg_ts"] = now

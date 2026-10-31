@@ -34,6 +34,41 @@ python3 api/server.py --relay ws://127.0.0.1:8790/live        # another relay
 `python3 api/test_pipeline.py` proves the whole path (fake relay → hub →
 capture → SSE replay → OSC datagrams) and prints `PASS <n> assertions`.
 
+## See it working without a sharer
+
+The real relay usually has nobody streaming (`/stats` → `people: 0`), so there is
+nothing to watch. `api/simulate.py` is a stand-in relay that speaks the same
+WebSocket protocol — it is a separate process, nothing fake lives inside the
+service:
+
+```bash
+python3 api/simulate.py --people 2                      # ws://127.0.0.1:8790/live
+python3 api/server.py --relay ws://127.0.0.1:8790/live --osc 127.0.0.1:5000
+```
+
+Everything downstream is the real code path: live state, SSE fan-out, JSONL
+capture and OSC all run exactly as they do against the Collective. The
+synthetic signal is not noise — band powers drift on slow oscillators, the EEG
+holds a 10 Hz alpha + 6 Hz theta mixture, heart rate breathes, and contact
+quality wanders — so the numbers you see move the way a real sharer's would.
+
+```bash
+curl -s localhost:8787/api/v1/live/sharers
+curl -N 'localhost:8787/api/v1/live/demo-01/eeg?decimate=8'
+curl -N localhost:8787/api/v1/live/demo-01/features
+curl -s localhost:8787/api/v1/captures          # one file per sharer, growing
+```
+
+To watch the OSC side without a listener stealing the port from Ableton:
+
+```bash
+python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(('127.0.0.1', 5000))
+while True: print(s.recvfrom(65535)[0][:24])"
+```
+
 ## Endpoints
 
 Everything lives under `/api/v1`, answers `application/json` with
@@ -142,10 +177,16 @@ Live and replayed features (`/live/{pseudonym}/features`,
 ```
 
 `contact` is the headband's hsi code per channel (1 good … 4 poor, `null` = no
-data). `null` band values mean that channel was not in contact. Replays pace
-themselves from the recorded receive times (`speed=50` finishes a short capture
-promptly; a gap never stalls longer than 5 s), and `start=<n>` skips the first n
-frames of the stream.
+data). `null` band values mean that channel was not in contact. `eeg_hz` is the
+measured sample rate **per channel** (a 256 Hz band shows ~256, not 4 × 256).
+Replays pace themselves from the recorded receive times (`speed=50` finishes a
+short capture promptly; a gap never stalls longer than 5 s), and `start=<n>`
+skips the first n frames of the stream.
+
+A `features` event is emitted once per incoming state frame — `bands`,
+`quality`, `arousal`, `hr` — so a running stream produces several per upstream
+tick, each carrying the current merged state. Clients that want one update per
+tick should coalesce on `ts` (or just act on the latest).
 
 ## OSC (→ Ableton)
 
@@ -185,8 +226,10 @@ the time of writing) but exposes **no download route** — `/record/<file>`,
 `/record/file/<file>` all 404. Raw history therefore has to be captured while
 it is live, which is what this service does: one JSONL per pseudonym,
 `{"recv_ts": <epoch seconds>, "frame": <upstream frame verbatim>}`, rotated at
-64 MiB, in `api/data/captures/` (gitignored). Frames without a pseudonym
-(`snapshot`, `aggregate`) are recorded under `_relay`.
+64 MiB, in `api/data/captures/` (gitignored). Each pseudonym keeps its own open
+handle, so several sharers streaming at once never shred each other's capture.
+Frames without a pseudonym (`snapshot`, `aggregate`) are recorded under
+`_relay`.
 
 ```json
 {"id": "russet-grebe-53__20261031T032403", "file": "russet-grebe-53__20261031T032403.jsonl",
@@ -206,4 +249,5 @@ never enter the repository.
 | `relay.py` | upstream WebSocket client, per-sharer state, fan-out, projections |
 | `capture.py` | JSONL writer/list/read |
 | `osc.py` | hand-rolled OSC encoding + UDP sender (`python-osc` not required) |
+| `simulate.py` | stand-in relay: synthetic sharers over the real protocol, for demos |
 | `test_pipeline.py` | end-to-end proof over a local fake relay |
