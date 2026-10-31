@@ -104,6 +104,32 @@ s.bind(('127.0.0.1', 5000))
 while True: print(s.recvfrom(65535)[0][:24])"
 ```
 
+## Running alongside the page
+
+The site and this service are two independent consumers of the same relay, which
+is the point of it: the page keeps working while Ableton gets the data.
+
+- The api is **read-only** upstream — it opens the relay WebSocket and never
+  sends, so it cannot disturb a sharer, a viewer or the page.
+- It costs the relay one viewer slot (`/stats` shows `viewers` grow, `people`
+  unchanged) and binds its own local port (`--port`, default 8787), so it runs
+  next to whatever serves the page.
+- The page prefers a **same-origin** relay (`fetch("stats")`) and falls back to
+  `wss://cyborg-collective-relay.onrender.com/live`. Both sides must point at
+  the same one: if you serve the page from a local server that also serves the
+  relay, give this service `--relay ws://127.0.0.1:<that-port>/live`; otherwise
+  the default already matches the fallback.
+- `/api/v1/*` answers `Access-Control-Allow-Origin: *`, so a page can also read
+  this service directly from JavaScript if it wants the derived features.
+
+```bash
+python3 api/server.py --osc 127.0.0.1:5000     # alongside the site, real relay
+```
+
+Then `python3 api/probe_live.py` says whether the headband on the other end is
+actually streaming — a sharer that is merely *connected* sends `device` frames
+and nothing else, which is what that report is for.
+
 ## Endpoints
 
 Everything lives under `/api/v1`, answers `application/json` with

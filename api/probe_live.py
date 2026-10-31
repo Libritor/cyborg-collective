@@ -69,8 +69,14 @@ def _event(block):
 
 
 def _read_events(host, port, path, seconds, on_event):
-    """Feed every SSE event to ``on_event`` for ``seconds``; return an error."""
-    conn = http.client.HTTPConnection(host, port, timeout=2.0)
+    """Feed every SSE event to ``on_event`` for ``seconds``; return an error.
+
+    One socket timeout covers the whole window: a timeout *is* the end of the
+    probe when a stream is silent, and ``http.client`` cannot be read again
+    after one anyway ("cannot read from timed out object") -- retrying after a
+    timeout ended a 30 s probe on a quiet sharer after 2 s.
+    """
+    conn = http.client.HTTPConnection(host, port, timeout=max(1.0, seconds + 1.0))
     try:
         conn.request("GET", path, headers={"Accept": "text/event-stream"})
         response = conn.getresponse()
@@ -82,7 +88,7 @@ def _read_events(host, port, path, seconds, on_event):
             try:
                 chunk = response.read1(65536)
             except (socket.timeout, TimeoutError):
-                continue                    # silent stream: keep reading
+                break                       # the window passed in silence
             except (OSError, http.client.HTTPException):
                 break
             if not chunk:
@@ -235,10 +241,14 @@ def main(argv=None):
 
     widths = ("unknown" if eeg["sample_min"] is None
               else f"{eeg['sample_min']}..{eeg['sample_max']}")
-    print(f"eeg events        {eeg['events']}   fs {_short(eeg['fs'])}"
+
+    def dropout(nulls, counts):
+        return f"{_percent(nulls, counts):.1f}%" if counts else "n/a"
+
+    print(f"eeg events        {eeg['events']}   fs {_short(eeg['fs'] if eeg['events'] else None)}"
           f"   rows {_short(eeg['rows'])}   samples/row {widths}")
     print("nulls per channel "
-          + "  ".join(f"{channel} {_percent(nulls, counts):.1f}%"
+          + "  ".join(f"{channel} {dropout(nulls, counts)}"
                       for channel, nulls, counts
                       in zip(eeg["channels"], eeg["nulls"], eeg["counts"])))
     print(f"features events   {features['events']}"
@@ -260,6 +270,9 @@ def main(argv=None):
 
     if not eeg["events"]:
         print(f"no eeg frames in {args.seconds}s")
+        print("CHECK warn the sharer is listed but streams no samples: on a Muse "
+              "this means the app is idle (it sends only device frames), "
+              "the headband is off, or it is not worn")
         return 1
 
     if eeg["rows"] == len(CHANNELS) and not eeg["unequal"]:

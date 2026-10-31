@@ -498,6 +498,8 @@ def main():
 
         print("stale heartbeat")
         _check_stale(HTTP_PORT, pause)
+        print("probe on a silent sharer")
+        _check_probe_silent(HTTP_PORT, pause)
 
         print("error paths")
         status, body = get_json(HTTP_PORT, "/api/v1/captures/nope/eeg")
@@ -705,6 +707,30 @@ def _check_stale(port, pause):
         check(isinstance(staleness[0].get("stale_s"), (int, float))
               and staleness[0]["stale_s"] >= 0.5,
               "the stale event carries the measured silence")
+
+
+def _check_probe_silent(port, pause):
+    """A silent stream must not cut the probe short: the window is the window.
+
+    Regression: ``http.client`` cannot be read again after a read timeout
+    ("cannot read from timed out object"), so retrying after one ended a 30 s
+    probe on a quiet sharer after 2 s -- reporting 0 events as if it had waited.
+    """
+    pause.set()
+    try:
+        started = time.time()
+        probe = subprocess.run(
+            [sys.executable, str(PROBE), "--api", f"http://127.0.0.1:{port}",
+             "--seconds", "3"],
+            capture_output=True, text=True, timeout=60)
+        elapsed = time.time() - started
+    finally:
+        pause.clear()
+    check(probe.returncode == 1, f"probe_live fails when no eeg arrives ({probe.returncode})")
+    check("no eeg frames in 3" in probe.stdout, "probe_live says how long it waited")
+    check(elapsed >= 2.9, f"probe_live reads the whole window in silence "
+                          f"({elapsed:.1f}s of 3)")
+    check("TP9 n/a" in probe.stdout, "probe_live reports no dropout figure when nothing arrived")
 
 
 def _check_validity():
