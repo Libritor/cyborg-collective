@@ -10,8 +10,8 @@
 
 import { KIT, KIT_NAMES, renderKit, fillNoise } from "./kit.js";
 import { createVoices } from "./voices.js";
-import { sixteenth } from "./scheduler.js";
 import { createGenerator, nextBar } from "./generator.js";
+import { arrangeBars, playEvent } from "./arrange.js";
 
 window.__result = null;      // null means "not finished"; ok is a boolean
 
@@ -213,35 +213,17 @@ async function runKit() {
 
 // --------------------------------------------------------------- section: voices
 
-/** One event list from the real generator, and the four stem renders that share it. */
-function arrange(bars, { seed = 3, tonicMidi = 57, bpm = 132, controls }) {
+/**
+ * One event list from the real generator, via the same seam the live loop uses.
+ * This used to be a second copy of the bar -> events mapping, and it played only
+ * chords[0], so the sus resolution and the drone never reached these
+ * measurements. arrangeBars is now the single source.
+ */
+function arrangement(count, { seed = 3, tonicMidi = 57, bpm = 132, controls }) {
   const gen = createGenerator({ seed, tonicMidi, bpm });
-  const events = [];
-  const timbres = [];
-  const barLength = (60 / bpm) * 4;
-  for (let i = 0; i < bars; i += 1) {
-    const bar = nextBar(gen, controls);
-    const start = i * barLength;
-    const s = sixteenth(bar.tempo ?? bpm);
-    timbres.push({ at: start, value: bar.timbre });
-    for (const hit of bar.drums) {
-      events.push({ kind: "drum", hit: hit.hit, vel: hit.vel, time: start + hit.step * s });
-    }
-    for (const note of bar.bass) {
-      events.push({ kind: "bass", midi: note.midi, vel: note.vel, dur: note.dur * s,
-        time: start + note.step * s });
-    }
-    for (const note of bar.lead) {
-      events.push({ kind: "lead", midi: note.midi, vel: note.vel, dur: note.dur * s,
-        time: start + note.step * s });
-    }
-    if (bar.chords.length) {
-      const chord = bar.chords[0];
-      events.push({ kind: "pad", voicing: chord.voicing, time: start, dur: barLength - 0.03 });
-    }
-  }
-  events.sort((a, b) => a.time - b.time);
-  return { events, timbres, barLength, duration: bars * barLength };
+  const bars = [];
+  for (let i = 0; i < count; i += 1) bars.push(nextBar(gen, controls));
+  return arrangeBars(bars, { bpm });
 }
 
 async function renderStem(kit, arrangement, kinds, seconds, { tap = "master" } = {}) {
@@ -249,11 +231,7 @@ async function renderStem(kit, arrangement, kinds, seconds, { tap = "master" } =
   const voices = createVoices(ctx, kit, { bpm: 132 });
   for (const { at, value } of arrangement.timbres) voices.setTimbre(value, at);
   for (const event of arrangement.events) {
-    if (!kinds.includes(event.kind)) continue;
-    if (event.kind === "drum") voices.play.drum(event.hit, event.time, event.vel);
-    if (event.kind === "bass") voices.play.bass(event.midi, event.time, event.dur, event.vel);
-    if (event.kind === "pad") voices.play.pad(event.voicing, event.time, event.dur);
-    if (event.kind === "lead") voices.play.lead(event.midi, event.time, event.dur, event.vel);
+    if (kinds.includes(event.kind)) playEvent(voices, event);
   }
   if (tap === "sum") {
     // Cut the sum from the saturator and listen to it directly: this is the
@@ -268,17 +246,16 @@ async function runVoices() {
   const { buffers, ir } = await renderKit(SAMPLE_RATE);
   const kit = { buffers, ir };
   const BARS = 4;
-  const arrangement = arrange(BARS, { controls: { C: 0.6, alphaShare: 0.3, arousal: 0.6, motion: 0.1 } });
-  const seconds = arrangement.duration + 2.6;    // the reverb tail has to fit
+  const arrangementData = arrangement(BARS, { controls: { C: 0.6, alphaShare: 0.3, arousal: 0.6, motion: 0.1 } });
+  const seconds = arrangementData.duration + 2.6;    // the reverb tail has to fit
 
-  const counts = ["drum", "bass", "pad", "lead"].map((k) => [k, arrangement.events.filter((e) => e.kind === k).length]);
+  const VOICES = ["drum", "bass", "pad", "drone", "lead"];
+  const counts = VOICES.map((k) => [k, arrangementData.events.filter((e) => e.kind === k).length]);
   check(counts.every(([, n]) => n > 0),
     `the generator gave every voice something to play (${counts.map(([k, n]) => `${k} ${n}`).join(", ")})`);
 
   const stems = {};
-  for (const [kind, kinds] of [["drums", ["drum"]], ["bass", ["bass"]], ["pad", ["pad"]], ["lead", ["lead"]]]) {
-    stems[kind] = await renderStem(kit, arrangement, kinds, seconds);
-  }
+  for (const kind of VOICES) stems[kind] = await renderStem(kit, arrangementData, [kind], seconds);
 
   const levels = {};
   for (const [kind, rendered] of Object.entries(stems)) {
@@ -292,8 +269,8 @@ async function runVoices() {
 
   // The stems are measured alone so a broken voice cannot hide behind the others;
   // the full mix is measured together because that is what actually has to stay
-  // under the ceiling. Four voices that each fit can still sum past it.
-  const mix = await renderStem(kit, arrangement, ["drum", "bass", "pad", "lead"], seconds);
+  // under the ceiling. Voices that each fit can still sum past it.
+  const mix = await renderStem(kit, arrangementData, VOICES, seconds);
   const mixData = mix.getChannelData(0);
   const mixPeak = db(peakOf(mixData));
   const mixRms = db(rmsOf(mixData));
@@ -303,7 +280,7 @@ async function runVoices() {
   // signal actually entering the WaveShaper is measured here: its curve only
   // covers [-1, 1], and anything past that is a hard clip wearing a saturator's
   // name. The voice sum measured 5.2 peak before this was gain staged.
-  const sum = await renderStem(kit, arrangement, ["drum", "bass", "pad", "lead"], seconds, { tap: "sum" });
+  const sum = await renderStem(kit, arrangementData, VOICES, seconds, { tap: "sum" });
   const sumPeak = peakOf(sum.getChannelData(0));
   check(sumPeak <= 1.0,
     `the voice sum peaks at ${sumPeak.toFixed(3)}, inside the shaper's [-1, 1] domain (no clamp)`);

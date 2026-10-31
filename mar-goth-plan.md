@@ -361,7 +361,7 @@ screenshot of chain view + chart strip), and your A/B against the references.
 | Slice | Deliverable | Done when |
 |---|---|---|
 | S1 ✅ | `conditioner.js` + `families.js` + `generator.js`: controls → chain events (chords with devices, bass, drums) | `node music/test_generator.js` PASS 66 |
-| S2 | `audio.js`: prerendered drums, voice chains, scheduler, master bus | fixture page plays a full band; screenshot + stem counts |
+| S2 ✅ | `kit.js` + `voices.js` + `scheduler.js` + `arrange.js` + `loop.js`: prerendered drums, five voices, the lookahead clock, the bar→events seam, and a page that plays | `music/listen.html` makes sound (RMS −12.5 dBFS live), `npm test` 23 + 32 + 12 + 17 + 66, browser 14 + 15 |
 | S3 | `ui.js`: chain view, chart strip, device rack, ring, transport | chart follows the generator in a live render |
 | S4 | `app.js` seam + consent gate + multi-wizard roles | two simulated wizards get two roles; a stale one hands over |
 | S5 | player mode (Web MIDI or chart-only), `grab`, `cruelty` | you improvise over a changing chart |

@@ -8,7 +8,7 @@
   :root { color-scheme: dark; --line: #2a2a2a; --dim: #777; }
   * { box-sizing: border-box; }
   body {
-    margin: 0; padding: 2rem 1.5rem 4rem;
+    margin: 0; padding: 2rem 1.5rem 4rem; max-width: 56rem;
     font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
     background: #0d0d0f; color: #ddd;
   }
@@ -22,24 +22,19 @@
   }
   button:hover { border-color: #555; }
   button[aria-pressed="true"] { background: #2b1414; border-color: #6b2b2b; color: #f2b8b8; }
+  button[hidden] { display: none; }
   label { display: flex; gap: .5rem; align-items: center; color: var(--dim); }
   input[type="range"] { width: 7rem; accent-color: #8a6cff; }
-  output { color: #ddd; min-width: 2.4rem; text-align: right; }
+  output { color: #ddd; min-width: 2.6rem; text-align: right; }
   #meter { width: 8rem; height: .55rem; background: #1b1b1f; border: 1px solid #333; border-radius: 3px; }
   #meterbar { height: 100%; width: 0%; background: #8a6cff; transition: width .05s linear; }
-  #readout { display: grid; gap: .5rem; }
-  .row { display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
-  .k { color: var(--dim); }
-  #chart { font-size: 1.35rem; letter-spacing: .04em; }
-  #chart .next { font-size: .8em; color: var(--dim); }
-  #reason { color: var(--dim); }
-  #devices { display: flex; gap: .4rem; flex-wrap: wrap; }
-  .lamp {
-    font-size: .8em; padding: .1rem .5rem; border: 1px solid var(--line);
-    border-radius: 999px; color: #4a4a4a;
-  }
-  .lamp[data-on="true"] { color: #d8f0d8; border-color: #2e5a2e; background: #12210f; }
-  .lamp[data-fired="true"] { color: #fff; border-color: #8a6cff; background: #241a4a; }
+  #label { color: #b9a9ff; margin: .75rem 0 0; }
+  #cast { display: grid; gap: .4rem; }
+  .wizard { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
+  .wizard .who { color: #ddd; }
+  .wizard .role { font-size: .8em; padding: .05rem .45rem; border: 1px solid #3a5a3a; border-radius: 999px; color: #d8f0d8; }
+  .wizard .refused { color: #e08c8c; font-size: .9em; }
+  .wizard[data-stale="true"] .who { color: #665; }
   #status { color: var(--dim); min-height: 1.5rem; }
   footer { color: #555; margin-top: 2rem; }
   a { color: #8a6cff; }
@@ -47,30 +42,28 @@
 </head>
 <body>
 <h1>The Chains of Margoth and the Wizards of SixthSense</h1>
-<p class="sub">the band as the generator decides it. nothing here is a recording.</p>
+<p class="sub" id="sub">the band as the generator decides it. nothing here is a recording.</p>
 
 <section id="transport">
   <button id="play" aria-pressed="false">▶ listen</button>
-  <button id="grab" title="hold this chord for two bars (space)">grab</button>
+  <button id="export" hidden>export wav</button>
   <label>C <input id="c" type="range" min="0" max="1" step="0.01" value="0.45"><output id="c-out">0.45</output></label>
   <label>bpm <input id="bpm" type="range" min="90" max="160" step="1" value="132"><output id="bpm-out">132</output></label>
   <label>cruelty <input id="cruelty" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="cruelty-out">0.15</output></label>
   <div id="meter"><div id="meterbar"></div></div>
 </section>
 
-<section id="ui">
-  <div class="row">
-    <span class="k">bar</span><span id="bar">—</span>
-    <span class="k">clock</span><span id="tempo">—</span>
-    <span class="k">family</span><span id="family">—</span>
-  </div>
-  <div id="chart">—</div>
-  <div id="reason"></div>
-  <div id="devices"></div>
-</section>
+<section id="mount" aria-label="chain view"></section>
 
+<section id="cast" aria-label="wizards" hidden></section>
+
+<p id="label" hidden></p>
 <p id="status">prerendering the kit…</p>
-<footer>gates: <a href="./test_audio.html?section=kit">kit</a> · <a href="./test_audio.html?section=voices">voices</a></footer>
+<footer>
+  gates: <a href="./test_audio.html?section=kit">kit</a> ·
+  <a href="./test_audio.html?section=voices">voices</a> ·
+  <a href="./ui-demo.html">ui demo</a>
+</footer>
 
 <script type="module" src="./listen.js"></script>
 </body>
