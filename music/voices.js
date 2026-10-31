@@ -219,6 +219,49 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
       }
     },
 
+    /**
+     * The pedal. `droneBar()` has been emitting this note since S1 -- the tonic,
+     * held clear of the bass register -- and nothing played it, so the device was
+     * audible only on paper. Sine for weight, saw for the open string, a lowpass
+     * to keep it out of the pad's way, and a slow attack so it arrives instead of
+     * starting.
+     */
+    drone(midi, time, dur = 1.8, vel = 0.5) {
+      const hz = mtof(midi);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(1400, time);
+      filter.Q.value = 0.707;
+      filter.connect(input);
+      const toReverb = ctx.createGain();
+      toReverb.gain.value = 0.25;
+      filter.connect(toReverb);
+      toReverb.connect(reverbIn);
+
+      const env = ctx.createGain();
+      const attack = 0.25;
+      const hold = Math.max(dur, attack + 0.001);
+      const end = hold + 0.35;
+      env.gain.setValueAtTime(0, time);
+      env.gain.linearRampToValueAtTime(vel, time + attack);
+      env.gain.setValueAtTime(vel, time + hold);
+      env.gain.exponentialRampToValueAtTime(0.001, time + end);
+      env.gain.setValueAtTime(0, time + end);
+      env.connect(filter);
+
+      for (const [type, level] of [["sine", 1], ["sawtooth", 0.45]]) {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.setValueAtTime(hz, time);
+        const gain = ctx.createGain();
+        gain.gain.value = level;
+        osc.connect(gain);
+        gain.connect(env);
+        osc.start(time);
+        osc.stop(time + end + 0.02);
+      }
+    },
+
     pad(voicing, time, dur = 1.8) {
       const notes = [...voicing].slice(0, 4);
       if (!notes.length) return;
