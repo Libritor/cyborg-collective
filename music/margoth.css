@@ -212,7 +212,11 @@ main { padding-block: 26px 8px; }
 main > section + section { margin-top: 26px; }
 #mount:empty { display: none; }
 
-#cast { display: grid; gap: 6px; }
+/* Not `#cast { display: grid }`: an id selector is (1,0,0) and would beat
+   `main [hidden]` (0,1,1), so the attribute would stop hiding the section and an
+   empty wizards area would keep its 26px row on every page. Gate the display on
+   the attribute instead -- the same trap as the UA rule, one level up. */
+#cast:not([hidden]) { display: grid; gap: 6px; }
 
 .wizard {
   display: flex;
