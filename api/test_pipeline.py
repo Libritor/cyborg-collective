@@ -27,7 +27,7 @@ import time
 from pathlib import Path
 
 from capture import CaptureWriter, list_captures
-from relay import RelayHub
+from relay import STATE_TYPES, RelayHub
 
 API_DIR = Path(__file__).resolve().parent
 SERVER = API_DIR / "server.py"
@@ -187,9 +187,9 @@ def start_udp_listener(port, box, stop):
 
 
 # --------------------------------------------------------------------- HTTP/SSE
-def get_json(port, path, timeout=10.0):
+def get_json(port, path, timeout=10.0, method="GET"):
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=timeout)
-    conn.request("GET", path)
+    conn.request(method, path)
     response = conn.getresponse()
     body = response.read()
     status = response.status
@@ -366,6 +366,8 @@ def main():
             check(found[0]["hsi"]["TP9"] == 1 and found[0]["hsi"]["AF7"] == 2, "live hsi codes")
             check(len(found[0]["bands"]["rel"]["delta"]) == 4, "live bands rel delta")
             check(found[0]["hr"]["bpm"] == 68.0, "live hr bpm")
+            check(isinstance(found[0].get("stale_s"), (int, float)) and found[0]["stale_s"] < 60,
+                  "sharers expose stale_s (seconds since their last frame)")
 
         print("live features stream")
         live = read_sse(HTTP_PORT, f"/api/v1/live/{PSEUDONYM}/features", want=2, timeout=15.0)
@@ -401,10 +403,30 @@ def main():
         check(status == 400 and "error" in body, "bad channel is a 400 JSON error")
         status, body = get_json(HTTP_PORT, "/api/v1/sessions/nope/nope")
         check(status == 404 and body.get("error") == "unknown stamp", "unknown stamp is a 404")
+        status, body = get_json(HTTP_PORT, "/nope")
+        check(status == 404 and body.get("error") == "not found",
+              "an unknown path is a 404 JSON error, not 405")
+        status, body = get_json(HTTP_PORT, "/api/v1/sessions", method="POST")
+        check(status == 405 and isinstance(body, dict) and "error" in body,
+              "a wrong method is a 405 JSON error")
+        status, _ = get_json(HTTP_PORT, "/api/v1/sessions", method="OPTIONS")
+        check(status == 204, "OPTIONS on a GET route is 204")
+        status, _ = get_json(HTTP_PORT, "/nope", method="OPTIONS")
+        check(status == 204, "OPTIONS on an unknown path is 204")
+        status, body = get_json(HTTP_PORT, "/api/v1/sessions?since=2025-13-99")
+        check(status == 400, "an impossible date is rejected")
+        status, body = get_json(HTTP_PORT, f"/api/v1/captures/{capture_id}/eeg", method="HEAD")
+        check(status == 405, "HEAD on a stream route is refused, not replayed")
+        status, body = get_json(HTTP_PORT, f"/api/v1/live/{PSEUDONYM}/features", method="HEAD")
+        check(status == 405, "HEAD on a live stream is refused")
 
         print("regressions")
         _check_capture_rotation(workdir)
+        _check_capture_cache(workdir)
+        _check_capture_limits(workdir)
+        _check_subscriber_filter()
         _check_eeg_rate()
+        _check_ghost_pruning()
         return _report(workdir)
     finally:
         stop.set()
@@ -442,6 +464,105 @@ def _check_capture_rotation(workdir):
     files = list_captures(limited)
     check(len(files) > 1, f"a pseudonym still rotates past rotate_bytes ({len(files)} files)")
     check(all(c["sharers"] == ["a"] for c in files), "rotated files stay with their pseudonym")
+
+
+def _check_capture_cache(workdir):
+    """Frame counts are exact, counted incrementally, and survive truncation."""
+    directory = workdir / "cache"
+    writer = CaptureWriter(directory)
+    frame = {"t": "eeg", "pseudonym": "a", "x": [[0.0] * 4] * 4}
+    for _ in range(5):
+        writer.write("a", frame)
+    writer.close()
+    check(list_captures(directory)[0]["frames"] == 5, "capture summary counts the frames")
+    path = next(directory.glob("*.jsonl"))
+    with path.open("a", encoding="utf-8") as fh:
+        for _ in range(3):
+            fh.write(json.dumps({"recv_ts": time.time(), "frame": frame}) + "\n")
+    check(list_captures(directory)[0]["frames"] == 8, "appended frames are counted")
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write('{"recv_ts": 1, "frame": {"t": "ee')      # half-written tail line
+    check(list_captures(directory)[0]["frames"] == 8, "a half-written line is not counted")
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write('g", "pseudonym": "a"}}\n')
+    check(list_captures(directory)[0]["frames"] == 9, "the completed line is counted")
+    path.write_text(json.dumps({"recv_ts": time.time(), "frame": frame}) + "\n",
+                    encoding="utf-8")
+    check(list_captures(directory)[0]["frames"] == 1, "a truncated and rewritten file is recounted")
+
+
+def _check_capture_limits(workdir):
+    """Bounded handles, and no non-finite frame may poison the archive."""
+    frame = {"t": "eeg", "pseudonym": "a", "x": [[0.0] * 4] * 4}
+    many = CaptureWriter(workdir / "handles", max_open=8)
+    for index in range(40):
+        many.write(f"pseudonym-{index}", frame)
+    check(len(many.paths()) == 8, f"open capture handles are capped ({len(many.paths())} of 40)")
+    many.close()
+    check(len(list((workdir / "handles").glob("*.jsonl"))) == 40,
+          "closing a handle never loses the capture file")
+
+    # evicting a handle must resume the same file, never start a new one
+    shred = CaptureWriter(workdir / "shred", max_open=2)
+    for _ in range(10):
+        for index in range(4):
+            shred.write(f"s{index}", frame)
+    shred.close()
+    split = list_captures(workdir / "shred")
+    check(len(split) == 4, f"an evicted handle resumes its file ({len(split)} files for 4 sharers)")
+    check(all(entry["frames"] == 10 for entry in split),
+          "each resumed file keeps every frame of its sharer")
+
+    poisoned = CaptureWriter(workdir / "nan")
+    poisoned.write("a", frame)
+    poisoned.write("a", {"t": "eeg", "pseudonym": "a", "ts": 1e999, "x": [[float("inf")]]})
+    poisoned.close()
+    lines = next((workdir / "nan").glob("*.jsonl")).read_text().splitlines()
+    parsed = all(json.loads(line) for line in lines)
+    check(poisoned.rejected == 1 and len(lines) == 1 and parsed,
+          "a frame with non-finite numbers is rejected, archive stays valid JSON")
+
+
+def _check_subscriber_filter():
+    """A features stream must not be flooded (and lose state) by raw eeg frames."""
+    hub = RelayHub("ws://unused.invalid/live")
+    hub.handle_message({"t": "snapshot", "people": [{"pseudonym": "a", "tier": "raw"}]})
+    features = hub.subscribe("a", STATE_TYPES)
+    eeg = hub.subscribe("a", ("eeg",))
+    hub.handle_message({"t": "eeg", "pseudonym": "a", "x": [[0.0] * 8] * 4})
+    hub.handle_message({"t": "bands", "pseudonym": "a", "rel": {}, "abs": {}})
+    check(features.qsize() == 1, "a features subscriber receives only state frames")
+    check(eeg.qsize() == 1, "an eeg subscriber receives only eeg frames")
+    hub.unsubscribe("a", features)
+    hub.unsubscribe("a", eeg)
+    check(hub._subs == {}, "unsubscribing removes the queues")
+
+    # a filtered subscriber must still learn that the sharer left
+    hub.handle_message({"t": "snapshot", "people": [{"pseudonym": "a", "tier": "raw"}]})
+    watching = hub.subscribe("a", ("eeg", "leave"))
+    hub.handle_message({"t": "leave", "pseudonym": "a"})
+    kinds = []
+    while not watching.empty():
+        kinds.append(watching.get_nowait()["t"])
+    check(kinds == ["leave"], "a stream subscriber receives the leave frame")
+    check(not hub.has("a"), "leave empties the sharer state")
+
+
+def _check_ghost_pruning():
+    """A snapshot is the authoritative roster: sharers who left must disappear."""
+    hub = RelayHub("ws://unused.invalid/live")
+    hub.handle_message({"t": "snapshot", "people": [
+        {"pseudonym": "a", "tier": "raw", "since": 1},
+        {"pseudonym": "b", "tier": "raw", "since": 1}]})
+    check([s["pseudonym"] for s in hub.sharers()] == ["a", "b"], "snapshot seeds the roster")
+    hub.handle_message({"t": "snapshot", "people": [{"pseudonym": "a", "tier": "raw", "since": 1}]})
+    check([s["pseudonym"] for s in hub.sharers()] == ["a"],
+          "a smaller snapshot drops the sharer who left")
+    hub.handle_message({"t": "snapshot", "people": []})
+    check(hub.sharers() == [], "an empty snapshot clears the roster")
+    hub.handle_message({"t": "bands", "pseudonym": "c", "rel": {}, "abs": {}})
+    check([s["pseudonym"] for s in hub.sharers()] == ["c"],
+          "a later frame re-creates a sharer")
 
 
 def _check_eeg_rate():

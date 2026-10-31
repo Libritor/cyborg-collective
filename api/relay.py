@@ -33,6 +33,10 @@ KNOWN_TYPES = {
     "eeg", "leave", "checkins_changed", "shares_changed", "record_changed",
 }
 GLOBAL_PSEUDONYM = "_relay"  # capture bucket for snapshot/aggregate frames
+MAX_MESSAGE_BYTES = 8 * 1024 * 1024   # one upstream frame; real eeg frames are ~10 KB
+HEALTHY_SECONDS = 10.0                # a connection this old resets the backoff
+MAX_SHARERS = 2048                    # state entries kept, oldest dropped first
+MAX_UNKNOWN_TYPES = 64                # remember at most this many for logging
 
 log = logging.getLogger("collective-api.relay")
 
@@ -57,7 +61,7 @@ def band_block(source):
     block = {}
     for band in BANDS:
         values = source.get(band) if isinstance(source, dict) else None
-        row = list(values)[:len(CHANNELS)] if isinstance(values, list) else []
+        row = values[:len(CHANNELS)] if isinstance(values, list) else []
         row += [None] * (len(CHANNELS) - len(row))
         block[band] = [number(v) for v in row]
     return block
@@ -147,6 +151,10 @@ class RelayHub:
     def _ensure(self, pseudonym):
         state = self._state.get(pseudonym)
         if state is None:
+            if len(self._state) >= MAX_SHARERS:
+                # a relay that churns pseudonyms must not grow us without bound
+                oldest = min(self._state, key=lambda key: self._state[key].get("last_seen") or 0)
+                self._state.pop(oldest, None)
             state = {
                 "pseudonym": pseudonym,
                 "name": None,
@@ -156,16 +164,18 @@ class RelayHub:
                 "last": {},
                 "eeg_hz": None,
                 "last_eeg_ts": None,
+                "last_seen": 0.0,
             }
             self._state[pseudonym] = state
+        state["last_seen"] = time.time()
         return state
 
     def _seed_person(self, person):
         pseudonym = person.get("pseudonym")
         if not isinstance(pseudonym, str) or not pseudonym:
-            return
+            return None
         if person.get("tier") == "camera" or person.get("kind") == "camera":
-            return
+            return None
         state = self._ensure(pseudonym)
         state["name"] = person.get("name")
         state["device"] = person.get("device")
@@ -176,6 +186,7 @@ class RelayHub:
             for key, value in last.items():
                 if isinstance(value, dict):
                     state["last"][key] = value
+        return pseudonym
 
     # ------------------------------------------------------------------ dispatch
     def handle_message(self, message):
@@ -193,7 +204,7 @@ class RelayHub:
 
         if kind not in KNOWN_TYPES:
             self.unknown_frames += 1
-            if kind not in self._unknown_seen:
+            if kind not in self._unknown_seen and len(self._unknown_seen) < MAX_UNKNOWN_TYPES:
                 self._unknown_seen.add(kind)
                 log.warning("relay sent unknown frame type %r; dropping it", kind)
             return
@@ -202,9 +213,17 @@ class RelayHub:
         self.last_frame_ts = time.time()
 
         if kind == "snapshot":
+            # a snapshot is the relay's full roster: anyone absent has gone. This
+            # is what clears ghosts left by a relay restart, or by a `leave` we
+            # missed while disconnected. Any later frame re-creates them.
+            roster = set()
             for person in message.get("people") or []:
                 if isinstance(person, dict):
-                    self._seed_person(person)
+                    seeded = self._seed_person(person)
+                    if seeded is not None:
+                        roster.add(seeded)
+            for stale in set(self._state) - roster:
+                self._state.pop(stale, None)
         elif kind == "aggregate":
             self.aggregate = message
         elif kind == "leave":
@@ -241,16 +260,18 @@ class RelayHub:
         state["last_eeg_ts"] = now
 
     # ------------------------------------------------------------------ fan-out
-    def subscribe(self, pseudonym):
+    def subscribe(self, pseudonym, types=None):
+        """A queue for one sharer; ``types`` limits which frame types it sees."""
         queue = asyncio.Queue(maxsize=QUEUE_MAX)
-        self._subs.setdefault(pseudonym, set()).add(queue)
+        restrict = None if types is None else frozenset(types)
+        self._subs.setdefault(pseudonym, {})[queue] = restrict
         return queue
 
     def unsubscribe(self, pseudonym, queue):
         subs = self._subs.get(pseudonym)
         if not subs:
             return
-        subs.discard(queue)
+        subs.pop(queue, None)
         if not subs:
             self._subs.pop(pseudonym, None)
 
@@ -258,7 +279,10 @@ class RelayHub:
         subs = self._subs.get(pseudonym)
         if not subs:
             return
-        for queue in list(subs):
+        kind = message.get("t")
+        for queue, restrict in list(subs.items()):
+            if restrict is not None and kind not in restrict:
+                continue
             try:
                 queue.put_nowait(message)
             except asyncio.QueueFull:
@@ -288,6 +312,10 @@ class RelayHub:
             "hr": hr_of(last),
             "eeg_hz": number(state.get("eeg_hz")),
             "age_s": max(0.0, now - since / 1000.0) if since is not None else None,
+            # seconds since this sharer's last frame: the only honest staleness
+            # signal, since age_s is time since it joined
+            "stale_s": (max(0.0, now - state["last_seen"])
+                        if state.get("last_seen") else None),
         }
         if with_rms:
             out["rms"] = rms_of(last)
@@ -297,11 +325,18 @@ class RelayHub:
         return [self._sharer(s) for s in sorted(self._state.values(),
                                                 key=lambda s: s["pseudonym"])]
 
-    def osc_state(self):
+    def osc_state(self, pseudonym=None):
         """The sharer projection plus per-channel RMS, for the OSC emitter."""
+        if pseudonym is not None:
+            state = self._state.get(pseudonym)
+            return {"sharers": [self._sharer(state, with_rms=True)] if state else []}
         return {"sharers": [self._sharer(s, with_rms=True)
                             for s in sorted(self._state.values(),
                                             key=lambda s: s["pseudonym"])]}
+
+    def osc_target(self):
+        """Whichever sharer ``--osc-sharer any`` follows: the first pseudonym."""
+        return min(self._state) if self._state else None
 
     def has(self, pseudonym):
         return pseudonym in self._state
@@ -322,14 +357,16 @@ class RelayHub:
         """Connect, read frames, reconnect forever with jittered backoff."""
         backoff = 1.0
         while True:
+            healthy = False
             try:
                 timeout = aiohttp.ClientTimeout(total=None, sock_connect=30)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.ws_connect(self.url, heartbeat=30,
-                                                  max_msg_size=0) as ws:
+                                                  max_msg_size=MAX_MESSAGE_BYTES) as ws:
                         self.connected = True
                         self.reconnects += 1
-                        backoff = 1.0
+                        opened = time.monotonic()
+                        frames_before = self.frames
                         log.info("relay connected: %s", self.url)
                         async for message in ws:
                             if message.type == aiohttp.WSMsgType.TEXT:
@@ -343,6 +380,8 @@ class RelayHub:
                                 break
                             else:
                                 break       # CLOSE / CLOSED / CLOSING / binary
+                        healthy = (self.frames > frames_before
+                                   or time.monotonic() - opened >= HEALTHY_SECONDS)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -350,6 +389,10 @@ class RelayHub:
             finally:
                 self.connected = False
 
+            # only a connection that actually delivered something resets the
+            # ramp: a relay that accepts and closes must not be hammered at 1 Hz
+            if healthy:
+                backoff = 1.0
             delay = min(30.0, backoff) * (1 + random.uniform(-0.1, 0.1))
             log.info("relay reconnect in %.1fs", delay)
             await asyncio.sleep(delay)

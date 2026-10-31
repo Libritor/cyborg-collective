@@ -239,7 +239,8 @@ async def run(args):
     finally:
         task.cancel()
         await asyncio.gather(task, return_exceptions=True)
-        await broadcast({"t": "leave", "pseudonym": voices[0].pseudonym})
+        for voice in voices:            # every sharer leaves, not just the first
+            await broadcast({"t": "leave", "pseudonym": voice.pseudonym})
         await runner.cleanup()
     return 0
 

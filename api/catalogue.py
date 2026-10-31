@@ -166,6 +166,8 @@ class Catalogue:
 
     def device(self, stamp, tag):
         """One device's full JSON with ``preview_url``; None when no file matches."""
+        if stamp not in self._sessions:     # no probing for files outside the index
+            return None
         raw = self._load_device_file(stamp, tag)
         if raw is None:
             return None

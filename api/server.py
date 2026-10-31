@@ -22,10 +22,12 @@ import argparse
 import asyncio
 import json
 import logging
+import math
 import re
 import signal
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 from aiohttp import web
@@ -65,7 +67,12 @@ def error_response(message, status):
 
 @web.middleware
 async def errors_and_cors(request, handler):
-    """Turn ApiError into JSON, and put the CORS header on every response."""
+    """Turn every failure into ``{"error": ...}`` JSON and add the CORS header.
+
+    OPTIONS is answered here, before routing, so it works on every path without
+    a catch-all route (which would make unknown paths report 405 instead of
+    404).
+    """
     if request.method == "OPTIONS":
         return web.Response(status=204, headers={
             **CORS,
@@ -77,8 +84,15 @@ async def errors_and_cors(request, handler):
     except ApiError as exc:
         return error_response(exc.message, exc.status)
     except web.HTTPException as exc:
-        exc.headers.update(CORS)
-        return exc
+        # routing failures (404 unknown path, 405 wrong method) arrive here
+        response = error_response((exc.reason or "error").lower(), exc.status)
+        allow = exc.headers.get("Allow")
+        if allow:
+            response.headers["Allow"] = allow
+        return response
+    except Exception:
+        log.exception("unhandled error on %s %s", request.method, request.path)
+        return error_response("internal error", 500)
     if not response.prepared:
         response.headers.update(CORS)
     return response
@@ -116,6 +130,10 @@ def date_param(request, name):
         return None
     if not DATE_RE.fullmatch(raw):
         raise ApiError(f"{name} must be YYYY-MM-DD", 400)
+    try:
+        date.fromisoformat(raw)
+    except ValueError:
+        raise ApiError(f"{name} is not a real date: {raw}", 400)
     return raw
 
 
@@ -152,6 +170,8 @@ def eeg_event(frame, pseudonym, channels, decimate, seq=None):
         ])
     fs = number(frame.get("fs")) or FS_DEFAULT
     ts = number(frame.get("ts"))
+    if ts is not None and not math.isfinite(ts):   # a relay may send 1e999
+        ts = None
     return {
         "t": "eeg",
         "pseudonym": pseudonym,
@@ -335,26 +355,33 @@ async def live_eeg(request):
         raise ApiError("unknown pseudonym", 404)
     channels = channels_param(request)
     decimate = int_param(request, "decimate", 1, 1, 16)
-    queue = hub.subscribe(pseudonym)
-    response = await sse_start(request)
-    seq = 0
+    queue = hub.subscribe(pseudonym, ("eeg", "leave"))
     try:
-        rate = hub.eeg_hz(pseudonym) or FS_DEFAULT
-        await sse_send(response, {
-            "t": "hello", "pseudonym": pseudonym,
-            "fs": round(rate / decimate, 3), "channels": channels,
-            "decimate": decimate,
-        })
-        async for frame in sse_queue(response, queue):
-            if frame.get("t") != "eeg":
-                continue
-            await sse_send(response, eeg_event(frame, pseudonym, channels, decimate, seq=seq))
-            seq += 1
-    except (ConnectionResetError, RuntimeError):
-        pass                      # client went away or the transport closed
+        response = await sse_start(request)
+        seq = 0
+        try:
+            rate = hub.eeg_hz(pseudonym) or FS_DEFAULT
+            await sse_send(response, {
+                "t": "hello", "pseudonym": pseudonym,
+                "fs": round(rate / decimate, 3), "channels": channels,
+                "decimate": decimate,
+            })
+            async for frame in sse_queue(response, queue):
+                kind = frame.get("t")
+                if kind == "leave":
+                    await sse_send(response, {"t": "bye", "pseudonym": pseudonym,
+                                              "reason": "left"})
+                    return response
+                if kind != "eeg":
+                    continue
+                await sse_send(response, eeg_event(frame, pseudonym, channels,
+                                                   decimate, seq=seq))
+                seq += 1
+        except (ConnectionResetError, RuntimeError, OSError):
+            pass                  # client went away or the transport closed
+        return response
     finally:
         hub.unsubscribe(pseudonym, queue)
-    return response
 
 
 async def live_features(request):
@@ -362,32 +389,41 @@ async def live_features(request):
     pseudonym = request.match_info["pseudonym"]
     if not hub.has(pseudonym):
         raise ApiError("unknown pseudonym", 404)
-    queue = hub.subscribe(pseudonym)
-    response = await sse_start(request)
+    queue = hub.subscribe(pseudonym, tuple(STATE_TYPES) + ("leave",))
     try:
-        await sse_send(response, {"t": "hello", "pseudonym": pseudonym,
-                                  "eeg_hz": hub.eeg_hz(pseudonym)})
-        async for frame in sse_queue(response, queue):
-            if frame.get("t") not in STATE_TYPES:
-                continue
-            payload = hub.features(pseudonym) or {}
-            await sse_send(response, {
-                "t": "features", "pseudonym": pseudonym,
-                "ts": int(time.time() * 1000), **payload,
-            })
-    except (ConnectionResetError, RuntimeError):
-        pass
+        response = await sse_start(request)
+        try:
+            await sse_send(response, {"t": "hello", "pseudonym": pseudonym,
+                                      "eeg_hz": hub.eeg_hz(pseudonym)})
+            async for frame in sse_queue(response, queue):
+                kind = frame.get("t")
+                if kind == "leave":
+                    await sse_send(response, {"t": "bye", "pseudonym": pseudonym,
+                                              "reason": "left"})
+                    return response
+                if kind not in STATE_TYPES:
+                    continue
+                payload = hub.features(pseudonym) or {}
+                await sse_send(response, {
+                    "t": "features", "pseudonym": pseudonym,
+                    "ts": int(time.time() * 1000), **payload,
+                })
+        except (ConnectionResetError, RuntimeError, OSError):
+            pass
+        return response
     finally:
         hub.unsubscribe(pseudonym, queue)
-    return response
 
 
 async def captures_list(request):
-    return json_response({"captures": list_captures(request.app["captures_dir"])})
+    # counting frames reads every byte: keep it off the event loop
+    captures = await asyncio.to_thread(list_captures, request.app["captures_dir"])
+    return json_response({"captures": captures})
 
 
 async def capture_detail(request):
-    entry = find_capture(request.app["captures_dir"], request.match_info["capture_id"])
+    entry = await asyncio.to_thread(find_capture, request.app["captures_dir"],
+                                    request.match_info["capture_id"])
     if entry is None:
         raise ApiError("unknown capture", 404)
     return json_response(entry)
@@ -426,14 +462,13 @@ async def capture_eeg(request):
             seen += 1
             if seen <= start:
                 continue
-            delay = replay_pacing(previous, entry["recv_ts"], speed)
-            if delay > 0:
-                await asyncio.sleep(delay)
+            # sleep(0) still yields: without it a fast replay can starve the loop
+            await asyncio.sleep(replay_pacing(previous, entry["recv_ts"], speed))
             previous = entry["recv_ts"]
             pseudonym = frame.get("pseudonym") or capture_id
             await sse_send(response, eeg_event(frame, pseudonym, channels, decimate, seq=sent))
             sent += 1
-    except (ConnectionResetError, RuntimeError):
+    except (ConnectionResetError, RuntimeError, OSError):
         pass
     return response
 
@@ -474,9 +509,7 @@ async def capture_features(request):
             seen += 1
             if seen <= start:
                 continue
-            delay = replay_pacing(previous, entry["recv_ts"], speed)
-            if delay > 0:
-                await asyncio.sleep(delay)
+            await asyncio.sleep(replay_pacing(previous, entry["recv_ts"], speed))
             previous = entry["recv_ts"]
             await sse_send(response, {
                 "t": "features",
@@ -485,17 +518,17 @@ async def capture_features(request):
                 "ts": int(entry["recv_ts"] * 1000),
                 **features_of(merged, eeg_hz),
             })
-    except (ConnectionResetError, RuntimeError):
+    except (ConnectionResetError, RuntimeError, OSError):
         pass
     return response
 
 
 # --------------------------------------------------------------------------- app
-def build_app(catalogue, hub=None, captures_dir=None, osc=None, relay_url=DEFAULT_RELAY):
+def build_app(catalogue, captures_dir, hub=None, osc=None, relay_url=DEFAULT_RELAY):
     app = web.Application(middlewares=[errors_and_cors])
     app["catalogue"] = catalogue
     app["hub"] = hub
-    app["captures_dir"] = Path(captures_dir) if captures_dir is not None else Path("api/data/captures")
+    app["captures_dir"] = Path(captures_dir)
     app["osc"] = osc
     app["relay_url"] = relay_url
 
@@ -506,13 +539,12 @@ def build_app(catalogue, hub=None, captures_dir=None, osc=None, relay_url=DEFAUL
     router.add_get("/api/v1/sessions/{stamp}/{tag}", device_detail)
     router.add_get("/api/v1/sessions/{stamp}/{tag}/patch", device_patch)
     router.add_get("/api/v1/live/sharers", live_sharers)
-    router.add_get("/api/v1/live/{pseudonym}/eeg", live_eeg)
-    router.add_get("/api/v1/live/{pseudonym}/features", live_features)
+    router.add_get("/api/v1/live/{pseudonym}/eeg", live_eeg, allow_head=False)
+    router.add_get("/api/v1/live/{pseudonym}/features", live_features, allow_head=False)
     router.add_get("/api/v1/captures", captures_list)
     router.add_get("/api/v1/captures/{capture_id}", capture_detail)
-    router.add_get("/api/v1/captures/{capture_id}/eeg", capture_eeg)
-    router.add_get("/api/v1/captures/{capture_id}/features", capture_features)
-    router.add_route("OPTIONS", "/{tail:.*}", lambda request: web.Response(status=204))
+    router.add_get("/api/v1/captures/{capture_id}/eeg", capture_eeg, allow_head=False)
+    router.add_get("/api/v1/captures/{capture_id}/features", capture_features, allow_head=False)
     return app
 
 
@@ -531,7 +563,10 @@ async def serve(args):
     osc = None
     if args.osc:
         host, port = parse_host_port(args.osc)
-        osc = OscEmitter(host, port, args.osc_sharer)
+        try:
+            osc = OscEmitter(host, port, args.osc_sharer)
+        except OSError as exc:
+            raise SystemExit(f"--osc {args.osc}: {exc}")
         osc.set_error_logger(lambda message: log.warning("%s", message))
 
     writer = None
@@ -543,15 +578,23 @@ async def serve(args):
     if not args.no_relay:
         hub = RelayHub(args.relay)
 
+        def osc_target():
+            """The one sharer the OSC feed follows, or None."""
+            if osc.sharer == "any":
+                return hub.osc_target()
+            return osc.sharer if hub.has(osc.sharer) else None
+
         def on_frame(pseudonym, frame):
             if writer is not None:
                 writer.write(pseudonym, frame)
             if osc is not None and frame.get("t") in STATE_TYPES:
-                osc.emit(hub.osc_state())
+                target = osc_target()
+                if target is not None and pseudonym == target:
+                    osc.emit(hub.osc_state(target))
 
         hub.on_frame = on_frame
 
-    app = build_app(catalogue, hub=hub, captures_dir=captures_dir, osc=osc,
+    app = build_app(catalogue, captures_dir, hub=hub, osc=osc,
                     relay_url=args.relay)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()

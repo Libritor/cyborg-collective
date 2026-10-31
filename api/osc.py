@@ -88,6 +88,14 @@ class OscEmitter:
         self._on_error = None
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._sock.setblocking(False)
+        try:
+            # resolve once: a hostname here would cost a getaddrinfo per datagram,
+            # on the event loop, and a slow resolver would freeze every stream
+            self._addr = socket.getaddrinfo(self.host, self.port, 0,
+                                            socket.SOCK_DGRAM)[0][4]
+        except OSError as exc:
+            self._sock.close()
+            raise OSError(f"cannot resolve {self.host}:{self.port}: {exc}") from exc
 
     @property
     def target(self):
@@ -149,7 +157,7 @@ class OscEmitter:
         count = 0
         for address, values in messages:
             try:
-                self._sock.sendto(encode_message(address, values), (self.host, self.port))
+                self._sock.sendto(encode_message(address, values), self._addr)
                 count += 1
             except OSError as exc:
                 if exc.errno in (errno.EAGAIN, errno.EWOULDBLOCK, errno.ENOBUFS):

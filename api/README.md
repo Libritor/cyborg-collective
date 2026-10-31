@@ -72,9 +72,12 @@ while True: print(s.recvfrom(65535)[0][:24])"
 ## Endpoints
 
 Everything lives under `/api/v1`, answers `application/json` with
-`Access-Control-Allow-Origin: *`, and reports errors as `{"error": "..."}`
-(`404` for unknown stamp/tag/capture/pseudonym, `503` when the relay is off,
-`400` for a bad query parameter).
+`Access-Control-Allow-Origin: *`, and reports errors as `{"error": "..."}` —
+an unknown path is a `404`, a wrong method is a `405`, an unhandled failure is
+a `500`, all JSON. `404` marks an unknown stamp/tag/capture/pseudonym, `503`
+means the relay is off, and `400` is a bad query parameter (including
+impossible dates such as `2025-13-99`). `HEAD` is refused (`405`) on the four
+stream routes: a stream has no meaningful body to probe.
 
 | Method | Path | Returns |
 |---|---|---|
@@ -183,6 +186,12 @@ Replays pace themselves from the recorded receive times (`speed=50` finishes a
 short capture promptly; a gap never stalls longer than 5 s), and `start=<n>`
 skips the first n frames of the stream.
 
+When the sharer leaves (the relay sends `leave`), both live streams emit one
+final `{"t": "bye", "pseudonym": ..., "reason": "left"}` and close, so a player
+never sits on keepalives for someone who is gone. `/live/sharers` reports the
+same fact as `stale_s` — seconds since that sharer's last frame — because
+`age_s` is merely how long they have been sharing.
+
 A `features` event is emitted once per incoming state frame — `bands`,
 `quality`, `arousal`, `hr` — so a running stream produces several per upstream
 tick, each carrying the current merged state. Clients that want one update per
@@ -215,8 +224,24 @@ Wiring, end to end:
    the IAC port, then map the incoming CC to any parameter.
 
 `/eeg/bands` is one message carrying five floats, so several bands can drive
-several CCs from a single rule set; `--osc-sharer` picks which sharer feeds it
-(default: the first one streaming).
+several CCs from a single rule set. Exactly one sharer feeds OSC: `--osc-sharer
+any` (the default) follows the lexicographically first pseudonym currently
+known, and `--osc-sharer <pseudonym>` pins one; frames from anyone else emit
+nothing, so two people streaming never fight over the same CC.
+
+## Bounds
+
+- **upstream frames**: at most 8 MiB each. A larger message is refused by the
+  socket (which then reconnects) instead of being buffered — real `eeg` frames
+  are about 10 KB.
+- **state**: 2048 sharers at most; a relay that churns pseudonyms evicts the
+  least recently heard (`snapshot` also prunes the roster).
+- **streams**: a `/features` subscriber only receives `bands`/`quality`/
+  `arousal`/`hr` frames and an `/eeg` subscriber only `eeg`, so a torrent of
+  raw frames can neither waste memory nor evict the state a player needs.
+- **replay**: paced from the recorded receive times and yields to the event
+  loop every frame, so one full-speed replay cannot starve live SSE or the
+  relay fan-out.
 
 ## Captures
 
@@ -226,10 +251,20 @@ the time of writing) but exposes **no download route** — `/record/<file>`,
 `/record/file/<file>` all 404. Raw history therefore has to be captured while
 it is live, which is what this service does: one JSONL per pseudonym,
 `{"recv_ts": <epoch seconds>, "frame": <upstream frame verbatim>}`, rotated at
-64 MiB, in `api/data/captures/` (gitignored). Each pseudonym keeps its own open
-handle, so several sharers streaming at once never shred each other's capture.
-Frames without a pseudonym (`snapshot`, `aggregate`) are recorded under
-`_relay`.
+64 MiB, in `api/data/captures/` (gitignored). Bounds that matter for a
+long-running service:
+
+- **handles**: at most 32 capture files are held open; the least-recently
+  written is closed first (never deleted), and its path is remembered, so a
+  sharer whose handle was evicted **resumes the same file**. A capture is only
+  ever split by `rotate_bytes`, never by bookkeeping.
+- **naming**: a pseudonym outside `[A-Za-z0-9._-]` is sanitised and keeps a
+  short digest, so `a b` and `a_b` stay distinct files. Frames without a
+  pseudonym (`snapshot`, `aggregate`) go to the `_relay` bucket, which lands as
+  `relay-<digest>__<stamp>.jsonl`.
+- **validity**: a frame carrying `inf`/`nan` (a relay may send `1e999`) is
+  rejected instead of written, because `Infinity` would poison the archive for
+  every JSON reader.
 
 ```json
 {"id": "russet-grebe-53__20261031T032403", "file": "russet-grebe-53__20261031T032403.jsonl",
@@ -238,7 +273,18 @@ Frames without a pseudonym (`snapshot`, `aggregate`) are recorded under
 ```
 
 A raw-tier sharer is roughly 16 MB/hour; `api/data/` is gitignored so captures
-never enter the repository.
+never enter the repository. Counting a capture's frames means reading every
+line, so a summary is counted **incrementally**: the next scan resumes at the
+byte where the last one stopped, a half-written tail line waits for the next
+pass, and a truncated file is recounted from zero. Counts are therefore always
+exact and a poll costs only what was appended. The scan runs off the event loop
+(`asyncio.to_thread`) and `/captures/{id}` never touches the other captures.
+
+**Who is "live"?** A `snapshot` from the relay is treated as its full roster, so
+anyone absent from it is dropped — that is what clears a sharer who left while
+the service was disconnected. While the socket is down, the last known state is
+kept and `relay` reports `disconnected` (and `age_s` keeps growing), rather than
+pretending the roster is current.
 
 ## Layout
 
