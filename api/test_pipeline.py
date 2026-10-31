@@ -27,10 +27,13 @@ import time
 from pathlib import Path
 
 from capture import CaptureWriter, list_captures
-from relay import STATE_TYPES, RelayHub
+from catalogue import CATALOGUE_ROOT, OPTIC_SITES, Catalogue
+from relay import STATE_TYPES, RelayHub, valid_of
+from server import build_patch
 
 API_DIR = Path(__file__).resolve().parent
 SERVER = API_DIR / "server.py"
+PROBE = API_DIR / "probe_live.py"
 
 # ports are chosen at run time so a demo (simulate.py + server.py) may hold the
 # usual ones without colliding: see free_port() in main()
@@ -56,11 +59,11 @@ def check(condition, label):
 
 
 # ------------------------------------------------------------------- test input
-def eeg_frame(seq, phase):
+def eeg_frame(seq, phase, samples=256):
     rows = []
     for channel in range(4):
         rows.append([round(40 * math.sin((i + phase) / 12.0 + channel) + 5 * channel, 4)
-                     for i in range(256)])
+                     for i in range(samples)])
     return {"t": "eeg", "pseudonym": PSEUDONYM, "ts": 1793414821927 + seq, "seq": seq,
             "fs": 256, "x": rows}
 
@@ -89,23 +92,49 @@ def hr_frame():
             "rmssd_ms": 41.0, "sdnn_ms": 55.0, "beats": 11, "source": "polar"}
 
 
+def imu_frame():
+    return {"t": "imu", "pseudonym": PSEUDONYM,
+            "gyro": [0.5, -1.25, 2.0], "accel": [0.0, 0.02, 1.01]}
+
+
+def optics_frame():
+    return {"t": "optics", "pseudonym": PSEUDONYM, "ts": 1793414821927,
+            "sites": {name: {"ratio": 1.05, "r730": 6.1, "r850": 7.6}
+                      for name in OPTIC_SITES},
+            "ppg": {"850nm_LEFT_OUTER": 68.0}}
+
+
+def device_frame():
+    """Aux electrodes ride in device frames, one frame per device."""
+    return {"t": "device", "pseudonym": PSEUDONYM, "model": "muse", "battery": 88,
+            "aux": [{"channel": "AUX_L", "hsi": 1, "std_uv": 12.5},
+                    {"channel": "AUX_R", "hsi": 3, "std_uv": 30.1}]}
+
+
 FIRST_FRAMES = [
     {"t": "snapshot", "people": [{"pseudonym": PSEUDONYM, "name": "Tester",
                                   "tier": "raw", "since": int(time.time() * 1000),
                                   "device": {"model": "muse"}, "last": {}}]},
+    device_frame(),
     eeg_frame(0, 0),
     bands_frame(1.0),
-    eeg_frame(1, 7),
-    bands_frame(1.1),
     quality_frame(),
     arousal_frame(),
     hr_frame(),
+    imu_frame(),
+    optics_frame(),
 ]
-REPEAT_FRAMES = [bands_frame(1.2), quality_frame(), arousal_frame(), hr_frame()]
+# the steady state: eeg every tick (51 samples / 0.2 s = a 255 Hz stream), one
+# other frame per tick, so a features stream sees every block several times a
+# second and the rate estimator has a coherent signal to measure
+REPEAT_FRAMES = [bands_frame(1.2), quality_frame(), arousal_frame(), hr_frame(),
+                 imu_frame(), optics_frame()]
+REPEAT_SAMPLES = 51
+REPEAT_PERIOD = 0.2
 
 
 # ------------------------------------------------------------------- fake relay
-def start_fake_relay(port, stop):
+def start_fake_relay(port, stop, pause):
     from aiohttp import web
 
     async def ws_handler(request):
@@ -115,12 +144,17 @@ def start_fake_relay(port, stop):
             for frame in FIRST_FRAMES:
                 await response.send_str(json.dumps(frame))
                 await asyncio.sleep(0.02)
+            tick = 0
             while not stop.is_set():
-                for frame in REPEAT_FRAMES:
-                    if stop.is_set():
-                        break
-                    await response.send_str(json.dumps(frame))
-                    await asyncio.sleep(0.2)
+                if pause.is_set():
+                    # a sharer who goes silent: nothing arrives, nothing closes
+                    await asyncio.sleep(0.05)
+                    continue
+                await response.send_str(
+                    json.dumps(eeg_frame(1000 + tick, tick % 12, REPEAT_SAMPLES)))
+                await response.send_str(json.dumps(REPEAT_FRAMES[tick % len(REPEAT_FRAMES)]))
+                tick += 1
+                await asyncio.sleep(REPEAT_PERIOD)
         finally:
             await response.close()
         return response
@@ -254,12 +288,13 @@ def main():
     captures = workdir / "captures"
     captures.mkdir()
     stop = threading.Event()
+    pause = threading.Event()
     datagrams = []
     process = None
 
     print(f"workdir {workdir}")
     print(f"ports http={HTTP_PORT} ws={WS_PORT} osc={OSC_PORT}")
-    start_fake_relay(WS_PORT, stop)
+    start_fake_relay(WS_PORT, stop, pause)
     if not wait_tcp(WS_PORT):
         print("FAIL fake relay never accepted a connection")
         stop.set()
@@ -272,6 +307,8 @@ def main():
                "--relay", f"ws://127.0.0.1:{WS_PORT}/live",
                "--captures", str(captures),
                "--osc", f"127.0.0.1:{OSC_PORT}",
+               "--sse-keepalive", "1",
+               "--stale-after", "0.5",
                "--log-level", "warning"]
     try:
         process = subprocess.Popen(command, cwd=str(API_DIR.parent),
@@ -298,28 +335,28 @@ def main():
 
         def sharer_capture():
             # the hub also records snapshot/aggregate frames under "_relay";
-            # the sharer's own file is the one carrying eeg (2 eeg + 2 bands
-            # + quality + arousal + hr = 7 frames)
+            # the sharer's own file is the one carrying that pseudonym
             body = get_json(HTTP_PORT, "/api/v1/captures")[1]
             for entry in body.get("captures") or []:
-                if entry["eeg_frames"] == 2 and entry["frames"] >= 7:
+                if entry["sharers"] == [PSEUDONYM] and entry["frames"] >= 8:
                     return entry
             return None
 
         capture = wait_for(sharer_capture, timeout=25.0)
-        check(bool(capture), "capture recorded with 2 eeg frames")
+        check(bool(capture), "capture recorded for the sharer")
         if not capture:
             return _report(workdir)
         capture_id = capture["id"]
         check(capture["sharers"] == [PSEUDONYM], "capture records the sharer pseudonym")
-        check(capture["frames"] >= 7,
-              f"capture has all seven sharer frames, plus repeats ({capture['frames']})")
+        check(capture["eeg_frames"] >= 1 and capture["frames"] >= 8,
+              f"capture holds every frame type ({capture['frames']} frames,"
+              f" {capture['eeg_frames']} eeg)")
 
         print("replay eeg")
         events = read_sse(HTTP_PORT, f"/api/v1/captures/{capture_id}/eeg?speed=50")
         check(bool(events) and events[0].get("t") == "hello", "replay starts with a hello event")
         eeg_events = [e for e in events if e.get("t") == "eeg"]
-        check(len(eeg_events) >= 2, f"replay yields both eeg frames ({len(eeg_events)})")
+        check(len(eeg_events) >= 2, f"replay yields the captured eeg frames ({len(eeg_events)})")
         if eeg_events:
             first = eeg_events[0]
             check(len(first["x"]) == 4, "replay eeg carries four channels")
@@ -333,7 +370,7 @@ def main():
         filtered = [e for e in read_sse(
             HTTP_PORT, f"/api/v1/captures/{capture_id}/eeg?speed=50&channels=AF7&decimate=4")
             if e.get("t") == "eeg"]
-        check(len(filtered) == 2, f"filtered replay yields two events ({len(filtered)})")
+        check(len(filtered) >= 2, f"filtered replay yields eeg events ({len(filtered)})")
         if filtered:
             check(len(filtered[0]["x"]) == 1, "channels=AF7 keeps one row")
             check(len(filtered[0]["x"][0]) == 64, "decimate=4 keeps 64 samples")
@@ -356,6 +393,7 @@ def main():
             check(last["arousal"]["quality"] == 0.72, "features arousal quality score")
             check(last["hr"]["ok"] is True and last["hr"]["bpm"] == 68.0, "features hr bpm")
             check(last["eeg_hz"] is not None, "features report an eeg rate")
+            check(last["stale_s"] is None, "a replay reports no staleness")
 
         print("live state")
         sharers = get_json(HTTP_PORT, "/api/v1/live/sharers")[1]
@@ -368,32 +406,98 @@ def main():
             check(found[0]["hr"]["bpm"] == 68.0, "live hr bpm")
             check(isinstance(found[0].get("stale_s"), (int, float)) and found[0]["stale_s"] < 60,
                   "sharers expose stale_s (seconds since their last frame)")
+            check(found[0]["valid"] == {"bands": True, "arousal": True, "hr": True},
+                  "live sharers gate all three state blocks as valid")
+            check(found[0]["imu"]["gyro"] == [0.5, -1.25, 2.0],
+                  "live sharers carry the gyro axes")
+            check(found[0]["aux"]["AUX_L"] == {"hsi": 1, "std_uv": 12.5},
+                  "live sharers carry the left aux electrode")
+            check(found[0]["aux"]["AUX_R"]["hsi"] == 3,
+                  "live sharers carry the right aux electrode")
+            check(found[0]["optics"]["sites"]["left_outer"]["ratio"] == 1.05,
+                  "live sharers carry the fNIRS sites")
+            check(found[0]["optics"]["ppg"] == {"850nm_LEFT_OUTER": 68.0},
+                  "live sharers carry the ppg channels")
 
         print("live features stream")
-        live = read_sse(HTTP_PORT, f"/api/v1/live/{PSEUDONYM}/features", want=2, timeout=15.0)
+        live = read_sse(HTTP_PORT, f"/api/v1/live/{PSEUDONYM}/features", want=12, timeout=20.0)
         check(bool(live) and live[0].get("t") == "hello", "live features hello first")
         live_features = [e for e in live if e.get("t") == "features"]
         check(bool(live_features), "live features streams an event")
         if live_features:
-            check(len(live_features[0]["bands"]["rel"]["delta"]) == 4,
+            latest = live_features[-1]
+            check(len(latest["bands"]["rel"]["delta"]) == 4,
                   "live features bands.rel.delta has four entries")
+            check(latest["valid"] == {"bands": True, "arousal": True, "hr": True},
+                  "live features gate all three state blocks as valid")
+            check(len(latest["imu"]["gyro"]) == 3, "live features imu.gyro has three axes")
+            check(len(latest["imu"]["accel"]) == 3, "live features imu.accel has three axes")
+            check(isinstance(latest["optics"]["sites"]["left_outer"]["ratio"], float),
+                  "live features carry the fNIRS ratio")
+            check(isinstance(latest["stale_s"], (int, float)) and latest["stale_s"] < 60,
+                  "live features carry stale_s")
+
+        print("catalogue sensing")
+        row = (get_json(HTTP_PORT, "/api/v1/sessions?limit=1")[1].get("rows") or [{}])[0]
+        for key in ("artifact_free_frac", "hsi_frac", "gyro_rms", "pulse", "battery"):
+            check(key in row, f"session rows carry {key}")
+        check(isinstance(row.get("hsi_frac"), dict) and row["hsi_frac"].get("TP9"),
+              "hsi_frac keeps the per-channel code fractions")
+        status, patch = get_json(
+            HTTP_PORT, "/api/v1/sessions/drive__d0190f77e762/mindP482_2025-06-16--18-13-53/patch")
+        check(status == 200 and patch.get("motion_rms") == 20.9148472521439,
+              "patch reports the recorded gyro rms")
+        check(isinstance(patch.get("pulse"), dict) and "bpm" in patch["pulse"],
+              "patch carries a pulse object")
+
+        print("probe_live")
+        probe = subprocess.run(
+            [sys.executable, str(PROBE), "--api", f"http://127.0.0.1:{HTTP_PORT}",
+             "--seconds", "3"],
+            capture_output=True, text=True, timeout=60)
+        check(probe.returncode == 0, f"probe_live exits 0 ({probe.returncode})")
+        check("eeg events" in probe.stdout, "probe_live reports eeg events")
+        check("channel layout" in probe.stdout, "probe_live confirms the channel layout")
+        if probe.returncode != 0:
+            print(probe.stdout + probe.stderr)
 
         print("osc")
-        osc_seen = wait_for(lambda: dict(_osc_map(datagrams)) if datagrams else None, timeout=20.0)
+        osc_seen = wait_for(lambda: dict(_osc_map(datagrams))
+                            if len(_osc_map(datagrams)) >= 18 else None, timeout=20.0)
         check(bool(osc_seen), "osc datagrams arrive")
         if osc_seen:
-            check(len(osc_seen.get("/eeg/bands", [])) == 5, "/eeg/bands carries five floats")
-            check(len(osc_seen.get("/eeg/bands/abs", [])) == 5, "/eeg/bands/abs carries five floats")
-            check(len(osc_seen.get("/eeg/contact", [])) == 4, "/eeg/contact carries four floats")
-            check(len(osc_seen.get("/eeg/alpha", [])) == 1, "/eeg/alpha carries one float")
-            check(len(osc_seen.get("/eeg/arousal", [])) == 1, "/eeg/arousal carries one float")
-            check(len(osc_seen.get("/eeg/hr", [])) == 1, "/eeg/hr carries one float")
-            check(len(osc_seen.get("/eeg/rms", [])) == 4, "/eeg/rms carries four floats")
+            expected = {
+                "/eeg/bands": 5, "/eeg/bands/abs": 5, "/eeg/contact": 4,
+                "/eeg/alpha": 1, "/eeg/arousal": 1, "/eeg/hr": 1, "/eeg/rms": 4,
+                "/eeg/bands/valid": 1, "/eeg/arousal/valid": 1, "/eeg/hr/valid": 1,
+                "/eeg/aux": 2, "/imu/gyro": 3, "/imu/accel": 3, "/imu/motion": 1,
+                "/optics/ratio": 4, "/optics/r730": 4, "/optics/r850": 4,
+                "/optics/valid": 1,
+            }
+            check(len(osc_seen) == 18, f"osc sends eighteen addresses ({len(osc_seen)})")
+            check({address: len(values) for address, values in osc_seen.items()} == expected,
+                  "every osc address carries the documented argument count")
             contact = osc_seen["/eeg/contact"]
             check(contact[0] == 1.0 and contact[1] == 0.5 and contact[2] == 0.0,
                   "/eeg/contact maps hsi 1/2/none to 1.0/0.5/0.0")
             check(abs(osc_seen["/eeg/arousal"][0] - 0.61) < 1e-6, "/eeg/arousal carries the index")
             check(abs(osc_seen["/eeg/hr"][0] - 68.0) < 1e-6, "/eeg/hr carries the bpm")
+            check(osc_seen["/eeg/bands/valid"] in ([0.0], [1.0]),
+                  "/eeg/bands/valid is a 0.0/1.0 gate")
+            check(osc_seen["/eeg/bands/valid"] == [1.0],
+                  "/eeg/bands/valid opens when a channel is in contact")
+            check(osc_seen["/eeg/aux"] == [1.0, 0.25],
+                  "/eeg/aux maps the aux electrodes through the same contact table")
+            check(all(abs(v - w) < 1e-3 for v, w in zip(osc_seen["/imu/accel"], [0.0, 0.02, 1.01])),
+                  "/imu/accel carries three axes")
+            check(abs(osc_seen["/imu/motion"][0] - 0.0101) < 1e-3,
+                  "/imu/motion is the deviation of |accel| from 1 g")
+            check(all(abs(v - 1.05) < 1e-3 for v in osc_seen["/optics/ratio"]),
+                  "/optics/ratio carries one value per fNIRS site")
+            check(osc_seen["/optics/valid"] == [1.0], "/optics/valid opens when a site reports")
+
+        print("stale heartbeat")
+        _check_stale(HTTP_PORT, pause)
 
         print("error paths")
         status, body = get_json(HTTP_PORT, "/api/v1/captures/nope/eeg")
@@ -427,6 +531,8 @@ def main():
         _check_subscriber_filter()
         _check_eeg_rate()
         _check_ghost_pruning()
+        _check_validity()
+        _check_catalogue_sensing()
         return _report(workdir)
     finally:
         stop.set()
@@ -579,6 +685,77 @@ def _check_eeg_rate():
     rate = hub.sharers()[0]["eeg_hz"]
     check(rate is not None and 200 <= rate <= 320,
           f"eeg_hz reports the per-channel rate ({round(rate or 0, 1)} for 32 samples / 0.125 s)")
+
+
+def _check_stale(port, pause):
+    """A silent sharer must be reported, not left looking alive forever.
+
+    Nothing arrives to say a sharer died, so the streams need their own
+    heartbeat: a keepalive period with no frames is a staleness measurement.
+    """
+    pause.set()
+    try:
+        events = read_sse(port, f"/api/v1/live/{PSEUDONYM}/features", timeout=3.5)
+    finally:
+        pause.clear()
+    staleness = [e for e in events if e.get("t") == "stale"]
+    check(bool(staleness), "a silent sharer emits a stale event")
+    if staleness:
+        check(staleness[0].get("pseudonym") == PSEUDONYM, "the stale event names the sharer")
+        check(isinstance(staleness[0].get("stale_s"), (int, float))
+              and staleness[0]["stale_s"] >= 0.5,
+              "the stale event carries the measured silence")
+
+
+def _check_validity():
+    """A zero and a gap must be distinguishable: validity is emit-only gating."""
+    check(valid_of({}) == {"bands": False, "arousal": False, "hr": False},
+          "valid_of gates every block for a sharer with no state")
+    lost = {"quality": {"hsi": {"TP9": 4, "AF7": 4, "AF8": 4, "TP10": 4}},
+            "bands": {"rel": {"delta": [0.1, 0.1, 0.1, 0.1]}}}
+    check(valid_of(lost)["bands"] is False,
+          "bands are gated when every channel reports hsi 4")
+    empty = {"quality": {"hsi": {"TP9": 1, "AF7": None, "AF8": None, "TP10": None}},
+             "bands": {"rel": {"delta": [None, None, None, None]}}}
+    check(valid_of(empty)["bands"] is False,
+          "bands are gated when every channel value is null")
+    check(valid_of({"arousal": {"index": None, "label": "no_claim"}})["arousal"] is False,
+          "arousal is gated with no index and no claim")
+    check(valid_of({"arousal": {"index": 0.0, "label": "calm"}})["arousal"] is True,
+          "an arousal of zero with a claim stays valid")
+    check(valid_of({"hr": {"ok": False, "bpm": 68.0}})["hr"] is False,
+          "hr is gated while the detector says it is not ok")
+
+
+def _check_catalogue_sensing():
+    """Sensing survives flattening, and /patch derives pulse and motion from it."""
+    catalogue = Catalogue(CATALOGUE_ROOT)
+    device = {"stamp": "s", "tag": "t", "usable": True,
+              "pulse": {"channel": "850nm_LEFT_OUTER", "bpm_mean": 71.5,
+                        "bpm_sd": 2.5, "windows": 4, "valid": 3},
+              "battery": [88.0, 87.0], "gyro_rms": 12.5,
+              "hsi": {"TP9": {"1": 1.0}, "AF7": {}},
+              "artifact_free_frac": {"TP9": 0.9}}
+    row = catalogue._flat_row({"stamp": "s", "devices": [device]})
+    check(row["pulse"]["bpm_mean"] == 71.5 and row["pulse"]["valid"] == 3,
+          "a session row keeps the pulse mean and its valid window count")
+    check(row["battery"] == [88.0, 87.0], "a session row keeps the battery series")
+    check(row["gyro_rms"] == 12.5, "a session row keeps the gyro rms")
+    check(row["hsi_frac"] == {"TP9": {"1": 1.0}, "AF7": {}},
+          "hsi_frac keeps a channel's code fractions and an empty mapping as {}")
+    check("AF8" not in row["hsi_frac"],
+          "hsi_frac omits channels the device does not report")
+    check(row["artifact_free_frac"]["TP9"] == 0.9
+          and row["artifact_free_frac"]["AF7"] is None,
+          "artifact_free_frac is per channel, null where the device has none")
+    patch = build_patch(dict(device, clean_epoch_frac={}))
+    check(patch["pulse"] == {"bpm": 71.5, "valid": True},
+          "patch derives pulse bpm and usability")
+    check(patch["motion_rms"] == 12.5, "patch carries the motion rms")
+    check(build_patch({"pulse": {"valid": 0}})["pulse"] == {"bpm": None, "valid": False},
+          "a pulse with no valid windows is unusable")
+    check(build_patch({})["pulse"] == {"bpm": None, "valid": False},
+          "a device with no pulse reports an empty pulse, never null")
 
 
 def _up(port):

@@ -9,11 +9,12 @@ address, all-float arguments, indexed with ``(address, index)`` rules.
 from __future__ import annotations
 
 import errno
+import math
 import socket
 import struct
 import time
 
-from catalogue import CHANNELS, BANDS
+from catalogue import BANDS, CHANNELS, OPTIC_SITES
 
 HSI_CONTACT = {1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
 
@@ -71,6 +72,21 @@ def _contact_vector(hsi):
         code = _contact_code(hsi.get(channel))
         out.append(HSI_CONTACT.get(code, 0.0))
     return out
+
+
+def _flag(block, key):
+    return 1.0 if (block or {}).get(key) else 0.0
+
+
+def _active(block, key):
+    return _as_float((block or {}).get(key)) or 0.0
+
+
+def _aux_contact(aux, key):
+    """One aux electrode as 1.0..0.0, reusing the hsi -> contact table."""
+    entry = aux.get(key)
+    code = _contact_code(entry.get("hsi")) if isinstance(entry, dict) else None
+    return HSI_CONTACT.get(code, 0.0)
 
 
 class OscEmitter:
@@ -145,6 +161,20 @@ class OscEmitter:
         rms = [_as_float(v) or 0.0 for v in (sharer.get("rms") or [])][:4]
         rms += [0.0] * (4 - len(rms))
 
+        valid = sharer.get("valid") or {}
+        imu = sharer.get("imu") or {}
+        optics = sharer.get("optics") or {}
+        raw_accel = (imu.get("accel") or [])[:3]
+        raw_accel += [None] * (3 - len(raw_accel))
+        gyro = [(_as_float(v) or 0.0) for v in (imu.get("gyro") or [])][:3]
+        gyro += [0.0] * (3 - len(gyro))
+        accel = [(_as_float(v) or 0.0) for v in raw_accel]
+        has_accel = all(_as_float(v) is not None for v in raw_accel)
+        motion = abs(math.sqrt(sum(v * v for v in accel)) - 1.0) if has_accel else 0.0
+        aux = [_aux_contact(sharer.get("aux") or {}, key) for key in ("AUX_L", "AUX_R")]
+        sites = optics.get("sites") or {}
+        ratio = [_as_float((sites.get(name) or {}).get("ratio")) or 0.0 for name in OPTIC_SITES]
+
         messages = [
             ("/eeg/bands", rel),
             ("/eeg/bands/abs", abs_),
@@ -153,6 +183,18 @@ class OscEmitter:
             ("/eeg/arousal", [index if index is not None else 0.0]),
             ("/eeg/hr", [bpm if bpm is not None else 0.0]),
             ("/eeg/rms", rms),
+            ("/eeg/bands/valid", [_flag(valid, "bands")]),
+            ("/eeg/arousal/valid", [_flag(valid, "arousal")]),
+            ("/eeg/hr/valid", [_flag(valid, "hr")]),
+            ("/eeg/aux", aux),
+            ("/imu/gyro", gyro),
+            ("/imu/accel", accel),
+            ("/imu/motion", [motion]),
+            ("/optics/ratio", ratio),
+            ("/optics/r730", [_active(sites.get(name) or {}, "r730") for name in OPTIC_SITES]),
+            ("/optics/r850", [_active(sites.get(name) or {}, "r850") for name in OPTIC_SITES]),
+            ("/optics/valid", [1.0 if any(_as_float((sites.get(name) or {}).get("ratio"))
+                                          is not None for name in OPTIC_SITES) else 0.0]),
         ]
         count = 0
         for address, values in messages:

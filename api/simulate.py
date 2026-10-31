@@ -2,8 +2,9 @@
 """simulate.py -- a stand-in for the Collective relay, for demos and drills.
 
 Speaks the relay's WebSocket protocol verbatim (``snapshot``, ``eeg``,
-``bands``, ``quality``, ``arousal``, ``hr``, ``aggregate``), so the service
-under test cannot tell it apart from the real thing:
+``bands``, ``quality``, ``arousal``, ``hr``, ``imu``, ``optics``, ``device``,
+``aggregate``), so the service under test cannot tell it apart from the real
+thing:
 
     python3 api/simulate.py                          # ws://127.0.0.1:8790/live
     python3 api/server.py --relay ws://127.0.0.1:8790/live --osc 127.0.0.1:5000
@@ -29,6 +30,8 @@ import time
 
 from aiohttp import web
 
+from catalogue import OPTIC_SITES
+
 CHANNELS = ["TP9", "AF7", "AF8", "TP10"]
 BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
 FS = 256
@@ -44,6 +47,7 @@ class Voice:
         self.seed = seed
         self.since = int(time.time() * 1000)
         self.seq = 0
+        self.device_sent = False
 
     # ------------------------------------------------------------------ signal
     def _phase(self, index):
@@ -81,7 +85,7 @@ class Voice:
             "TP9": 1,
             "AF7": 1 if wander < 0.6 else 2,
             "AF8": 2 if wander < 0.4 else 1,
-            "TP10": 1 if wander < 0.35 else (2 if wander < 0.7 else 3),
+            "TP10": 1 if wander < 0.25 else (2 if wander < 0.5 else (3 if wander < 0.75 else 4)),
         }
 
     def bands(self, t, contact):
@@ -121,6 +125,28 @@ class Voice:
             "source": "polar",
         }
 
+    def imu(self, t):
+        return {"t": "imu", "pseudonym": self.pseudonym,
+                "gyro": [round(6.0 * math.sin(0.9 * t + self._phase(axis)), 3)
+                         for axis in range(3)],
+                "accel": [round((1.0 if axis == 2 else 0.0)
+                                + 0.15 * math.sin(0.7 * t + self._phase(axis)), 3)
+                          for axis in range(3)]}
+
+    def optics(self, t):
+        sites = {name: {"ratio": round(1.0 + 0.12 * math.sin(0.4 * t + i), 4),
+                        "r730": round(6.0 + 0.8 * math.sin(0.3 * t + i), 3),
+                        "r850": round(7.5 + 0.9 * math.sin(0.35 * t + i), 3)}
+                 for i, name in enumerate(OPTIC_SITES)}
+        return {"t": "optics", "pseudonym": self.pseudonym, "ts": int(time.time() * 1000),
+                "sites": sites, "ppg": {"850nm_LEFT_OUTER": round(self.hr(t)["bpm"], 2)}}
+
+    def device_frame(self):
+        return {"t": "device", "pseudonym": self.pseudonym, "model": "Muse S (gen 2)",
+                "battery": 87,
+                "aux": [{"channel": "AUX_L", "hsi": 1, "std_uv": 14.2},
+                        {"channel": "AUX_R", "hsi": 2, "std_uv": 21.7}]}
+
     def frames(self, t, samples):
         contact = self.hsi(t)
         return [
@@ -129,6 +155,8 @@ class Voice:
             self.quality(contact),
             self.arousal(t),
             self.hr(t),
+            self.imu(t),
+            self.optics(t),
         ]
 
     def snapshot_entry(self):
@@ -193,6 +221,13 @@ async def run(args):
             now = time.time()
             elapsed = now - started
             for voice in voices:
+                if not voice.device_sent and clients:
+                    # the relay describes a device once -- but only to someone
+                    # listening, so it waits for the first connection instead of
+                    # being spent into an empty room
+                    voice.device_sent = True
+                    await broadcast(voice.device_frame())
+                    stats["frames"] += 1
                 for frame in voice.frames(elapsed, samples):
                     await broadcast(frame)
                     stats["frames"] += 1

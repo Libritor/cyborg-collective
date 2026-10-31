@@ -35,11 +35,12 @@ from aiohttp import web
 from capture import CaptureWriter, capture_path, find_capture, list_captures, read_frames
 from catalogue import BANDS, CATALOGUE_ROOT, CHANNELS, Catalogue, number
 from osc import OscEmitter
-from relay import DEFAULT_RELAY, FS_DEFAULT, STATE_TYPES, RelayHub, features_of
+from relay import DEFAULT_RELAY, FEATURE_TRIGGERS, FS_DEFAULT, RelayHub, features_of
 
 SERVICE = "collective-api"
 VERSION = "1.0.0"
 KEEPALIVE_S = 15.0
+STALE_AFTER_S = 5.0
 REPLAY_MAX_DELAY = 5.0
 CORS = {"Access-Control-Allow-Origin": "*"}
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
@@ -213,13 +214,15 @@ async def sse_send(response, payload):
     await response.write(b"data: " + data.encode("utf-8") + b"\n\n")
 
 
-async def sse_queue(response, queue):
-    """Yield queued frames, emitting a keepalive comment every KEEPALIVE_S."""
+async def sse_queue(response, queue, keepalive_s=KEEPALIVE_S, on_idle=None):
+    """Yield queued frames; a keepalive comment (and any idle hook) every keepalive_s."""
     while True:
         try:
-            yield await asyncio.wait_for(queue.get(), timeout=KEEPALIVE_S)
+            yield await asyncio.wait_for(queue.get(), timeout=keepalive_s)
         except asyncio.TimeoutError:
             await response.write(b": keepalive\n\n")
+            if on_idle is not None:
+                await on_idle()
 
 
 def require_hub(request):
@@ -263,11 +266,16 @@ def build_patch(device):
     clean = device.get("clean_epoch_frac")
     if not isinstance(clean, dict):
         clean = {}
+    pulse = device.get("pulse")
     return {
         "stamp": device.get("stamp"),
         "tag": device.get("tag"),
         "duration_s": number(device.get("duration_s")),
         "fs_hz": number(device.get("fs_est")),
+        "pulse": {"bpm": number(pulse.get("bpm_mean")) if isinstance(pulse, dict) else None,
+                  "valid": bool(isinstance(pulse, dict)
+                                and (number(pulse.get("valid")) or 0) > 0)},
+        "motion_rms": number(device.get("gyro_rms")),
         "contact": {ch: number(clean.get(ch)) for ch in CHANNELS},
         "bands_log10": log10,
         "bands_norm": norm,
@@ -366,7 +374,15 @@ async def live_eeg(request):
                 "fs": round(rate / decimate, 3), "channels": channels,
                 "decimate": decimate,
             })
-            async for frame in sse_queue(response, queue):
+
+            async def on_idle():
+                stale = hub.stale_s(pseudonym)
+                if stale is not None and stale > request.app["stale_after_s"]:
+                    await sse_send(response, {"t": "stale", "pseudonym": pseudonym,
+                                              "stale_s": round(stale, 1)})
+
+            async for frame in sse_queue(response, queue,
+                                         request.app["keepalive_s"], on_idle):
                 kind = frame.get("t")
                 if kind == "leave":
                     await sse_send(response, {"t": "bye", "pseudonym": pseudonym,
@@ -389,19 +405,27 @@ async def live_features(request):
     pseudonym = request.match_info["pseudonym"]
     if not hub.has(pseudonym):
         raise ApiError("unknown pseudonym", 404)
-    queue = hub.subscribe(pseudonym, tuple(STATE_TYPES) + ("leave",))
+    queue = hub.subscribe(pseudonym, tuple(FEATURE_TRIGGERS) + ("leave",))
     try:
         response = await sse_start(request)
         try:
             await sse_send(response, {"t": "hello", "pseudonym": pseudonym,
                                       "eeg_hz": hub.eeg_hz(pseudonym)})
-            async for frame in sse_queue(response, queue):
+
+            async def on_idle():
+                stale = hub.stale_s(pseudonym)
+                if stale is not None and stale > request.app["stale_after_s"]:
+                    await sse_send(response, {"t": "stale", "pseudonym": pseudonym,
+                                              "stale_s": round(stale, 1)})
+
+            async for frame in sse_queue(response, queue,
+                                         request.app["keepalive_s"], on_idle):
                 kind = frame.get("t")
                 if kind == "leave":
                     await sse_send(response, {"t": "bye", "pseudonym": pseudonym,
                                               "reason": "left"})
                     return response
-                if kind not in STATE_TYPES:
+                if kind not in FEATURE_TRIGGERS:
                     continue
                 payload = hub.features(pseudonym) or {}
                 await sse_send(response, {
@@ -503,7 +527,7 @@ async def capture_features(request):
                     eeg_hz = rate if eeg_hz is None else (0.2 * rate + 0.8 * eeg_hz)
                 last_eeg_ts = entry["recv_ts"]
                 continue
-            if kind not in STATE_TYPES:
+            if kind not in FEATURE_TRIGGERS:
                 continue
             merged[kind] = frame
             seen += 1
@@ -524,13 +548,16 @@ async def capture_features(request):
 
 
 # --------------------------------------------------------------------------- app
-def build_app(catalogue, captures_dir, hub=None, osc=None, relay_url=DEFAULT_RELAY):
+def build_app(catalogue, captures_dir, hub=None, osc=None, relay_url=DEFAULT_RELAY,
+              keepalive_s=KEEPALIVE_S, stale_after_s=STALE_AFTER_S):
     app = web.Application(middlewares=[errors_and_cors])
     app["catalogue"] = catalogue
     app["hub"] = hub
     app["captures_dir"] = Path(captures_dir)
     app["osc"] = osc
     app["relay_url"] = relay_url
+    app["keepalive_s"] = keepalive_s
+    app["stale_after_s"] = stale_after_s
 
     router = app.router
     router.add_get("/api/v1/health", health)
@@ -587,7 +614,7 @@ async def serve(args):
         def on_frame(pseudonym, frame):
             if writer is not None:
                 writer.write(pseudonym, frame)
-            if osc is not None and frame.get("t") in STATE_TYPES:
+            if osc is not None and frame.get("t") in FEATURE_TRIGGERS:
                 target = osc_target()
                 if target is not None and pseudonym == target:
                     osc.emit(hub.osc_state(target))
@@ -595,7 +622,8 @@ async def serve(args):
         hub.on_frame = on_frame
 
     app = build_app(catalogue, captures_dir, hub=hub, osc=osc,
-                    relay_url=args.relay)
+                    relay_url=args.relay, keepalive_s=args.sse_keepalive,
+                    stale_after_s=args.stale_after)
     runner = web.AppRunner(app, access_log=None)
     await runner.setup()
     site = web.TCPSite(runner, args.host, args.port)
@@ -648,12 +676,22 @@ def build_parser():
                         help="send OSC/UDP here, e.g. 127.0.0.1:5000")
     parser.add_argument("--osc-sharer", default="any", metavar="PSEUDONYM|any",
                         help="which sharer feeds OSC (default: any = the first)")
+    parser.add_argument("--sse-keepalive", type=float, default=KEEPALIVE_S, metavar="SECONDS",
+                        help="seconds of stream silence before a keepalive comment "
+                             f"(default: {KEEPALIVE_S})")
+    parser.add_argument("--stale-after", type=float, default=STALE_AFTER_S, metavar="SECONDS",
+                        help="a silent sharer is reported stale once this many seconds pass "
+                             f"(default: {STALE_AFTER_S})")
     parser.add_argument("--log-level", default="info")
     return parser
 
 
 def main(argv=None):
     args = build_parser().parse_args(argv)
+    if args.sse_keepalive < 0.5:
+        raise SystemExit("--sse-keepalive must be at least 0.5 seconds")
+    if args.stale_after < 0.0:
+        raise SystemExit("--stale-after must not be negative")
     if args.captures is None:
         args.captures = str(Path(args.root) / "api" / "data" / "captures")
     logging.basicConfig(

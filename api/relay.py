@@ -19,13 +19,16 @@ import time
 
 import aiohttp
 
-from catalogue import BANDS, CHANNELS, number
+from catalogue import BANDS, CHANNELS, OPTIC_SITES, number
 
 DEFAULT_RELAY = "wss://cyborg-collective-relay.onrender.com/live"
 FS_DEFAULT = 256
 QUEUE_MAX = 64
+AXES = 3                              # gyro / accel components per imu frame
 # frame types that carry a person's merged state
 STATE_TYPES = ("bands", "quality", "arousal", "hr")
+# everything that changes the feature payload: state plus motion and optics
+FEATURE_TRIGGERS = STATE_TYPES + ("imu", "optics")
 # everything the page knows about; anything else is logged once and dropped
 KNOWN_TYPES = {
     "snapshot", "aggregate", "join", "presence", "profile", "device", "wearable",
@@ -97,6 +100,65 @@ def hr_of(last):
     }
 
 
+def valid_of(last):
+    """Which state blocks are trustworthy right now."""
+    in_contact = any(code in (1, 2) for code in hsi_of(last).values())
+    rel = (last.get("bands") or {}).get("rel")
+    has_bands = isinstance(rel, dict) and any(
+        isinstance(row, list) and any(number(v) is not None for v in row)
+        for row in rel.values())
+    arousal = last.get("arousal") or {}
+    arousal_ok = (number(arousal.get("index")) is not None
+                  and arousal.get("label") != "no_claim")
+    hr = last.get("hr") or {}
+    hr_ok = bool(hr.get("ok")) and number(hr.get("bpm")) is not None
+    return {"bands": bool(in_contact and has_bands),
+            "arousal": bool(arousal_ok), "hr": bool(hr_ok)}
+
+
+def _triplet(values):
+    row = values[:AXES] if isinstance(values, list) else []
+    row += [None] * (AXES - len(row))
+    return [number(v) for v in row]
+
+
+def imu_of(last):
+    imu = last.get("imu") or {}
+    return {"gyro": _triplet(imu.get("gyro")), "accel": _triplet(imu.get("accel"))}
+
+
+def aux_of(last):
+    """Aux electrodes ride inside device frames: aux[].{channel,hsi,std_uv}."""
+    device = last.get("device") or {}
+    rows = device.get("aux")
+    out = {"AUX_L": None, "AUX_R": None}
+    for row in rows if isinstance(rows, list) else []:
+        channel = row.get("channel") if isinstance(row, dict) else None
+        if channel in out:
+            code = row.get("hsi")
+            out[channel] = {"hsi": code if isinstance(code, int) else None,
+                            "std_uv": number(row.get("std_uv"))}
+    return out
+
+
+def optics_of(last):
+    optics = last.get("optics") or {}
+    sites = optics.get("sites") if isinstance(optics.get("sites"), dict) else {}
+    shaped = {}
+    for name in OPTIC_SITES:
+        site = sites.get(name)
+        shaped[name] = None if not isinstance(site, dict) else {
+            "ratio": number(site.get("ratio")),
+            "r730": number(site.get("r730")),
+            "r850": number(site.get("r850")),
+        }
+    ppg = optics.get("ppg") if isinstance(optics.get("ppg"), dict) else {}
+    return {"sites": shaped,
+            "ppg": {str(key): number(value) for key, value in ppg.items()
+                    if number(value) is not None},
+            "ts": number(optics.get("ts"))}
+
+
 def rms_of(last):
     """RMS µV of the last ``eeg`` frame, one value per channel."""
     eeg = last.get("eeg") or {}
@@ -110,7 +172,7 @@ def rms_of(last):
     return out
 
 
-def features_of(last, eeg_hz=None):
+def features_of(last, eeg_hz=None, stale_s=None):
     """The SSE ``features`` body shared by live streams and replays."""
     return {
         "bands": bands_of(last),
@@ -118,6 +180,10 @@ def features_of(last, eeg_hz=None):
         "arousal": arousal_of(last),
         "hr": hr_of(last),
         "eeg_hz": number(eeg_hz),
+        "valid": valid_of(last),
+        "imu": imu_of(last),
+        "optics": optics_of(last),
+        "stale_s": number(stale_s),
     }
 
 
@@ -310,12 +376,15 @@ class RelayHub:
             "bands": bands_of(last),
             "arousal": arousal_of(last),
             "hr": hr_of(last),
+            "valid": valid_of(last),
+            "imu": imu_of(last),
+            "aux": aux_of(last),
+            "optics": optics_of(last),
             "eeg_hz": number(state.get("eeg_hz")),
             "age_s": max(0.0, now - since / 1000.0) if since is not None else None,
             # seconds since this sharer's last frame: the only honest staleness
             # signal, since age_s is time since it joined
-            "stale_s": (max(0.0, now - state["last_seen"])
-                        if state.get("last_seen") else None),
+            "stale_s": self.stale_s(state["pseudonym"]),
         }
         if with_rms:
             out["rms"] = rms_of(last)
@@ -346,11 +415,18 @@ class RelayHub:
         state = self._state.get(pseudonym)
         if state is None:
             return None
-        return features_of(state["last"], state.get("eeg_hz"))
+        return features_of(state["last"], state.get("eeg_hz"), self.stale_s(pseudonym))
 
     def eeg_hz(self, pseudonym):
         state = self._state.get(pseudonym)
         return number(state.get("eeg_hz")) if state else None
+
+    def stale_s(self, pseudonym):
+        """Seconds since this sharer's last frame, or None when unknown."""
+        state = self._state.get(pseudonym)
+        if state is None or not state.get("last_seen"):
+            return None
+        return max(0.0, time.time() - state["last_seen"])
 
     # ------------------------------------------------------------------ transport
     async def run(self):

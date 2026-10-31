@@ -23,6 +23,9 @@ CATALOGUE_ROOT = Path(__file__).resolve().parent.parent
 
 CHANNELS = ["TP9", "AF7", "AF8", "TP10"]
 BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
+# the four fNIRS sites the page maps; any other name a device invents is dropped
+OPTIC_SITES = ("left_outer", "left_inner", "right_inner", "right_outer")
+
 
 _SAFE = re.compile(r"[A-Za-z0-9._-]+")
 
@@ -39,6 +42,44 @@ def _per_channel(mapping):
     if not isinstance(mapping, dict):
         return {ch: None for ch in CHANNELS}
     return {ch: number(mapping.get(ch)) for ch in CHANNELS}
+
+
+def _int_or_none(value):
+    """An integer count, or None (JSON counts arrive as int or float)."""
+    value = number(value)
+    return int(value) if value is not None else None
+
+
+def _hsi_frac(mapping):
+    """{channel: {hsi code: fraction of the session}}, {} when no hsi at all."""
+    if not isinstance(mapping, dict):
+        return {}
+    out = {}
+    for channel in CHANNELS:
+        codes = mapping.get(channel)
+        if isinstance(codes, dict):
+            out[channel] = {str(code): number(frac) for code, frac in codes.items()
+                            if number(frac) is not None}
+    return out
+
+
+def _pulse(pulse):
+    """The recorded pulse summary, or None when the device has none."""
+    if not isinstance(pulse, dict):
+        return None
+    channel = pulse.get("channel")
+    return {"channel": str(channel) if channel is not None else None,
+            "bpm_mean": number(pulse.get("bpm_mean")),
+            "bpm_sd": number(pulse.get("bpm_sd")),
+            "windows": _int_or_none(pulse.get("windows")),
+            "valid": _int_or_none(pulse.get("valid"))}
+
+
+def _numbers(values):
+    """The numbers in a JSON list, in order; None when it is not a list."""
+    if not isinstance(values, list):
+        return None
+    return [number(v) for v in values if number(v) is not None]
 
 
 class Catalogue:
@@ -98,6 +139,11 @@ class Catalogue:
             "fs_hz": number(device.get("fs_est")),
             "raw_rms_uv": _per_channel(device.get("raw_rms_uv")),
             "clean_frac": _per_channel(device.get("clean_epoch_frac")),
+            "artifact_free_frac": _per_channel(device.get("artifact_free_frac")),
+            "hsi_frac": _hsi_frac(device.get("hsi")),
+            "gyro_rms": number(device.get("gyro_rms")),
+            "pulse": _pulse(device.get("pulse")),
+            "battery": _numbers(device.get("battery")),
             "bands": bands,
             "preview_url": self._preview_url(device),
         }
