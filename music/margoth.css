@@ -282,11 +282,19 @@ h2 {
   transition: width .06s linear;
 }
 
+/* Fixed width, not min-width: the readout changes every animation frame, and in
+   a centred row an auto-width box re-centres the whole console up to 60 times a
+   second -- measured 26.5px of slide between "-8.0 / -1.0 dBFS" and
+   "-26.7 / -20.2 dBFS". 18ch is the longest string the format can produce
+   ("-38.0 / -38.0 dBFS"), and mono with tabular-nums makes ch exact, so the box
+   never moves; right-aligned, the digits grow leftward inside it. */
 #meter-text {
   font: 11px/1 var(--mono);
   font-variant-numeric: tabular-nums;
   color: var(--dim);
-  min-width: 10ch;
+  width: 18ch;
+  text-align: right;
+  white-space: nowrap;
 }
 
 /* The transport hides its export button with an attribute, and the UA rule for
