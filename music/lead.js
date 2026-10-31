@@ -207,10 +207,9 @@ export function patchFrom(source = {}) {
  * key is held). Mixed into the voice sum instead, the compressor held the total
  * and the lead could not be heard: measured, five voices at level 1.5 moved the
  * master RMS 1.1 dB while driving the sum to 1.32. 0.92 puts one note above the
- * band's own RMS once the duck has stepped the band back, and leaves the ceiling
- * to catch transients rather than notes: measured, one key peaks at 0.65 and six
- * silent keys at 0.79, so the curve is transparent instead of flattening a chord
- * (at 1.1 the six-key case sat on the flat top for 7.6% of its samples).
+ * band's own RMS once the duck has stepped the band back. Measured with the
+ * limiter in front of it: one key peaks at 0.71 and six at 0.79, with no sample
+ * touching the ceiling at any polyphony -- the curve is a backstop, not a voice.
  */
 export const LEAD_CEILING = 0.95;
 /**
@@ -245,36 +244,56 @@ export function ceilingCurve({ ceiling = LEAD_CEILING, headroom = LEAD_HEADROOM,
 }
 
 export function createLeadPatch(ctx, { level = 0.92, headroom = LEAD_HEADROOM } = {}) {
+  //   voices -> voiceBus(level, 1/sqrt n) -> limiter -> domain scale -> soft ceiling
+  //          -> domain scale back -> out
   const out = ctx.createGain();          // the page connects to this
   const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.Q.value = 0.8;
   filter.frequency.value = 2600;
   const voiceBus = ctx.createGain();     // level, and polyphony compensation
+
+  // A chord is not six times a note, and these voices are *partly coherent* -- a
+  // pentatonic shares harmonics, so its notes add in phase at the low partials.
+  // Measured: 1/sqrt(n) let three keys peak 2.2 dB above one; 1/n^0.65 still let
+  // six reach the ceiling; 1/n made a chord 6 dB quieter than a single note, which
+  // is worse than either. So the bus compensates for loudness only, and a fast
+  // limiter -- not louder arithmetic -- catches what coherence adds.
+  const limiter = ctx.createDynamicsCompressor();
+  limiter.threshold.value = -4;          // about 0.63: under the ceiling, over a note
+  limiter.knee.value = 6;
+  limiter.ratio.value = 12;
+  limiter.attack.value = 0.003;          // fast enough for a key's own attack
+  limiter.release.value = 0.12;
+
   const into = ctx.createGain();         // scales the signal into the curve's domain
   into.gain.value = 1 / headroom;
-  const limiter = ctx.createWaveShaper();
-  limiter.curve = ceilingCurve({ headroom });
-  limiter.oversample = "2x";
+  const ceiling = ctx.createWaveShaper();
+  ceiling.curve = ceilingCurve({ headroom });
+  ceiling.oversample = "2x";
   const outOf = ctx.createGain();        // ...and the domain's scale back out
   outOf.gain.value = headroom;
+
   filter.connect(voiceBus);
-  voiceBus.connect(into);
-  into.connect(limiter);
-  limiter.connect(outOf);
+  voiceBus.connect(limiter);
+  limiter.connect(into);
+  into.connect(ceiling);
+  ceiling.connect(outOf);
   outOf.connect(out);
 
   let patch = { ...DEFAULT_PATCH };
   let wave = null;
   let voices = [];
 
-  // A chord of six is not six times as loud: the bus follows 1/sqrt(n), the usual
-  // polyphonic compromise between one note at full level and a chord that slams.
-  const setBus = () => {
-    const gain = level / Math.sqrt(Math.max(1, voices.length));
-    voiceBus.gain.setTargetAtTime(gain, ctx.currentTime, 0.02);
+  const POLYPHONY_EXPONENT = 0.5;
+  const setBus = (immediate = false) => {
+    const gain = level / Math.max(1, voices.length) ** POLYPHONY_EXPONENT;
+    const now = ctx.currentTime;
+    voiceBus.gain.cancelScheduledValues(now);
+    if (immediate) voiceBus.gain.setValueAtTime(gain, now);
+    else voiceBus.gain.setTargetAtTime(gain, now, 0.02);
   };
-  setBus();
+  setBus(true);
 
   const build = () => {
     const imag = harmonicAmplitudes(patch);
@@ -301,6 +320,12 @@ export function createLeadPatch(ctx, { level = 0.92, headroom = LEAD_HEADROOM } 
 
   const start = (midi, at = ctx.currentTime) => {
     const t = Math.max(at, ctx.currentTime);
+    // the count goes up before the oscillators start: otherwise a chord's attack
+    // is played at the previous, louder gain, which is exactly the transient that
+    // was poking the ceiling
+    const slot = { midi, env: null, oscs: [], started: t, release: null };
+    voices = voices.concat(slot);
+    setBus(true);
     const env = ctx.createGain();
     env.gain.setValueAtTime(0, t);
     env.gain.linearRampToValueAtTime(1, t + 0.012);
@@ -318,12 +343,12 @@ export function createLeadPatch(ctx, { level = 0.92, headroom = LEAD_HEADROOM } 
       osc.start(t);
       return osc;
     });
-    const voice = { midi, env, oscs, started: t, release: () => stop(voice, ctx.currentTime) };
-    voices = voices.concat(voice);
+    slot.env = env;
+    slot.oscs = oscs;
+    slot.release = () => stop(slot, ctx.currentTime);
     // steal the oldest rather than refuse a key: ten keys, six voices
     while (voices.length > MAX_VOICES) stop(voices[0], ctx.currentTime);
-    setBus();
-    return voice;
+    return slot;
   };
 
   build();
