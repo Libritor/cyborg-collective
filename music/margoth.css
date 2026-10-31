@@ -415,15 +415,18 @@ main > section + section { margin-top: 26px; }
 .mg-choice[data-kind="auto"] { border-style: dashed; }
 .mg-choice[data-kind="refused"] { color: var(--warm); }
 .mg-choice[data-stale="true"] { opacity: .6; }
-.mg-choice > span { color: var(--faint); margin-left: 6px; }
+.mg-seat-choices[hidden] { display: none; }
 
-/* a seat whose chosen head has gone: the choice is remembered, so say what is
-   actually driving instead of showing a chip that cannot light */
-.mg-seat-lost {
-  margin: 2px 0 0;
-  font: 11px/1.4 var(--mono);
-  color: var(--warm);
+/* One line per seat saying what it is actually doing: the choice is remembered,
+   so when a head goes it says so here rather than leaving a chip that cannot
+   light. */
+.mg-seat-state {
+  margin: 0;
+  font: 11px/1.5 var(--mono);
+  color: var(--dim);
 }
+
+.mg-seat-state[data-lost="true"] { color: var(--warm); }
 
 /* ----------------------------------------------------------------- the keys */
 .mg-keys {

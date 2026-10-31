@@ -20,7 +20,7 @@ import { playEvent } from "./arrange.js";
 import { createUI, mountParameters } from "./ui.js";
 import { KEYS, LEAD_RANGE, createLeadPatch, patchFrom, pentatonicNotes } from "./lead.js";
 import {
-  AUTO, PAGE, seatOptions, viewsForSeat, resolvedSeat, seatSentence,
+  AUTO, PAGE, seatOptions, viewsForSeat, resolvedSeat, seatSentence, seatStatus,
 } from "./drivers.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle, encodeWav } from "./idle.js";
@@ -88,6 +88,9 @@ const heldKeys = new Map();   // keycap -> sounding voice
 // Two seats, filled from the cast. "auto" is everyone in contact, `page` is the
 // sliders, and a pseudonym is that head alone.
 const seats = { band: AUTO, patch: AUTO };
+// What each seat's choice is called, so a head that leaves can still be named:
+// once it has gone, the roster no longer carries its display name.
+const seatNames = { band: "", patch: "" };
 
 const idleStamp = params.get("idle");
 const relayUrl = params.get("relay");
@@ -341,23 +344,23 @@ function renderDrivers() {
   if (key === castKey) return;
   castKey = key;
 
+  const SEAT_WORDS = {
+    band: { verb: "driving the band", alone: "the sliders drive the band" },
+    patch: { verb: "shaping the lead", alone: "the sliders shape the lead" },
+  };
   for (const seat of ["band", "patch"]) {
     const host = el(`seat-${seat}`);
     if (!host) continue;
     const inForce = resolvedSeat(relay ? relay.sharers(Date.now() / 1000) : [], seats[seat]);
     // A seat whose chosen head has gone keeps the choice but cannot honour it.
-    // The status line is no place to say so -- the relay's own state overwrites
-    // it every few seconds -- so the seat says it, and stays said.
+    // The page's status line is no place to say so -- the relay's own state
+    // overwrites that every few seconds -- so the seat says it, and stays said.
     const lost = seats[seat] !== AUTO && seats[seat] !== PAGE
       && inForce !== seats[seat] ? seats[seat] : null;
-    let lostNote = null;
-    if (lost) {
-      // `el` in this file is getElementById, not a tag factory: a seat note has to
-      // be built the long way round
-      lostNote = document.createElement("p");
-      lostNote.className = "mg-seat-lost";
-      lostNote.textContent = `${lost} has gone · following ${seatSentence(inForce, options)}`;
-    }
+    const lostName = seatNames[seat] || lost;
+    const lostNote = lost
+      ? { textContent: `${lostName} has gone. ${seatSentence(inForce, options)} is ${SEAT_WORDS[seat].verb}.` }
+      : null;
     host.replaceChildren(...options.map((option) => {
       const chip = document.createElement("button");
       chip.type = "button";
@@ -368,15 +371,24 @@ function renderDrivers() {
       chip.dataset.choice = option.id;
       chip.dataset.stale = String(option.stale === true);
       chip.disabled = option.kind === "refused";
-      chip.title = `${seat}: ${option.note}`;
+      chip.title = option.note;
       chip.append(document.createTextNode(option.label));
-      const note = document.createElement("span");
-      note.textContent = option.note;
-      chip.appendChild(note);
       chip.addEventListener("click", () => chooseSeat(seat, option.id));
       return chip;
     }));
-    if (lostNote) host.appendChild(lostNote);
+    // With nobody connected there is nothing to choose between, so the chips go
+    // and one sentence says what is driving instead. A row offering "Everyone"
+    // and "These sliders" when they are the same thing is not a choice.
+    const heads = rows.filter((r) => r.admitted && !r.stale).length;
+    const refused = rows.filter((r) => !r.admitted).length;
+    host.hidden = heads === 0;
+    const stateLine = el(`seat-${seat}-state`);
+    if (stateLine) {
+      stateLine.textContent = lostNote
+        ? lostNote.textContent
+        : seatStatus(inForce, options, { heads, refused, ...SEAT_WORDS[seat] });
+      stateLine.dataset.lost = String(!!lostNote);
+    }
   }
 }
 
@@ -391,16 +403,19 @@ function seatKeyOf(rows) {
 /** Hand a seat to a chip. The choice is memory-only: a page reload is a new room. */
 function chooseSeat(seat, choice) {
   if (seats[seat] === choice) return;
+  const chosen = seatOptions(relay ? relay.all() : []).find((option) => option.id === choice);
+  seatNames[seat] = chosen ? chosen.label : "";
   seats[seat] = choice;
   castKey = "";                       // force the chips to redraw
   renderDrivers();
   const views = relay ? relay.sharers(Date.now() / 1000) : [];
   const options = seatOptions(relay ? relay.all() : []);
   const inForce = resolvedSeat(views, choice);
+  const words = seat === "band" ? "driving the band" : "shaping the lead";
   if (inForce !== choice) {
-    say(`${seat}: ${choice} has gone, so ${seatSentence(inForce, options)} is driving`);
+    say(`${choice} has gone. ${seatSentence(inForce, options)} is ${words}`);
   } else {
-    say(`${seat}: ${seatSentence(inForce, options)}`);
+    say(`${seatSentence(inForce, options)} ${inForce === PAGE ? "are" : "is"} ${words}`);
   }
   applyPatch();
 }

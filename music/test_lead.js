@@ -6,7 +6,7 @@ import {
   isMajorQuality, pentatonicFamily, pentatonicNotes, harmonicAmplitudes, patchFrom, DEFAULT_PATCH,
 } from "./lead.js";
 import {
-  AUTO, PAGE, SEATS, seatOptions, viewsForSeat, resolvedSeat, seatSentence,
+  AUTO, PAGE, SEATS, seatOptions, viewsForSeat, resolvedSeat, seatSentence, seatStatus,
 } from "./drivers.js";
 import { QUALITY } from "./families.js";
 import { noteName } from "./explain.js";
@@ -147,9 +147,28 @@ check(resolvedSeat(views, "ana") === "ana", "a seat that is present is honoured"
 check(resolvedSeat(views, "nobody") === AUTO, "a seat that has gone falls back to auto");
 check(resolvedSeat(views, PAGE) === PAGE, "this page never falls back");
 check(resolvedSeat([], "ana") === AUTO, "and with nobody connected, auto is all there is");
-check(seatSentence(AUTO, options) === "every head in contact", "auto says what it means");
-check(seatSentence(PAGE, options) === "the sliders", "as does this page");
+check(seatSentence(AUTO, options) === "Everyone", "everyone says what it means");
+check(seatSentence(PAGE, options) === "These sliders", "as does this page");
 check(seatSentence("ana", options) === "Ana", "and a chosen head its own name");
+check(options.find((o) => o.id === AUTO).label === "Everyone"
+  && options.find((o) => o.id === PAGE).label === "These sliders",
+"the chip labels are readable on their own, with no note glued to them");
+// the state line is a sentence, and the no-heads case says the true thing
+check(seatStatus(AUTO, options, { heads: 0, verb: "driving the band", alone: "the sliders drive the band" })
+  === "No headband connected: the sliders drive the band.",
+`with no heads it does not pretend there is a choice (${seatStatus(AUTO, options, { heads: 0 })})`);
+check(seatStatus(AUTO, options, { heads: 2, verb: "driving the band" })
+  === "Everyone is driving the band · 2 heads in contact.", "with heads it says who and how many");
+check(seatStatus("ana", options, { heads: 2, verb: "shaping the lead" }) === "Ana is shaping the lead · 2 heads in contact.",
+  "and a chosen head gets the seat's own verb");
+check(seatStatus(PAGE, options, { heads: 1, verb: "shaping the lead" }) === "These sliders are shaping the lead · 1 head in contact.",
+  "the sliders take a plural verb, because the sentence has to read");
+check(seatStatus(AUTO, options, { heads: 1, refused: 1, verb: "driving the band" })
+  === "Everyone is driving the band · 1 head in contact · 1 not opened to the music.",
+`and it explains a chip that cannot be chosen (${seatStatus(AUTO, options, { heads: 1, refused: 1 })})`);
+check(seatStatus(AUTO, options, { heads: 0, refused: 2, verb: "driving the band", alone: "the sliders drive the band" })
+  === "No headband connected: the sliders drive the band. 2 heads are not opened to the music.",
+"with nobody admitted it says why the chips are absent");
 check(SEATS.join(",") === "band,patch", "there are two seats, and they are named");
 
 // -------------------------------------------------------------------- report

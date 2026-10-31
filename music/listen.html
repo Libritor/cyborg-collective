@@ -35,15 +35,17 @@
 
 <section class="mg-seats" id="seats" aria-label="who drives the band">
   <div class="mg-seat" data-seat="band">
-    <p class="mg-seat-head"><span class="mg-seat-role">band</span><span class="mg-seat-note">the parameters the backing track is generated from</span></p>
-    <div class="mg-seat-choices" id="seat-band" role="radiogroup" aria-label="who drives the backing track"></div>
+    <p class="mg-seat-head"><span class="mg-seat-role">who drives the band</span><span class="mg-seat-note">the parameters the backing track is generated from</span></p>
+    <div class="mg-seat-choices" id="seat-band" role="radiogroup" aria-label="who drives the band"></div>
+    <p class="mg-seat-state" id="seat-band-state" aria-live="polite"></p>
   </div>
   <div class="mg-seat" data-seat="patch">
-    <p class="mg-seat-head"><span class="mg-seat-role">lead patch</span><span class="mg-seat-note">the wavetable the lead plays</span></p>
-    <div class="mg-seat-choices" id="seat-patch" role="radiogroup" aria-label="who shapes the lead patch"></div>
+    <p class="mg-seat-head"><span class="mg-seat-role">who shapes the lead</span><span class="mg-seat-note">the wavetable the keys play</span></p>
+    <div class="mg-seat-choices" id="seat-patch" role="radiogroup" aria-label="who shapes the lead"></div>
+    <p class="mg-seat-state" id="seat-patch-state" aria-live="polite"></p>
   </div>
   <div class="mg-seat mg-seat-keys">
-    <p class="mg-seat-head"><span class="mg-seat-role">lead keys</span><span class="mg-seat-note" id="keys-note">a pentatonic of the current chord</span></p>
+    <p class="mg-seat-head"><span class="mg-seat-role">play the lead</span><span class="mg-seat-note" id="keys-note">a pentatonic of the chord in the bar</span></p>
     <div class="mg-keys" id="keys" role="group" aria-label="play the lead"></div>
   </div>
 </section>

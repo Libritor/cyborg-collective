@@ -17,12 +17,12 @@ export const AUTO = "auto";
 export const PAGE = "page";
 export const SEATS = Object.freeze(["band", "patch"]);
 
-/** The chips a seat offers, in reading order: auto, each head, this page. */
+/** The chips a seat offers, in reading order: everyone, each head, the sliders. */
 export function seatOptions(rows = []) {
   const options = [{
     id: AUTO,
-    label: "auto",
-    note: "every head in contact",
+    label: "Everyone",
+    note: "every head in contact, weighted by how well it is seated",
     kind: "auto",
   }];
   for (const row of Array.isArray(rows) ? rows : []) {
@@ -35,7 +35,7 @@ export function seatOptions(rows = []) {
       stale: !!row.stale,
     });
   }
-  options.push({ id: PAGE, label: "this page", note: "the sliders", kind: "page" });
+  options.push({ id: PAGE, label: "These sliders", note: "the three dials above", kind: "page" });
   return options;
 }
 
@@ -63,10 +63,28 @@ export function resolvedSeat(views = [], choice = AUTO) {
   return present ? choice : AUTO;
 }
 
-/** `"auto"` / `"page"` / a pseudonym, as the sentence a seat shows. */
+/** `"auto"` / `"page"` / a pseudonym, as the subject of a sentence. */
 export function seatSentence(seat, options = []) {
-  if (seat === PAGE) return "the sliders";
+  if (seat === PAGE) return "These sliders";
   const found = options.find((option) => option.id === seat);
-  if (seat === AUTO) return "every head in contact";
-  return found ? found.label : "nobody connected";
+  if (seat === AUTO) return "Everyone";
+  return found ? found.label : "nobody";
+}
+
+/**
+ * One line that says what the seat is actually doing, in words a first-time
+ * reader can follow. `verb` is the seat's own: the band is driven, the lead is
+ * shaped. With nobody connected there is nothing to choose, so it says that and
+ * stops.
+ */
+export function seatStatus(seat, options = [], {
+  heads = 0, refused = 0, verb = "driving the band", alone = "the sliders drive the band",
+} = {}) {
+  const closed = refused > 0 ? ` · ${refused} not opened to the music` : "";
+  if (heads === 0) {
+    return `No headband connected: ${alone}.${closed ? ` ${refused} ${refused === 1 ? "head is" : "heads are"} not opened to the music.` : ""}`;
+  }
+  const subject = seatSentence(seat, options);
+  const is = subject === "These sliders" ? "are" : "is";
+  return `${subject} ${is} ${verb} · ${heads} head${heads === 1 ? "" : "s"} in contact${closed}.`;
 }
