@@ -50,7 +50,9 @@ function gateSentence() {
 /** A timbre field as the arithmetic it is: floor + rise·ramp + linear·C. */
 function timbreFormula(name) {
   const r = TIMBRE_RAMPS[name];
-  const terms = [`${r.floor}`, `${r.rise} · ramp((C − ${n2(r.from)}) / ${n2(r.span)})`];
+  const terms = [];
+  if (r.floor) terms.push(`${r.floor}`);          // a "0 +" prefix is noise, not maths
+  terms.push(`${r.rise} · ramp((C − ${n2(r.from)}) / ${n2(r.span)})`);
   if (r.linear) terms.push(`${r.linear} · C`);
   return terms.join(" + ");
 }
@@ -90,7 +92,7 @@ export const PARAMETERS = Object.freeze([
     kind: "signal",
     range: "0 – 1",
     source: "the weighted sum of the three terms",
-    does: "Concentration: the one number the band reads as pressure. It opens the device ladder, sets the hats and then every timbre below.",
+    does: "Concentration: the number the grammar reads as pressure. It opens the device ladder, sets the hats, then every timbre below.",
     how: [
       `C = ${n2(WEIGHT_DEFAULTS.engagement)}·engagement + ${n2(WEIGHT_DEFAULTS.activation)}·activation + ${n2(WEIGHT_DEFAULTS.steadiness)}·steadiness, the three weights normalised, so only their ratio matters.`,
       `engagement = (β share − ${n2(TERM_SCALE.betaFloor)}) / ${n2(TERM_SCALE.betaSpan)}: beta as a share of α+θ+β, clamped to 0…1.`,
@@ -99,7 +101,7 @@ export const PARAMETERS = Object.freeze([
       gateSentence(),
       `Hats go from 8ths to 16ths above C ${n2(GRAMMAR.hats16Above)}. That same line is what locks the band after ${GRAMMAR.lockBars} bars, and what a release measures its drop against.`,
       `C also sets the sound: bass body = ${timbreFormula("bassCutoff")}, which is ${bassAt(0.3)} at C 0.30, ${bassAt(0.6)} at 0.60 and ${bassAt(0.9)} at 0.90.`,
-      `saturation = ${timbreFormula("saturation")}, so it is silent below C ${n2(TIMBRE_RAMPS.saturation.from)} and full at 1.0; the pad's reverb send opens from ${n2(TIMBRE_RAMPS.padSend.from)} and the lead's delay feedback from ${n2(TIMBRE_RAMPS.leadDelayFb.from)}.`,
+      `saturation = ${timbreFormula("saturation")}, which is 0 below C ${n2(TIMBRE_RAMPS.saturation.from)} and full at 1.0; the pad's reverb send opens from ${n2(TIMBRE_RAMPS.padSend.from)}, the lead's delay feedback from ${n2(TIMBRE_RAMPS.leadDelayFb.from)}.`,
     ],
   },
   {
@@ -109,7 +111,7 @@ export const PARAMETERS = Object.freeze([
     kind: "signal",
     range: "0 – 1",
     source: "the headband view (conditioner.js's view)",
-    does: "Relative alpha as a share of α+θ+β. Above 0.30 it opens a hat on the and of 4.",
+    does: "Relative alpha as a share of α+θ+β. The higher it is, the likelier an open hat on the and of 4: p = 0.30 + α, so it can fire at α 0.",
     how: [
       "α share = α / (α + θ + β), with each band the mean relative power over the electrodes that are in contact.",
       `open hat: p = ${n2(GRAMMAR.openHatBase)} + α on step 14, drawn once a bar — ${pct(GRAMMAR.openHatBase)} at α 0, ${pct(GRAMMAR.openHatBase + 0.5)} at α 0.5.`,
@@ -165,7 +167,7 @@ export const PARAMETERS = Object.freeze([
     kind: "transport",
     range: "90 – 160",
     source: "the transport",
-    does: "Tempo, and the one control the Muse does not move.",
+    does: "Tempo. Like cruelty, it belongs to the transport: the Muse has no say in it.",
     how: [
       "Not modulated by the Muse. nextBar takes the tempo from the transport, so a heart rate of 71 does not make a 71 bpm bar.",
       "The scheduler polls the tempo once per bar, at the downbeat: a bar keeps one grid for its sixteen steps and never drifts mid-bar.",

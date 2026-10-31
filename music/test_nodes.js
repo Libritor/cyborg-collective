@@ -416,10 +416,20 @@ const soloView = {
   arousal: 0.7, motion: 0.2, inContact: true, age: 0, gone: false, steadiness: 0.6, hsi: {}, rel: {},
   bpm: 148, rmssd: 40,
 };
-check(aggregate([soloView], 1).bpm === undefined,
-  "the Muse cannot set the tempo: aggregate() returns no bpm at all");
+const aggregated = aggregate([soloView], 1);
+check(aggregated.bpm === undefined && aggregated.cruelty === undefined,
+  "the Muse cannot set the tempo or the cruelty: aggregate() returns neither");
 check(parameterFor("bpm").how[0].startsWith("Not modulated by the Muse"),
   "and bpm's first line says so, instead of implying otherwise");
+// Two `does` strings overreached in earlier drafts -- "the one control the Muse
+// does not move" (cruelty is manual too) and "above 0.30 it opens a hat" (the
+// roll is 0.30 + alpha, which fires at alpha 0). Both are caught here.
+check(!/one control|the only/i.test(doc("bpm")) && /cruelty/i.test(doc("bpm")),
+  "bpm does not claim to be the only manual control");
+check(!/\bafter\s+0?\.?30|\babove\s+0?\.?30/i.test(parameterFor("alphaShare").does),
+  "alphaShare does not claim a threshold: it is a probability, and it fires at α 0");
+check(/p = 0\.30 \+ α/.test(doc("alphaShare")),
+  "and it prints the probability it actually rolls against");
 
 // Raising cruelty only ever adds devices. Measured, because the claim is in the
 // panel: the same rolls are compared against a higher threshold.
