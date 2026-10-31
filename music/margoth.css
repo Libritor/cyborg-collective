@@ -167,6 +167,19 @@ h2 {
   letter-spacing: -0.005em;
 }
 
+/* the epithet: the band's subtitle, set between the name and the description so
+   the description stays a description. Centred by .mg-top like the rest of the
+   masthead. --ink, not --accent: gold already means "the current path" in the
+   chain view, and a subtitle is not a musical claim. */
+.mg-subtitle {
+  margin: 14px auto 0;
+  max-width: 44ch;
+  font: italic clamp(18px, 2.2vw, 23px)/1.32 var(--serif);
+  letter-spacing: .004em;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
 .mg-sub {
   margin: 18px auto 0;
   max-width: 50ch;
@@ -448,6 +461,7 @@ footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; 
   .mg-top { padding-top: 38px; padding-bottom: 38px; }
   .mg-top::after { margin-top: 28px; }
   h1 { font-size: clamp(28px, 8.4vw, 34px); }
+  .mg-subtitle { font-size: 17px; max-width: 30ch; }
   .mg-sub { font-size: 15px; max-width: 34ch; }
   .mg-kicker::before,
   .mg-kicker::after { width: 18px; }

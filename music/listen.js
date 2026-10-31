@@ -366,7 +366,7 @@ async function boot() {
     label.hidden = false;
     label.textContent = idle.label;      // the honesty sentence, shown verbatim
     el("export").hidden = false;
-    document.title = `MarGoth — ${idleStamp}`;
+    document.title = `Mar(G)off — ${idleStamp}`;
     say(`idle piece for ${idleStamp} · generated, not replayed`);
   } else {
     gen = createGenerator({ seed: 5, tonicMidi: 57, bpm: state.bpm, cruelty: state.cruelty });

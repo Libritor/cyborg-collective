@@ -47,7 +47,6 @@ const RAW_BANDS = [
 ];
 const RAW_SLOTS = 8;             // heads drawn at once; more arrive next frame
 const WEIGHT_STEP = 0.05;        // the sliders' step, so a write can be skipped
-const EDGE_STUB = 26;            // how far left of a voice an input from the other graph reaches
 const SVG = "http://www.w3.org/2000/svg";
 const DASH = "—";
 
@@ -110,38 +109,64 @@ const CSS = `
 }
 
 /* ------------------------------------------------------------------- graphs */
+/* Balls and lines: one disc per thing, one straight line per dependency, and the
+   text knocked out of whatever line happens to pass behind it. */
 .mgu-graph { margin: 0; overflow-x: auto; }
 .mgu-graph-svg { display: block; width: 100%; min-width: 520px; height: auto; }
-.mgu-node-rect { fill: var(--mgu-panel-2); stroke: var(--mgu-line); stroke-width: 1; }
-.mgu-node-pip { fill: var(--mgu-line); }
-.mgu-node-label {
-  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px;
-  fill: var(--mgu-fg);
+
+.mgu-ball { fill: var(--mgu-panel); stroke: var(--mgu-line); stroke-width: 1.2; }
+.mgu-ball-label,
+.mgu-ball-value {
+  font-family: var(--mono, ui-monospace, Menlo, monospace);
+  font-size: 11px;
+  /* the halo is the card itself, so text wins over any line behind it */
+  paint-order: stroke;
+  stroke: var(--mgu-panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
-.mgu-node-value {
-  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px;
-  fill: var(--mgu-bright); font-variant-numeric: tabular-nums;
+.mgu-ball-label { fill: var(--mgu-dim); }
+.mgu-ball-value { fill: var(--mgu-bright); font-variant-numeric: tabular-nums; }
+
+.mgu-node[data-live="true"] .mgu-ball { stroke: var(--mgu-cold); }
+.mgu-node[data-live="true"] .mgu-ball-label { fill: var(--mgu-fg); }
+.mgu-node[data-live="true"][data-kind="voice"] .mgu-ball {
+  stroke: var(--mgu-accent);
+  fill: color-mix(in srgb, var(--mgu-accent) 14%, var(--mgu-panel));
 }
-.mgu-node[data-live="true"] .mgu-node-pip { fill: var(--mgu-accent); }
-.mgu-node[data-state="current"] .mgu-node-rect { stroke: var(--mgu-accent); stroke-width: 1.5; }
-/* The open chord is dashed whether or not the chain is standing on it, so a
-   family whose open chord is the current step keeps both readings. */
-.mgu-node[data-open="true"] .mgu-node-rect {
-  stroke: var(--mgu-accent); stroke-width: 1.5; stroke-dasharray: 5 3;
+.mgu-node[data-live="true"] { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--mgu-cold) 45%, transparent)); }
+.mgu-node[data-live="true"][data-kind="voice"] { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--mgu-accent) 50%, transparent)); }
+
+.mgu-node[data-state="current"] .mgu-ball { stroke: var(--mgu-accent); stroke-width: 2; }
+.mgu-node[data-state="armed"] .mgu-ball { stroke: var(--mgu-warm); stroke-width: 2; }
+.mgu-node[data-open="true"] .mgu-ball {
+  stroke: var(--mgu-accent); stroke-width: 1.6; stroke-dasharray: 4 3;
   animation: mgu-dash 1.2s linear infinite;
 }
-.mgu-node[data-state="armed"] .mgu-node-rect {
-  stroke: var(--mgu-warm); stroke-width: 1.5; stroke-dasharray: none; animation: none;
+/* ahead: the bar is about to do this. Warm, dashed, and dimmer than live, so a
+   prediction never looks like something that already happened. */
+.mgu-node[data-ahead="true"] .mgu-ball {
+  stroke: var(--mgu-warm); stroke-dasharray: 4 3; opacity: .8;
 }
+.mgu-node[data-ahead="true"] .mgu-ball-value { fill: var(--mgu-warm); }
+
 .mgu-edge {
   fill: none; stroke: var(--mgu-line); stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.mgu-edge[data-live="true"] { stroke: var(--mgu-cold); stroke-width: 1.5; }
-.mgu-edge[data-dashed="true"] { stroke-dasharray: 4 3; }
+.mgu-edge[data-live="true"] { stroke: var(--mgu-cold); stroke-width: 1.6; }
+.mgu-edge[data-dashed="true"] { stroke-dasharray: 3 4; opacity: .55; }
+.mgu-edge[data-ahead="true"] { stroke: var(--mgu-warm); stroke-dasharray: 3 4; opacity: .8; }
+.mgu-edge-head { fill: var(--mgu-line); }
+.mgu-edge-head[data-live="true"] { fill: var(--mgu-warm); }
 .mgu-edge-label {
-  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 10px;
+  font-family: var(--mono, ui-monospace, Menlo, monospace);
+  font-size: 10px;
   fill: var(--mgu-cold);
+  paint-order: stroke;
+  stroke: var(--mgu-panel);
+  stroke-width: 3px;
+  stroke-linejoin: round;
 }
 
 /* --------------------------------------------------------- the chain sidecar */
@@ -254,7 +279,7 @@ const CSS = `
   .mgu-harmony-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mgu-node[data-open="true"] .mgu-node-rect { animation: none; }
+  .mgu-node[data-open="true"] .mgu-ball { animation: none; }
   .mgu-ring-arc { transition: none; }
 }
 `;
@@ -319,15 +344,39 @@ function makeGraph(name) {
   return { svg, key: null, nodes: new Map(), edges: new Map() };
 }
 
-const midY = (node) => node.y + node.h / 2;
-const baseline = (node) => node.y + node.h / 2 + 4;
+const GAP = 3;          // clearance between a line and the ball it meets
+const ARC_PEAK = 8;     // the release arc lives above the row, inside the viewBox
 
-function edgePath(from, to) {
-  const x1 = from.x + from.w;
-  const y1 = midY(from);
-  const x2 = to.x;
-  const y2 = midY(to);
-  return `M ${x1} ${y1} C ${x1 + 12} ${y1}, ${x2 - 12} ${y2}, ${x2} ${y2}`;
+/**
+ * A straight line between two ball rims. Straight because curves between four
+ * columns are what made the first version read as spaghetti: with circles, a
+ * short line is the whole vocabulary.
+ */
+function edgeLine(from, to) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  return {
+    x1: from.x + ux * (from.r + GAP),
+    y1: from.y + uy * (from.r + GAP),
+    x2: to.x - ux * (to.r + GAP),
+    y2: to.y - uy * (to.r + GAP),
+  };
+}
+
+/** The one backward transition a family has: over the top, into the open chord. */
+function arcPath(from, to) {
+  const y1 = from.y - from.r - GAP;
+  const y2 = to.y - to.r - GAP;
+  const peak = Math.max(ARC_PEAK, Math.min(y1, y2) - 26);
+  return {
+    d: `M ${from.x} ${y1} C ${from.x} ${peak}, ${to.x} ${peak}, ${to.x} ${y2}`,
+    labelX: Math.round((from.x + to.x) / 2),
+    labelY: Math.round(peak + 2),
+    head: `M ${to.x - 4} ${y2 - 6} L ${to.x + 4} ${y2 - 6} L ${to.x} ${y2} z`,
+  };
 }
 
 /**
@@ -340,7 +389,7 @@ function drawGraph(host, graph, summary) {
   svg.setAttribute("viewBox", `0 0 ${graph.width} ${graph.height}`);
   svg.setAttribute("aria-label", summary);
 
-  const key = `${graph.nodes.map((n) => `${n.id}|${n.kind}|${n.label}|${n.note}|${n.x},${n.y},${n.w},${n.h}`).join(";")}`
+  const key = `${graph.nodes.map((n) => `${n.id}|${n.kind}|${n.place}|${n.label}|${n.note}|${n.x},${n.y},${n.r}`).join(";")}`
     + `#${graph.edges.map((e) => `${e.from}>${e.to}`).join(",")}`;
 
   if (key !== host.key) {
@@ -351,29 +400,31 @@ function drawGraph(host, graph, summary) {
     host.edges = new Map();
     for (const edge of graph.edges) {
       const to = byId.get(edge.to);
-      if (!to) continue;
       const from = byId.get(edge.from);
+      if (!to || !from) continue;
+      const shape = edge.arc ? arcPath(from, to) : null;
       const path = svgEl("path", { class: "mgu-edge" });
-      let labelNode = null;
-      if (from) {
-        path.setAttribute("d", edgePath(from, to));
+      if (shape) {
+        path.setAttribute("d", shape.d);
+        // only the backward transition needs an arrowhead: everywhere else the
+        // row order already says which way the signal goes
+        const head = svgEl("path", { class: "mgu-edge-head", d: shape.head });
+        edgeLayer.appendChild(head);
+        host.edges.set(`${edge.from}>${edge.to}#head`, { path: head });
       } else {
-        // A source in the other graph has no node here: it enters as a short
-        // stub at the target's own row, so the line reads as "this came from
-        // the harmony" instead of being drawn across the whole canvas.
-        const y = midY(to);
-        const x = Math.max(0, to.x - EDGE_STUB);
-        path.setAttribute("d", `M ${x} ${y} L ${to.x} ${y}`);
+        const line = edgeLine(from, to);
+        path.setAttribute("d", `M ${line.x1} ${line.y1} L ${line.x2} ${line.y2}`);
       }
       edgeLayer.appendChild(path);
       if (edge.label) {
-        labelNode = svgEl("text", { class: "mgu-edge-label" });
-        if (from) {
-          labelNode.setAttribute("x", String(Math.round((from.x + from.w + to.x) / 2)));
-          labelNode.setAttribute("y", String(Math.round((midY(from) + midY(to)) / 2 - 6)));
+        const labelNode = svgEl("text", { class: "mgu-edge-label" });
+        if (shape) {
+          labelNode.setAttribute("x", String(shape.labelX));
+          labelNode.setAttribute("y", String(shape.labelY));
         } else {
-          labelNode.setAttribute("x", String(Math.max(0, to.x - EDGE_STUB)));
-          labelNode.setAttribute("y", String(to.y - 2));
+          const line = edgeLine(from, to);
+          labelNode.setAttribute("x", String(Math.round(line.x1 + (line.x2 - line.x1) * 0.6)));
+          labelNode.setAttribute("y", String(Math.round(line.y1 + (line.y2 - line.y1) * 0.6 + 12)));
         }
         labelNode.textContent = edge.label;
         edgeLayer.appendChild(labelNode);
@@ -390,24 +441,28 @@ function drawGraph(host, graph, summary) {
       group.setAttribute("data-kind", node.kind);
       group.setAttribute("data-live", "false");
       group.setAttribute("data-open", "false");
-      const rect = svgEl("rect", {
-        class: "mgu-node-rect",
-        x: node.x, y: node.y, width: node.w, height: node.h, rx: 3,
-      });
-      const pip = svgEl("rect", {
-        class: "mgu-node-pip",
-        x: node.x + 1, y: node.y + 6, width: 2, height: node.h - 12,
-      });
+      group.setAttribute("data-ahead", "false");
+      const disc = svgEl("circle", { class: "mgu-ball", cx: node.x, cy: node.y, r: node.r });
+      const below = node.place === "below";
+      // "right": the name above the line, the number below it, so a horizontal
+      // edge never has to run through either. "below": both under the ball.
       const label = svgEl("text", {
-        class: "mgu-node-label", x: node.x + 10, y: baseline(node),
+        class: "mgu-ball-label",
+        x: below ? node.x : node.x + node.r + 6,
+        y: below ? node.y + node.r + 14 : node.y - 3,
       });
       const value = svgEl("text", {
-        class: "mgu-node-value", x: node.x + node.w - 8, y: baseline(node),
+        class: "mgu-ball-value",
+        x: below ? node.x : node.x + node.r + 6,
+        y: below ? node.y + node.r + 25 : node.y + 11,
       });
-      value.setAttribute("text-anchor", "end");
-      // the sentence a node cannot fit in 190px: the rule or gate it restates
+      if (below) {
+        label.setAttribute("text-anchor", "middle");
+        value.setAttribute("text-anchor", "middle");
+      }
+      // the sentence a ball cannot hold: the rule or gate it restates
       const title = svgEl("title");
-      group.append(title, rect, pip, label, value);
+      group.append(title, disc, label, value);
       nodeLayer.appendChild(group);
       host.nodes.set(node.id, { group, label, value, title });
     }
@@ -415,12 +470,18 @@ function drawGraph(host, graph, summary) {
     host.key = key;
   }
 
-  // 22 edges and 23 nodes a bar: mutate, never re-create.
+  // a bar's worth of balls and lines: mutate, never re-create
   for (const edge of graph.edges) {
     const slot = host.edges.get(`${edge.from}>${edge.to}`);
     if (!slot) continue;
     slot.path.setAttribute("data-live", String(!!edge.live));
     slot.path.setAttribute("data-dashed", String(!!edge.dashed));
+    slot.path.setAttribute("data-ahead", String(!!edge.ahead));
+    const head = host.edges.get(`${edge.from}>${edge.to}#head`);
+    if (head) {
+      head.path.setAttribute("data-live", String(!!edge.live));
+      head.path.setAttribute("data-dashed", String(!!edge.dashed));
+    }
   }
   for (const node of graph.nodes) {
     const slot = host.nodes.get(node.id);
@@ -428,8 +489,10 @@ function drawGraph(host, graph, summary) {
     slot.group.setAttribute("data-live", String(!!node.live));
     slot.group.setAttribute("data-state", node.state || "");
     slot.group.setAttribute("data-open", String(!!node.open));
+    slot.group.setAttribute("data-ahead", String(!!node.ahead));
     setText(slot.label, node.label);
-    setText(slot.value, node.value);
+    // a ball with nothing worth printing in the value slot prints nothing
+    setText(slot.value, node.value === DASH ? "" : node.value);
     setText(slot.title, [node.label, node.value, node.note].filter(Boolean).join(" · "));
   }
 }
@@ -440,10 +503,12 @@ function signalSummary(graph) {
   const C = find("C");
   const gates = find("gates");
   const firing = graph.nodes.filter((node) => node.kind === "rule" && node.live).map((n) => n.label);
+  const near = graph.nodes.filter((node) => node.ahead).map((n) => n.label);
   const playing = graph.nodes.filter((node) => node.kind === "voice" && node.live).map((n) => n.label);
   return [
-    C && C.value !== DASH ? `C ${C.value}, ${gates ? gates.note : ""}` : "no signal yet",
+    C && C.value !== DASH ? `C ${C.value}${gates && gates.note ? `, ${gates.note}` : ""}` : "no signal yet",
     `rules firing: ${firing.join(", ") || "none"}`,
+    near.length ? `ahead: ${near.join(", ")}` : "",
     `voices playing: ${playing.join(", ") || "none"}`,
   ].filter(Boolean).join("; ");
 }
@@ -451,6 +516,7 @@ function signalSummary(graph) {
 function harmonySummary(graph, chain) {
   const current = graph.nodes.find((node) => node.state === "current" || node.state === "armed") || null;
   const chords = graph.nodes.filter((node) => node.id.startsWith("chord:")).map((node) => node.label);
+  const next = graph.nodes.find((node) => node.ahead) || null;
   const bits = [];
   if (current) {
     const steps = graph.nodes.filter((node) => node.id.startsWith("step:"));
@@ -460,6 +526,7 @@ function harmonySummary(graph, chain) {
   } else if (graph.nodes.length === 1) {
     bits.push(`${graph.nodes[0].label}, ${graph.nodes[0].value}`);
   }
+  if (next) bits.push(`next ${next.label}`);
   if (chords.length) bits.push(`this bar: ${chords.join(", ")}`);
   if (chain && chain.open) bits.push(`open ${chain.open}`);
   return bits.join("; ") || "the chain";
@@ -535,7 +602,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
   const section = el("section", "mgu");
   section.setAttribute("data-mg-ui", "");
   section.setAttribute("role", "group");
-  section.setAttribute("aria-label", "MarGoth chain view");
+  section.setAttribute("aria-label", "Mar(G)off chain view");
 
   // ---------------------------------------------------------------- transport
   const head = el("div", "mgu-head");
@@ -970,13 +1037,15 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
   }
 
   /** Both graphs, from the bar that is on screen and the mix that made it. */
-  function renderGraphs(mix) {
+  function renderGraphs(mix, parts, weights) {
     const data = lastData || {};
     const chain = (data.ui && data.ui.chain) || null;
     const family = chain && chain.family ? familyById(chain.family) : null;
     const harmony = harmonyGraph(data, chain, family);
     drawGraph(harmonyHost, harmony, harmonySummary(harmony, chain));
-    const signal = signalGraph(mix, data);
+    // the terms and their weights are what make C, so the graph needs them: this
+    // is the view where a slider move redraws the sum
+    const signal = signalGraph(mix, data, { parts, weights: weights || lastWeights });
     drawGraph(signalHost, signal, signalSummary(signal));
   }
 
@@ -991,7 +1060,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     if (destroyed) return;
     if (weights) lastWeights = weights;
     renderCaption(mix);
-    renderGraphs(mix);
+    renderGraphs(mix, parts, weights);
     renderLadder(ladder);
     renderSound(sound);
     renderVoices(voices);

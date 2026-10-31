@@ -4,9 +4,8 @@
 import {
   GRAPH, signalGraph, harmonyGraph, stepEntries, describeRejection, gateText,
 } from "./nodes.js";
-import {
-  DEVICE_GATES, devicesAt, FAMILIES,
-} from "./generator.js";
+import { DEVICE_GATES, devicesAt, FAMILIES } from "./generator.js";
+import { WEIGHT_DEFAULTS } from "./conditioner.js";
 import {
   PARAMETERS, DEVICE_DOCS, DEVICE_LABELS, ladderRows, parameterFor,
 } from "./explain.js";
@@ -25,30 +24,32 @@ function check(condition, label) {
 
 const ids = (graph) => graph.nodes.map((node) => node.id);
 const pairs = (graph) => graph.edges.map((edge) => `${edge.from}|${edge.to}`);
+const find = (graph, id) => graph.nodes.find((node) => node.id === id) || null;
 const edgeBetween = (graph, from, to) => graph.edges.find((e) => e.from === from && e.to === to) || null;
 
-// The topology this renderer is allowed to assume, straight from the plan: if a
-// column, a row or an edge moves, that is a design change, not a refactor.
+// The topology the renderer may assume: if a ball moves column or an edge
+// disappears, that is a design change, not a refactor.
 const SIGNAL_IDS = [
-  "C", "alphaShare", "arousal", "motion", "asymmetry",
-  "gates", "hats", "openhat", "ghost", "fill", "register",
-  "timbre", "dev:sus", "dev:cliche", "dev:drone", "dev:mixture", "dev:climb", "dev:bII",
-  "voice:drums", "voice:bass", "voice:drone", "voice:pad", "voice:lead",
+  "engagement", "activation", "steadiness",
+  "alphaShare", "arousal", "motion", "asymmetry",
+  "C",
+  "hats", "gates", "timbre", "openhat", "ghost", "fill", "register",
+  "dev:sus", "dev:cliche", "dev:drone", "dev:mixture", "dev:climb", "dev:bII",
+  "voice:pad", "voice:drone", "voice:bass", "voice:drums", "voice:lead",
 ];
 const SIGNAL_EDGES = [
-  ["C", "gates"], ["C", "hats"], ["C", "timbre"],
+  ["engagement", "C"], ["activation", "C"], ["steadiness", "C"],
+  ["C", "hats"], ["C", "gates"], ["C", "timbre"],
   ["alphaShare", "openhat"], ["arousal", "ghost"], ["motion", "fill"], ["asymmetry", "register"],
   ["gates", "dev:sus"], ["gates", "dev:cliche"], ["gates", "dev:drone"],
   ["gates", "dev:mixture"], ["gates", "dev:climb"], ["gates", "dev:bII"],
-  ["hats", "voice:drums"], ["openhat", "voice:drums"], ["ghost", "voice:drums"], ["fill", "voice:drums"],
-  ["chord", "voice:bass"], ["chord", "voice:pad"],
   ["dev:cliche", "voice:pad"], ["dev:drone", "voice:drone"], ["register", "voice:lead"],
 ];
 
 // ------------------------------------------------------------------ fixtures
-const HOT_MIX = {
-  C: 0.95, alphaShare: 0.5, arousal: 0.9, motion: 0.3, asymmetry: -0.2,
-};
+const PARTS = { engagement: 0.6, activation: 0.4, steadiness: 0.5, age: 0 };
+const WEIGHTS = { engagement: 0.4, activation: 0.3, steadiness: 0.3 };
+const HOT_MIX = { C: 0.95, alphaShare: 0.5, arousal: 0.9, motion: 0.3, asymmetry: -0.2 };
 const HOT_BAR = {
   index: 3,
   drums: [
@@ -67,12 +68,13 @@ const HOT_BAR = {
 const QUIET_MIX = { C: 0.2, alphaShare: 0.1, arousal: 0.2, motion: 0.01, asymmetry: 0.1 };
 const QUIET_BAR = { index: 0, drums: [{ step: 0, hit: "kick" }], chords: [], bass: [], lead: [] };
 
-// A family the generator does not ship, so the layout is measured on seven steps
-// (no shipped family is that long) without the test pretending to be a family.
+// A family the generator does not ship, so the layout is measured on seven steps.
+// Its open chord is bVI, in the middle, so the release really is a backward
+// transition -- a family whose open chord is its last step has no arc to draw.
 const SEVEN = {
   id: "seven",
   title: "seven",
-  open: { label: "vi" },
+  open: { label: "bVI" },
   steps: [
     { label: "i", bars: 2 }, { label: "bIII", bars: 1 }, { label: "bVI", bars: 1, cliche: true },
     { label: "iv", bars: 2 }, { label: "bVII", bars: 1 }, { label: "V", bars: 1 },
@@ -80,63 +82,74 @@ const SEVEN = {
   ],
 };
 
-// ------------------------------------------------------------- signal: shape
+// -------------------------------------------------------------- signal: shape
 console.log("signal graph");
-const hot = signalGraph(HOT_MIX, HOT_BAR);
+const hot = signalGraph(HOT_MIX, HOT_BAR, { parts: PARTS, weights: WEIGHTS });
 check(JSON.stringify(ids(hot)) === JSON.stringify(SIGNAL_IDS),
-  `the node ids and their order are the plan's (${hot.nodes.length})`);
+  `the ball ids and their order are the plan's (${hot.nodes.length})`);
 const wanted = SIGNAL_EDGES.map(([from, to]) => `${from}|${to}`).sort();
-const got = pairs(hot).slice().sort();
-check(JSON.stringify(got) === JSON.stringify(wanted),
-  `the ${SIGNAL_EDGES.length} edges are exactly the plan's (${hot.edges.length})`);
+check(JSON.stringify(pairs(hot).slice().sort()) === JSON.stringify(wanted),
+  `the ${SIGNAL_EDGES.length} lines are exactly the plan's (${hot.edges.length})`);
+check(hot.edges.every((edge) => find(hot, edge.from) && find(hot, edge.to)),
+  "every line joins two balls -- no stubs entering from nowhere");
+check(hot.nodes.every((node) => node.kind !== "chord" && node.place === "right"),
+  "every signal ball puts its text to the right");
 
-const known = new Set(ids(hot));
-const dangling = hot.edges.filter((edge) => !known.has(edge.to) || (!known.has(edge.from) && edge.from !== "chord"));
-check(dangling.length === 0, `every edge endpoint is a node (${dangling.length} dangling)`);
-const fromChord = hot.edges.filter((edge) => edge.from === "chord");
-check(fromChord.length === 2, `exactly two edges enter from the other graph (${fromChord.length})`);
-check(fromChord.every((edge) => edge.label === "chord"),
-  "and they are labelled, so the renderer can draw the line it comes in on");
-
-const outside = hot.nodes.filter((node) => node.x < 0 || node.x + node.w > GRAPH.width
-  || node.y < 0 || node.y + node.h > GRAPH.height);
-check(outside.length === 0, `no node leaves the ${GRAPH.width}x${GRAPH.height} viewBox (${outside.length})`);
+const outside = hot.nodes.filter((node) => node.x - node.r < 0 || node.x + node.r > hot.width
+  || node.y - node.r < 0 || node.y + node.r > hot.height);
+check(outside.length === 0, `no ball leaves the ${hot.width}x${hot.height} viewBox (${outside.length})`);
+const wideText = hot.nodes.filter((node) => node.x + node.r + 84 > hot.width);
+check(wideText.length === 0, `and no label is pushed off the right edge (${wideText.map((n) => n.id).join(",") || "none"})`);
 const byColumn = new Map();
 for (const node of hot.nodes) byColumn.set(node.x, [...(byColumn.get(node.x) || []), node]);
 const ordered = [...byColumn.values()].every((column) => column
   .every((node, i) => i === 0 || node.y > column[i - 1].y));
 check(ordered, "rows within a column run strictly down the page, in the listed order");
-check([...new Set(hot.nodes.map((node) => node.kind))].sort().join(",")
-  === "device,rule,signal,timbre,voice",
-"the node kinds are the vocabulary the renderer styles");
 
-// --------------------------------------------------------- signal: liveness
+// ----------------------------------------------------------- signal: weights
+console.log("weights");
+const intoC = hot.edges.filter((edge) => edge.to === "C");
+check(intoC.length === 3 && intoC.every((edge) => edge.live),
+  "the three terms are live and all three feed C");
+check(intoC.map((edge) => edge.label).join(",") === "×0.40,×0.30,×0.30",
+  `each line into C is labelled with its weight (${intoC.map((e) => e.label).join(",")})`);
+check(["engagement", "activation", "steadiness"].every((id) => find(hot, id).value === PARTS[id].toFixed(2)),
+  "and each term prints its own value");
+check(find(hot, "engagement").note === "×0.40 = 0.24 → C",
+  `the term's title does the arithmetic (${find(hot, "engagement").note})`);
+const reweighted = signalGraph(HOT_MIX, HOT_BAR, {
+  parts: PARTS, weights: { engagement: 0.8, activation: 0.1, steadiness: 0.1 },
+});
+check(reweighted.edges.filter((e) => e.to === "C").map((e) => e.label).join(",") === "×0.80,×0.10,×0.10",
+  "re-weighting re-draws the labels, which is the whole point of drawing them");
+const bare = signalGraph({}, {});
+check(["engagement", "activation", "steadiness"].every((id) => find(bare, id).value === "—"),
+  "with no headband the terms read — rather than inventing numbers");
+check(bare.edges.filter((e) => e.to === "C").every((e) => !e.live),
+  "and no weight line is drawn live");
+check(bare.edges.filter((e) => e.to === "C").map((e) => e.label).join(",")
+  === `×${WEIGHT_DEFAULTS.engagement.toFixed(2)},×${WEIGHT_DEFAULTS.activation.toFixed(2)},×${WEIGHT_DEFAULTS.steadiness.toFixed(2)}`,
+"the default weights are named even when the terms are missing");
+
+// -------------------------------------------------------- signal: liveness
 console.log("signal liveness");
-const liveOf = (graph, id) => {
-  const node = graph.nodes.find((n) => n.id === id);
-  return node ? node.live : null;
-};
-const fired = ["gates", "hats", "openhat", "ghost", "fill", "register"];
-check(fired.every((id) => liveOf(hot, id) === true),
-  `a hot bar lights every rule it fired (${fired.filter((id) => liveOf(hot, id) !== true).join(",") || "all"})`);
+const live = (graph, id) => (find(graph, id) || {}).live;
+const ahead = (graph, id) => (find(graph, id) || {}).ahead;
+check(["hats", "gates", "openhat", "ghost", "fill", "register"].every((id) => live(hot, id)),
+  `a hot bar lights the rules it fired (${["hats", "gates", "openhat", "ghost", "fill", "register"].filter((id) => !live(hot, id)).join(",") || "all"})`);
 check(hot.nodes.filter((node) => node.id.startsWith("dev:")).every((node) => node.live),
   "and opens all six devices");
-check(["hats", "openhat", "ghost", "fill"].every((id) => edgeBetween(hot, id, "voice:drums").live),
-  "the four drum rules light their edges into the drums");
-check(edgeBetween(hot, "dev:cliche", "voice:pad").live === false,
-  "the cliché's edge is dark while the bar's chord is not one");
-const clicheBar = { ...HOT_BAR, chords: [{ ...HOT_BAR.chords[0], cliche: true }] };
-check(edgeBetween(signalGraph(HOT_MIX, clicheBar), "dev:cliche", "voice:pad").live === true,
-  "and lights on the bar where the cliché owns the top voice");
+check(live(hot, "voice:drums") && live(hot, "voice:bass") && live(hot, "voice:lead"),
+  "the voices that played are lit");
+check(find(hot, "dev:cliche") && edgeBetween(hot, "dev:cliche", "voice:pad").live,
+  "the cliché's line is live only while its device is open");
 
-const quiet = signalGraph(QUIET_MIX, QUIET_BAR);
-check(["hats", "openhat", "ghost", "fill", "register"].every((id) => liveOf(quiet, id) === false),
+const quiet = signalGraph(QUIET_MIX, QUIET_BAR, { parts: PARTS, weights: WEIGHTS });
+check(["openhat", "ghost", "fill", "register"].every((id) => !live(quiet, id)),
   "a quiet bar lights none of the probabilistic rules");
 check(quiet.nodes.filter((node) => node.id.startsWith("dev:")).filter((n) => n.live)
   .map((node) => node.id.slice(4)).join(",") === devicesAt(0.2).join(","),
   "and only the devices its concentration opens");
-check(edgeBetween(quiet, "dev:cliche", "voice:pad").live === false,
-  "the cliché edge is dark on a bar that is not a cliché");
 
 let deviceMismatch = 0;
 for (let i = 0; i <= 20; i += 1) {
@@ -147,61 +160,100 @@ for (let i = 0; i <= 20; i += 1) {
 }
 check(deviceMismatch === 0, `over 21 concentrations the lit devices are devicesAt(C), in order (${deviceMismatch} off)`);
 check(hot.nodes.filter((node) => node.id.startsWith("dev:"))
-  .every((node) => node.note === gateText(node.id.slice(4))),
-"every device node prints the gate the generator enforces");
+  .every((node) => node.value === gateText(node.id.slice(4))),
+"every device ball prints the gate the generator enforces");
+check(hot.nodes.filter((node) => node.id.startsWith("dev:"))
+  .every((node) => node.note === (DEVICE_DOCS.find((d) => d.id === node.id.slice(4)) || {}).does),
+"and carries the rule it plays in its title, from DEVICE_DOCS");
 
-// ----------------------------------------------------------- signal: values
+// ------------------------------------------------------ signal: what is ahead
+console.log("ahead of time");
+const midway = signalGraph({ C: 0.5, alphaShare: 0.5, arousal: 0.3, motion: 0.2, asymmetry: 0.1 },
+  { index: 1, drums: [], chords: [], bass: [], lead: [] }, { parts: PARTS, weights: WEIGHTS });
+check(ahead(midway, "hats"), "below 0.60 the hats are marked ahead, not live");
+check(!live(midway, "hats"), "and they are not drawn as already firing");
+check(ahead(midway, "dev:climb"), "the next device to open is marked ahead");
+check(find(midway, "gates").note === "next: climb at 0.55",
+  `the ladder names the gate that is coming (${find(midway, "gates").note})`);
+check(ahead(midway, "fill") && !live(midway, "fill"), "the bar-4 fill is ahead until its bar arrives");
+check(ahead(midway, "openhat"), "an open hat more likely than not is marked ahead");
+check(!ahead(hot, "hats") && !ahead(hot, "dev:climb"),
+  "a bar that already has everything ahead of it marks nothing ahead");
+const edgeToHats = edgeBetween(midway, "C", "hats");
+check(edgeToHats.ahead && !edgeToHats.live,
+  "the line into an ahead rule is drawn ahead too, so the prediction reaches the wire");
+check(find(midway, "gates").note !== find(signalGraph({ C: 0.95 }, {}), "gates").note,
+  "with every gate passed the ladder says so instead");
+
+// --------------------------------------------------------- signal: values
 console.log("signal values");
 const mixes = [
-  ["no mix, no bar", {}, {}],
-  ["a vamp", { C: 0.1, mode: "vamp", heads: 0 }, { vamp: true, index: 0 }],
-  ["a full bar", HOT_MIX, HOT_BAR],
-  ["nothing at all", null, null],
+  ["no mix, no bar", {}, {}, null],
+  ["a vamp", { C: 0.1, mode: "vamp", heads: 0 }, { vamp: true, index: 0 }, null],
+  ["a full bar", HOT_MIX, HOT_BAR, { parts: PARTS, weights: WEIGHTS }],
+  ["nothing at all", null, null, null],
 ];
-for (const [label, mix, bar] of mixes) {
-  const graph = signalGraph(mix, bar);
+for (const [label, mix, bar, extra] of mixes) {
+  const graph = signalGraph(mix, bar, extra || {});
   const values = graph.nodes.map((node) => node.value);
   const bad = values.filter((value) => typeof value !== "string"
     || value.includes("NaN") || value.includes("undefined") || value.includes("null"));
   check(bad.length === 0, `${label}: every value is a printable string (${bad.join(",") || "ok"})`);
-  check(graph.nodes.length === SIGNAL_IDS.length, `${label}: still every node`);
+  check(graph.nodes.length === SIGNAL_IDS.length, `${label}: still every ball`);
+  check(graph.nodes.every((node) => Number.isFinite(node.r) && node.r > 0),
+    `${label}: every ball has a radius`);
 }
 
-// ------------------------------------------------------------ harmony: path
-console.log("harmony graph");
+// ------------------------------------------------------------- harmony: walk
+console.log("harmony walk");
 const labels = SEVEN.steps.map((step) => step.label);
 const chain = {
   family: SEVEN.id, title: SEVEN.title, steps: labels,
   position: 4, open: SEVEN.open.label, armed: false, held: 1,
 };
-const path = harmonyGraph({ index: 9, chords: [] }, chain, SEVEN);
-check(path.nodes.filter((node) => node.id.startsWith("step:")).length === 7,
-  `a seven-step family draws seven steps (${path.nodes.length} nodes)`);
-const steps = path.nodes.filter((node) => node.id.startsWith("step:"));
+const walk = harmonyGraph({ index: 9, chords: [] }, chain, SEVEN);
+const steps = walk.nodes.filter((node) => node.id.startsWith("step:"));
+check(steps.length === 7, `a seven-step family draws seven steps (${walk.nodes.length} balls)`);
 check(steps.every((node, i) => i === 0 || node.x > steps[i - 1].x), "the steps run left to right");
-check(steps[steps.length - 1].x + steps[steps.length - 1].w <= path.width,
-  `and the last one ends inside the box (${steps[steps.length - 1].x + steps[steps.length - 1].w} of ${path.width})`);
-const current = path.nodes.find((node) => node.state === "current");
+check(steps.every((node) => node.place === "below"),
+  "and put their names under the ball, where a packed row has room");
+const current = walk.nodes.find((node) => node.state === "current");
 check(current && current.id === `step:${chain.position - 1}`,
   `the current step is position - 1 (${current && current.id})`);
-check(path.nodes.filter((node) => node.state === "current").length === 1,
+check(walk.nodes.filter((node) => node.state === "current").length === 1,
   "and it is the only current step: position is one fact, not a per-node guess");
-check(path.nodes.filter((node) => node.open === true).length === 1,
+check(walk.nodes.filter((node) => node.open === true).length === 1,
   "the open chord is marked once");
-check(path.nodes.filter((node) => node.open === true)[0].label === SEVEN.open.label,
+check(walk.nodes.filter((node) => node.open === true)[0].label === SEVEN.open.label,
   "and it is the family's open chord");
-check(path.edges.filter((edge) => edge.live).length === chain.position,
-  `the path travelled so far is lit (${path.edges.filter((e) => e.live).length} of ${path.edges.length} edges)`);
+check(walk.nodes.filter((node) => node.ahead).length === 1
+  && walk.nodes.filter((node) => node.ahead)[0].id === `step:${chain.position}`,
+"exactly the step after the current one is marked ahead");
+check(walk.edges.filter((edge) => edge.live && !edge.arc).length === chain.position,
+  `the walk travelled so far is lit (${walk.edges.filter((e) => e.live && !e.arc).length} of ${walk.edges.length})`);
 
-const armedPath = harmonyGraph({ index: 9, chords: [] }, { ...chain, armed: true }, SEVEN);
-const armedNode = armedPath.nodes.find((node) => node.state === "armed");
+const armedWalk = harmonyGraph({ index: 9, chords: [] }, { ...chain, armed: true }, SEVEN);
+const armedNode = armedWalk.nodes.find((node) => node.state === "armed");
 check(armedNode && armedNode.id === `step:${chain.position - 1}`,
   "armed overrides current on the same step, because a drop is the louder fact");
-check(armedPath.nodes.filter((node) => node.state === "current").length === 0,
+check(armedWalk.nodes.filter((node) => node.state === "current").length === 0,
   "and leaves no second state behind");
 
-// A family can be standing on its own open chord (open IV on the last step): the
-// two facts then hold on one node, which is why they are two fields.
+// the release: the one transition that goes backwards
+const releaseEdge = walk.edges.find((edge) => edge.arc);
+check(Boolean(releaseEdge) && !releaseEdge.live,
+  "the release arc exists and is dark until the generator is armed");
+check(releaseEdge && releaseEdge.label === "release" && releaseEdge.dashed,
+  "it is labelled and dashed, because it is a jump, not a step");
+const armedRelease = armedWalk.edges.find((edge) => edge.arc);
+check(armedRelease && armedRelease.live, "and it turns on when the drop is armed");
+check(armedRelease.from === `step:${steps.length - 1}`,
+  "it leaves the last step");
+check(armedRelease.to === `step:${labels.indexOf(SEVEN.open.label)}`,
+  "and lands on the open chord");
+
+// A family can be standing on its own open chord: the two facts then hold on one
+// ball, which is why they are two fields.
 const OPEN_LAST = {
   id: "open-last", title: "open-last", open: { label: "IV" },
   steps: [{ label: "i", bars: 2 }, { label: "IV", bars: 2 }],
@@ -210,8 +262,11 @@ const standing = harmonyGraph({ index: 4, chords: [] },
   { family: OPEN_LAST.id, steps: ["i", "IV"], position: 2, open: "IV", armed: false }, OPEN_LAST);
 check(standing.nodes[1].state === "current" && standing.nodes[1].open === true,
   "the step you are on can also be the open chord, and both are drawn");
+check(!standing.edges.some((edge) => edge.arc),
+  "a family whose open chord is its last step has no arc to draw");
 
 // ------------------------------------------------- harmony: this bar's chords
+console.log("harmony events");
 const susBar = {
   index: 12,
   chords: [
@@ -227,10 +282,12 @@ check(susGraph.edges.filter((edge) => edge.to.startsWith("chord:")).length === 3
   "each hanging off the step being played");
 check(chordNodes.map((node) => node.label).join(",") === "Am,Asus4,Am",
   "with the labels the chart prints");
-check(chordNodes.every((node) => node.x >= 0 && node.x + node.w <= susGraph.width),
-  "and the group is nudged inside the box rather than off it");
-check(susGraph.nodes.filter((node) => node.y + node.h > susGraph.height).length === 0,
-  `nothing is clipped by the box height (${susGraph.height})`);
+check(chordNodes.every((node) => node.y > GRAPH.top && node.x - node.r >= 0 && node.x + node.r <= susGraph.width),
+  "and the group is nudged inside the canvas rather than off it");
+const centred = Math.round((chordNodes[0].x + chordNodes[2].x) / 2);
+check(Math.abs(centred - find(susGraph, "step:3").x) <= 1,
+  `the group is centred under the current step (${centred} vs ${find(susGraph, "step:3").x})`);
+check(susGraph.height === 154, `three rows of content make a taller box (${susGraph.height})`);
 
 const rejectedBar = {
   index: 12,
@@ -241,35 +298,54 @@ const rejectedBar = {
 };
 const rejectedGraph = harmonyGraph(rejectedBar, chain, SEVEN);
 const lost = rejectedGraph.edges.filter((edge) => edge.to.startsWith("rejected:"));
-check(lost.length === 2, `two rejected voicings are two dashed edges (${lost.length})`);
+check(lost.length === 2, `two rejected voicings are two dashed lines (${lost.length})`);
 check(lost.every((edge) => edge.dashed === true && edge.live === false),
   "dashed and never live: a lost voicing did not sound");
-const lostNodes = rejectedGraph.nodes.filter((node) => node.id.startsWith("rejected:"));
-check(lostNodes.every((node) => node.note === describeRejection({ cost: 0 }).why
-  || node.note.length > 0), "each carries the reason the panel prints");
+check(rejectedGraph.nodes.filter((node) => node.id.startsWith("rejected:"))
+  .every((node) => node.note.length > 0), "each carries the reason the panel prints");
 check(describeRejection({ voicing: [57, 64, 69], cost: 0 }).why === "same cost · span tie-break",
   "a zero-cost loser names the tie-break, not a cost comparison");
 check(describeRejection({ voicing: [57, 64, 69], cost: 9 }).why.includes("9 >"),
   "an over-budget loser names the budget it broke");
+check(rejectedGraph.height === 190, `the lost row makes the box taller still (${rejectedGraph.height})`);
 
 // ------------------------------------------------------ harmony: no-chain states
 const vampGraph = harmonyGraph({ vamp: true, index: 0, chords: [] }, null, null);
 check(vampGraph.nodes.length === 1 && vampGraph.nodes[0].id === "vamp",
-  "a vamp is one node, not an empty graph");
-check(vampGraph.height === 52, `and the box collapses to one band (${vampGraph.height})`);
+  "a vamp is one ball, not an empty graph");
+check(vampGraph.height === 88, `and the box collapses to one row (${vampGraph.height})`);
 check(vampGraph.nodes[0].label === "vamp" && vampGraph.nodes[0].value === "root pedal",
   "the vamp says what it is playing");
 
 const emptyGraph = harmonyGraph({}, null, null);
 check(emptyGraph.nodes.length === 1 && emptyGraph.nodes[0].id === "waiting",
-  "before the first bar there is one waiting node");
-check(emptyGraph.height === 52, `at one band tall (${emptyGraph.height})`);
+  "before the first bar there is one waiting ball");
+check(emptyGraph.height === 88, `at one band tall (${emptyGraph.height})`);
 check(emptyGraph.nodes[0].label === "waiting for a bar" && emptyGraph.nodes[0].value === "—",
   "and it says plainly that nothing has played yet");
 
 const transition = harmonyGraph({ index: 3, chords: [] }, { steps: [], position: 0 }, null);
 check(transition.nodes.length === 1 && transition.nodes[0].label === "no chain",
   "a closed family is not called a vamp");
+
+// Every shipped family must fit its own box: the width is derived from the row
+// the steps make, so the longest family is the one that proves it.
+const spill = FAMILIES.filter((family) => {
+  const graph = harmonyGraph({ index: 1, chords: [] }, {
+    family: family.id, steps: family.steps.map((s) => s.label), position: 2, open: family.open.label,
+  }, family);
+  return graph.nodes.some((node) => node.x - node.r < 0 || node.x + node.r > graph.width);
+});
+check(spill.length === 0, `every shipped family fits its own viewBox (${spill.map((f) => f.id).join(",") || "all"})`);
+const slack = FAMILIES.filter((family) => {
+  const graph = harmonyGraph({ index: 1, chords: [] }, {
+    family: family.id, steps: family.steps.map((s) => s.label), position: 1, open: family.open.label,
+  }, family);
+  const row = graph.nodes.filter((node) => node.id.startsWith("step:"));
+  const mid = (row[0].x + row[row.length - 1].x) / 2;
+  return Math.abs(mid - graph.width / 2) > 0.6;
+});
+check(slack.length === 0, `the step row is centred in its own box (${slack.map((f) => f.id).join(",") || "all"})`);
 
 // ------------------------------------------------------------- the documents
 console.log("parameter table");
@@ -298,49 +374,17 @@ check(DEVICE_DOCS.every((entry) => entry.gate === DEVICE_GATES[entry.id]),
 check(DEVICE_DOCS.every((entry) => typeof entry.does === "string" && entry.does.length > 20),
   "and each has the rule it plays");
 
-// The one shipped family that is long enough to stress the step layout.
 const longest = FAMILIES.reduce((best, family) => (family.steps.length > best.steps.length ? family : best), FAMILIES[0]);
-const realChain = {
-  family: longest.id,
-  steps: longest.steps.map((step) => step.label),
-  position: 2,
-  open: longest.open.label,
-  armed: false,
-};
-const realPath = harmonyGraph({ index: 1, chords: [] }, realChain, longest);
-const entries = stepEntries(longest, realChain.steps);
+const entries = stepEntries(longest, longest.steps.map((step) => step.label));
 check(entries.length === longest.steps.length
   && entries.every((entry, i) => entry.label === longest.steps[i].label),
   "stepEntries recovers the shipped family's own bar counts");
-check(realPath.nodes.filter((node) => node.id.startsWith("step:"))
+const realWalk = harmonyGraph({ index: 1, chords: [] }, {
+  family: longest.id, steps: longest.steps.map((s) => s.label), position: 2, open: longest.open.label,
+}, longest);
+check(realWalk.nodes.filter((node) => node.id.startsWith("step:"))
   .every((node, i) => node.value === `${entries[i].bars} bar${entries[i].bars === 1 ? "" : "s"}`),
 "and the graph prints those counts, not one bar per node");
-
-// Every shipped family must fit its own box: the harmony viewBox is derived from
-// the row the steps make, so the longest family is the one that proves it.
-const spill = FAMILIES.filter((family) => {
-  const chain = {
-    family: family.id,
-    steps: family.steps.map((step) => step.label),
-    position: 2,
-    open: family.open.label,
-    armed: false,
-  };
-  const graph = harmonyGraph({ index: 1, chords: [] }, chain, family);
-  return graph.nodes.some((node) => node.x + node.w > graph.width + 0.01 || node.x < 0);
-});
-check(spill.length === 0, `every shipped family fits its own viewBox (${spill.map((f) => f.id).join(",") || "all"})`);
-// The box is the row: the step band fills it edge to edge, so no family leaves
-// slack that would shrink the drawing for nothing.
-const slack = FAMILIES.filter((family) => {
-  const graph = harmonyGraph({ index: 1, chords: [] }, {
-    family: family.id, steps: family.steps.map((s) => s.label), position: 1, open: family.open.label,
-  }, family);
-  const steps = graph.nodes.filter((node) => node.id.startsWith("step:"));
-  const right = steps[steps.length - 1].x + steps[steps.length - 1].w;
-  return Math.abs(right - graph.width) > 0.01;
-});
-check(slack.length === 0, `the step band fills the box exactly (${slack.map((f) => f.id).join(",") || "all"})`);
 
 // -------------------------------------------------------------------- report
 console.log("");
