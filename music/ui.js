@@ -112,7 +112,17 @@ const CSS = `
 /* Balls and lines: one disc per thing, one straight line per dependency, and the
    text knocked out of whatever line happens to pass behind it. */
 .mgu-graph { margin: 0; overflow-x: auto; }
-.mgu-graph-svg { display: block; width: 100%; min-width: 520px; height: auto; }
+/* The graph grows with the page, but only so far: past ~1200px the 11px labels
+   would render larger than the panel's own text. It centres in whatever column
+   it is given rather than hugging the left edge. */
+.mgu-graph-svg {
+  display: block;
+  width: 100%;
+  max-width: 1200px;
+  min-width: 520px;
+  height: auto;
+  margin-inline: auto;
+}
 
 .mgu-ball { fill: var(--mgu-panel); stroke: var(--mgu-line); stroke-width: 1.2; }
 .mgu-ball-label,
@@ -563,6 +573,8 @@ export function mountParameters({ root } = {}) {
     // the summary is read out or copied as text
     summary.append(
       el("span", "mg-param-label", entry.label),
+      " ",
+      el("span", "mg-param-gloss", entry.short),
       " ",
       el("span", "mg-chip", `${entry.kind} · ${entry.range}`),
     );

@@ -20,7 +20,7 @@ import { playEvent } from "./arrange.js";
 import { createUI, mountParameters } from "./ui.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle, encodeWav } from "./idle.js";
-import { ladderRows, timbreRows, voiceRows } from "./explain.js";
+import { ladderRows, timbreRows, voiceRows, parameterFor } from "./explain.js";
 import {
   concentrationParts, concentrationFromParts, partsFromConcentration,
   getConcentrationWeights, setConcentrationWeights, WEIGHT_DEFAULTS,
@@ -147,6 +147,28 @@ function grab() {
 
 // One status line, and it is the page's: the panel no longer keeps a second.
 function say(text) { el("status").textContent = text; }
+
+/**
+ * The transport's three dials, glossed from the table the panel prints. A rack
+ * label is a name and a scale; "C" alone is a name and nothing else, so each
+ * control gets the plain word and the range it can hold, plus the rule as a
+ * tooltip -- all of it read from explain.js, so a label cannot outlive its rule.
+ */
+const DIALS = [["c", "C"], ["bpm", "bpm"], ["cruelty", "cruelty"]];
+function explainDials() {
+  for (const [controlId, paramId] of DIALS) {
+    const input = el(controlId);
+    const entry = parameterFor(paramId);
+    if (!input || !entry) continue;
+    const wrap = input.closest(".mg-ctl");
+    const hint = wrap && wrap.querySelector(".mg-ctl-hint");
+    if (hint) hint.textContent = `${entry.short} · ${entry.range}`;
+    input.title = entry.does;
+    // the label element already reads "C concentration 0.45", which is the
+    // output's value rather than the control's name: say what it is instead
+    input.setAttribute("aria-label", `${entry.label} ${entry.short}, ${entry.range}`);
+  }
+}
 
 /** One raw head row for the panel's strip: what the conditioner actually sees. */
 function headRowOf(view) {
@@ -347,6 +369,7 @@ async function boot() {
   // The words before the sound: this needs no audio context, so the section is
   // complete even if the kit never renders.
   mountParameters({ root: el("params") });
+  explainDials();
 
   try {
     kit = await renderKit(ctx.sampleRate);

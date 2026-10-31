@@ -35,13 +35,18 @@ export const LADDER_RULES = Object.freeze({
  * The panel above and the "what the numbers mean" section below the stage are
  * both generated from this list, so an explanation cannot describe a rule the
  * instrument no longer has: the words live next to the data, and `nodes.js`
- * reads the same table for the graph notes. `kind` groups a row for the chip
- * (`signal`, `transport`, `weight`, `raw`); `range` is what the control or the
- * field can actually hold; `source` says where the number comes from.
+ * reads the same table for the graph notes. `label` is the mark the panel
+ * stencils (C, α, bpm, cruelty) and `short` is the plain word beside it
+ * (concentration, alpha share, tempo, harshness) -- a dial labelled only with its
+ * mark is not self-explanatory, and both spellings have to live here or they
+ * drift. `kind` groups a row for the chip (`signal`, `transport`, `weight`,
+ * `raw`); `range` is what the control or the field can actually hold; `source`
+ * says where the number comes from.
  */
 export const PARAMETERS = Object.freeze([
   {
     id: "C",
+    short: "concentration",
     label: "C",
     kind: "signal",
     range: "0 – 1",
@@ -50,6 +55,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "alphaShare",
+    short: "alpha share",
     label: "α",
     kind: "signal",
     range: "0 – 1",
@@ -58,6 +64,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "arousal",
+    short: "activation",
     label: "arousal",
     kind: "signal",
     range: "0 – 1",
@@ -66,6 +73,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "motion",
+    short: "movement",
     label: "motion",
     kind: "signal",
     range: "0 – 1",
@@ -74,6 +82,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "asymmetry",
+    short: "frontal asymmetry",
     label: "asymmetry",
     kind: "signal",
     range: "−1 – 1",
@@ -82,6 +91,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "bpm",
+    short: "tempo",
     label: "bpm",
     kind: "transport",
     range: "90 – 160",
@@ -90,6 +100,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "cruelty",
+    short: "harshness",
     label: "cruelty",
     kind: "transport",
     range: "0 – 0.6",
@@ -98,6 +109,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "weights",
+    short: "weighting",
     label: "weights",
     kind: "weight",
     range: "0 – 1 each",
@@ -106,6 +118,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "bands",
+    short: "band powers",
     label: "bands",
     kind: "raw",
     range: "—",
@@ -114,6 +127,7 @@ export const PARAMETERS = Object.freeze([
   },
   {
     id: "hsi",
+    short: "contact",
     label: "hsi",
     kind: "raw",
     range: "1 – 4",

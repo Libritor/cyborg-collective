@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mar(G)off — the band, live</title>
-<link rel="stylesheet" href="./margoth.css?v=5">
+<link rel="stylesheet" href="./margoth.css?v=7">
 </head>
 <body>
 <header class="mg-top">
@@ -18,9 +18,18 @@
 <section class="mg-bar" id="transport">
   <button id="play" aria-pressed="false">▶ listen</button>
   <button id="export" hidden>export wav</button>
-  <label class="mg-ctl"><span>C</span><input id="c" type="range" min="0" max="1" step="0.01" value="0.45"><output id="c-out">0.45</output></label>
-  <label class="mg-ctl"><span>bpm</span><input id="bpm" type="range" min="90" max="160" step="1" value="132"><output id="bpm-out">132</output></label>
-  <label class="mg-ctl"><span>cruelty</span><input id="cruelty" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="cruelty-out">0.15</output></label>
+  <label class="mg-ctl">
+    <span class="mg-ctl-head"><span class="mg-ctl-name">C</span><span class="mg-ctl-hint"></span></span>
+    <span class="mg-ctl-row"><input id="c" type="range" min="0" max="1" step="0.01" value="0.45"><output id="c-out">0.45</output></span>
+  </label>
+  <label class="mg-ctl">
+    <span class="mg-ctl-head"><span class="mg-ctl-name">bpm</span><span class="mg-ctl-hint"></span></span>
+    <span class="mg-ctl-row"><input id="bpm" type="range" min="90" max="160" step="1" value="132"><output id="bpm-out">132</output></span>
+  </label>
+  <label class="mg-ctl">
+    <span class="mg-ctl-head"><span class="mg-ctl-name">cruelty</span><span class="mg-ctl-hint"></span></span>
+    <span class="mg-ctl-row"><input id="cruelty" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="cruelty-out">0.15</output></span>
+  </label>
   <div class="mg-level"><div id="meter"><div id="meterbar"></div></div><span id="meter-text">—</span></div>
 </section>
 
