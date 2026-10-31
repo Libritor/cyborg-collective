@@ -162,15 +162,17 @@ function buildChord(gen, step, base, cliche) {
   };
 }
 
+// The pressure ladder, in the order a lamp rack reads it. `sus` is always on:
+// it is the open string, not a reward. The panel prints these gates, so they
+// live here rather than as literals inside devicesAt().
+export const DEVICE_GATES = Object.freeze({
+  sus: 0, cliche: 0.3, drone: 0.3, mixture: 0.3, climb: 0.55, bII: 0.75,
+});
+
 /** Devices available at a concentration, exactly the table in the plan. */
 export function devicesAt(C) {
-  const open = [];
-  open.push("sus");
-  if (C >= 0.3) open.push("cliche", "drone");
-  if (C >= 0.3) open.push("mixture");
-  if (C >= 0.55) open.push("climb");
-  if (C >= 0.75) open.push("bII");
-  return open;
+  const value = Number.isFinite(C) ? C : 0;
+  return Object.keys(DEVICE_GATES).filter((name) => value >= DEVICE_GATES[name]);
 }
 
 function pickFamily(gen, C) {
@@ -353,7 +355,14 @@ function droneBar(gen, devices) {
   return drone;
 }
 
-// ----------------------------------------------------------------------- lead
+// ---------------------------------------------------------------- lead
+/**
+ * Where an engaged buy-in puts the lead: the top of the register, so the tune
+ * sits above the pad instead of inside it. The panel prints this window, so it
+ * is one constant rather than a literal in the branch below.
+ */
+export const LEAD_HIGH = Object.freeze([75, 81]);
+
 /**
  * One chord tone per beat, placed inside the register and never repeating a
  * pitch. The anti-repeat guard used to run *before* the fold, so for a tonic
@@ -366,7 +375,7 @@ function autoLeadBar(gen, chord, controls) {
   if (!voicing || !voicing.length) return [];
   const pcs = [...new Set(voicing.map((m) => ((m % 12) + 12) % 12))];
   const high = (controls.asymmetry || 0) >= 0;
-  const [lo, hi] = high ? [75, 81] : REGISTER.lead;
+  const [lo, hi] = high ? LEAD_HIGH : REGISTER.lead;
   const notes = [];
   for (const [index, step] of [0, 4, 8, 12].entries()) {
     const pc = pcs[index % pcs.length];
@@ -502,6 +511,10 @@ export function nextBar(gen, controls = {}) {
   return bar;
 }
 
+// A wizard the headband cannot read keeps a fifth of a vote: present, but not
+// trusted enough to outvote two seated heads. The panel prints this as `vote`.
+export const VOTE_WEIGHT = Object.freeze({ contact: 1, silent: 0.2 });
+
 /**
  * Aggregate several wizards into the controls one bar needs.
  * Contact quality is the vote weight; a silent wizard has no vote. With one
@@ -512,7 +525,7 @@ export function aggregate(sharers, now) {
   if (!live.length) return { C: 0.1, mode: "vamp", heads: 0 };
   const weighted = live.map((s) => ({
     s,
-    w: s.inContact ? 1 : 0.2,
+    w: s.inContact ? VOTE_WEIGHT.contact : VOTE_WEIGHT.silent,
   }));
   const mix = (key) => {
     // the wrapper is {s, w}: reading e[key] here silently found nothing and

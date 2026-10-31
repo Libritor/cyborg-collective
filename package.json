@@ -4,6 +4,6 @@
   "type": "module",
   "description": "The Chains of Margoth: a headband-steered 80s goth band for 6ense.com. Modules are ES modules so node can test the generator and the browser can import the same files.",
   "scripts": {
-    "test": "node music/test_kit.js && node music/test_scheduler.js && node music/test_arrange.js && node music/test_loop.js && node music/test_relay.js && node music/test_idle.js && node music/test_generator.js"
+    "test": "node music/test_kit.js && node music/test_scheduler.js && node music/test_arrange.js && node music/test_loop.js && node music/test_relay.js && node music/test_explain.js && node music/test_idle.js && node music/test_generator.js"
   }
 }

@@ -23,7 +23,45 @@ export const CHANNELS = ["TP9", "AF7", "AF8", "TP10"];
 export const BANDS = ["delta", "theta", "alpha", "beta", "gamma"];
 const CONTACT = new Set([1, 2]);   // hsi 1 good, 2 ok; 3 poor, 4 none
 
+// What the three concentration terms weigh. Only their ratio matters -- they are
+// normalised -- which is what lets a page re-weight them without changing what a
+// weight *means*: 0.4/0.3/0.3 and 1/1/1 both sum to one.
+export const WEIGHT_DEFAULTS = Object.freeze({ engagement: 0.4, activation: 0.3, steadiness: 0.3 });
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+/** Three non-negative finite weights summing to 1; bad terms fall back one by one. */
+export function normaliseWeights(weights = {}) {
+  const pick = (key) => {
+    const value = weights ? weights[key] : undefined;
+    return Number.isFinite(value) && value >= 0 ? value : WEIGHT_DEFAULTS[key];
+  };
+  const terms = {
+    engagement: pick("engagement"),
+    activation: pick("activation"),
+    steadiness: pick("steadiness"),
+  };
+  const sum = terms.engagement + terms.activation + terms.steadiness;
+  if (!Number.isFinite(sum) || sum <= 0) return { ...WEIGHT_DEFAULTS };
+  return {
+    engagement: terms.engagement / sum,
+    activation: terms.activation / sum,
+    steadiness: terms.steadiness / sum,
+  };
+}
+
+let CURRENT_WEIGHTS = normaliseWeights(WEIGHT_DEFAULTS);
+
+/** The weights in force, frozen: a caller cannot re-weight the band by accident. */
+export function getConcentrationWeights() {
+  return Object.freeze({ ...CURRENT_WEIGHTS });
+}
+
+/** Merge a partial over the weights in force, normalise, and report what landed. */
+export function setConcentrationWeights(partial) {
+  CURRENT_WEIGHTS = normaliseWeights({ ...CURRENT_WEIGHTS, ...(partial || {}) });
+  return getConcentrationWeights();
+}
 
 function smooth(prev, next, dt, tau) {
   if (prev === undefined || prev === null) return next;
@@ -194,6 +232,7 @@ export function view(sharer, now) {
     betaShare,
     theta,
     delta,
+    gamma: shareOf(sharer, "gamma", channels),
     asymmetry,
     steadiness,
     arousal: sharer.arousal,
@@ -209,19 +248,61 @@ export function view(sharer, now) {
 }
 
 /**
+ * The three terms a single number stands in for -- what the page uses when there
+ * is no headband and the sliders are the wizard. Chosen so the *default* weights
+ * reproduce C exactly (measured: |sum - C| <= 1.1e-16 across 0..1) while the
+ * three are not equal, so a re-weighting actually moves C. Without that, a page
+ * with one slider would have nothing for its weight sliders to weigh.
+ */
+export function partsFromConcentration(C) {
+  const value = Number.isFinite(C) ? clamp(C, 0, 1) : 0;
+  const engagement = Math.min(1, 1.5 * value);
+  const activation = value;
+  // solved from the default weights: 0.4·e + 0.3·a + 0.3·s = C
+  const steadiness = clamp((0.7 * value - 0.4 * engagement) / 0.3, 0, 1);
+  return { engagement, activation, steadiness, age: 0 };
+}
+
+/**
+ * The three terms of C, before they are weighted: what the panel shows so the
+ * number is not a black box, and what a re-weighting is applied to.
+ */
+export function concentrationParts(v) {
+  const view = v || {};
+  const betaShare = view.betaShare === null || view.betaShare === undefined ? null : view.betaShare;
+  return {
+    engagement: betaShare === null ? 0.3 : clamp((betaShare - 0.15) / 0.35, 0, 1),
+    activation: view.arousal === null || view.arousal === undefined ? 0.3 : clamp(view.arousal, 0, 1),
+    steadiness: typeof view.steadiness === "number" ? view.steadiness : 0.5,
+    age: typeof view.age === "number" ? view.age : Infinity,
+  };
+}
+
+/**
+ * C from its parts and the weights in force. The decay is applied to the
+ * weighted sum and is deliberately *not* re-clamped: a stale wizard bleeds
+ * toward C_FLOOR rather than snapping to it.
+ */
+export function concentrationFromParts(parts, weights = getConcentrationWeights()) {
+  const w = weights || getConcentrationWeights();
+  const p = parts || {};
+  const raw = clamp(
+    w.engagement * p.engagement + w.activation * p.activation + w.steadiness * p.steadiness,
+    0,
+    1,
+  );
+  if (p.age > DECAY_S) {
+    const bleed = Math.exp(-(p.age - DECAY_S) / DECAY_TAU);
+    return C_FLOOR + (raw - C_FLOOR) * bleed;
+  }
+  return raw;
+}
+
+/**
  * Concentration in [0, 1]: task engagement, activation and steadiness.
  * Decays toward C_FLOOR when the signal has been gone past DECAY_S, so a solo
  * wizard who takes the headband off leaves a hypnotic vamp, not a frantic loop.
  */
 export function concentration(v) {
-  const engagement = v.betaShare === null
-    ? 0.3
-    : clamp((v.betaShare - 0.15) / 0.35, 0, 1);
-  const activation = v.arousal === null ? 0.3 : clamp(v.arousal, 0, 1);
-  const raw = 0.4 * engagement + 0.3 * activation + 0.3 * v.steadiness;
-  if (v.age > DECAY_S) {
-    const bleed = Math.exp(-(v.age - DECAY_S) / DECAY_TAU);
-    return C_FLOOR + (raw - C_FLOOR) * bleed;
-  }
-  return clamp(raw, 0, 1);
+  return concentrationFromParts(concentrationParts(v));
 }

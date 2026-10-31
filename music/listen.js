@@ -11,13 +11,20 @@
 // silence under the first press.
 
 import { renderKit } from "./kit.js";
-import { createGenerator, nextBar, aggregate } from "./generator.js";
+import {
+  createGenerator, nextBar, aggregate, VOTE_WEIGHT,
+} from "./generator.js";
 import { createVoices } from "./voices.js";
 import { createLoop } from "./loop.js";
 import { playEvent } from "./arrange.js";
 import { createUI } from "./ui.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle, encodeWav } from "./idle.js";
+import { ladderRows, timbreRows, voiceRows } from "./explain.js";
+import {
+  concentrationParts, concentrationFromParts, partsFromConcentration,
+  getConcentrationWeights, setConcentrationWeights, WEIGHT_DEFAULTS,
+} from "./conditioner.js";
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -30,8 +37,36 @@ window.__audio = {
 
 const state = { C: 0.45, bpm: 132, cruelty: 0.15 };
 
+// The concentration weights the page starts with: the listener's last choice, or
+// the conditioner's defaults. localStorage can be unavailable (private mode,
+// file://), and a panel that cannot remember is still a panel.
+const WEIGHTS_KEY = "margoth.concWeights";
+
+function storedWeights() {
+  try {
+    const raw = localStorage.getItem(WEIGHTS_KEY);
+    if (!raw) return null;
+    const values = JSON.parse(raw);
+    if (!Array.isArray(values) || values.length !== 3) return null;
+    if (!values.every((v) => Number.isFinite(v) && v >= 0)) return null;
+    return { engagement: values[0], activation: values[1], steadiness: values[2] };
+  } catch {
+    return null;
+  }
+}
+
+function persistWeights(next) {
+  try {
+    localStorage.setItem(WEIGHTS_KEY, JSON.stringify([next.engagement, next.activation, next.steadiness]));
+  } catch {
+    // no storage: the weights still hold in memory for this page
+  }
+}
+
+setConcentrationWeights(storedWeights() || WEIGHT_DEFAULTS);
+
 const ctx = new AudioContext();
-const ui = createUI({ root: el("mount"), onGrab: () => grab() });
+const ui = createUI({ root: el("mount"), onGrab: () => grab(), onWeights: (next) => applyWeights(next) });
 
 let kit = null;
 let loop = null;
@@ -46,9 +81,21 @@ let castAt = 0;
 const idleStamp = params.get("idle");
 const relayUrl = params.get("relay");
 
-/** The solo wizard on this page: pressure is its arousal, and nothing else votes. */
-function soloControls() {
-  return { C: state.C, alphaShare: 0.35, arousal: state.C, motion: 0.35, asymmetry: 0.2 };
+/**
+ * The solo wizard on this page: pressure is its arousal, and nothing else votes.
+ * There is no headband, so its three concentration terms are the ones a single
+ * number stands in for (partsFromConcentration) -- which is also why the weight
+ * sliders have something to re-weight here. At the default weights this is
+ * exactly the C slider, to the last bit.
+ */
+function soloControls(parts = partsFromConcentration(state.C)) {
+  return {
+    C: concentrationFromParts(parts),
+    alphaShare: 0.35,
+    arousal: state.C,
+    motion: 0.35,
+    asymmetry: 0.2,
+  };
 }
 
 /**
@@ -57,14 +104,37 @@ function soloControls() {
  * empty room rather than a fallback invented here.
  */
 function currentControls() {
-  if (!relay) return soloControls();
+  if (!relay) return soloControls(lastParts || partsFromConcentration(state.C));
   const at = Date.now() / 1000;
   return aggregate(relay.sharers(at), at);
 }
 
+/**
+ * The controls the current bar was actually generated from. `onBar` hands this
+ * to the panel, so the signals it prints are the ones that made the bar and not
+ * a fresh reading taken a bar later.
+ */
+let lastControls = null;
+let lastTimbre = null;
+let lastParts = null;
+let lastSignals = null;
+
 function pullBar(index) {
-  if (idle) return idle.pullBar(index % idle.bars);
-  return nextBar(gen, currentControls());
+  if (idle) {
+    const bar = idle.pullBar(index % idle.bars);
+    // the idle piece walks its own controls, and its own controls are what the
+    // ladder must print: the C slider is not that wizard
+    lastControls = idle.controls(index % idle.bars);
+    lastParts = partsFromConcentration(lastControls.C);   // no headband, same rule
+    return bar;
+  }
+  if (relay) {
+    lastParts = null;             // onBar reads the terms off the same views it prints
+  } else {
+    lastParts = partsFromConcentration(state.C);
+  }
+  lastControls = currentControls();
+  return nextBar(gen, lastControls);
 }
 
 function grab() {
@@ -77,6 +147,26 @@ function grab() {
 
 function say(text) { ui.status(text); el("status").textContent = text; }
 
+/** One raw head row for the panel's strip: what the conditioner actually sees. */
+function headRowOf(view) {
+  return {
+    pseudonym: view.pseudonym,
+    name: view.name,
+    C: view.C,
+    alphaShare: view.alphaShare,
+    betaShare: view.betaShare,
+    theta: view.theta,
+    delta: view.delta,
+    gamma: view.gamma,
+    arousal: view.arousal,
+    bpm: view.bpm,
+    rmssd: view.rmssd,
+    hsi: view.hsi,
+    inContact: view.inContact,
+    vote: view.inContact ? VOTE_WEIGHT.contact : VOTE_WEIGHT.silent,
+  };
+}
+
 function onBar(event) {
   window.__audio.bars += 1;
   const bar = event.data;
@@ -86,8 +176,45 @@ function onBar(event) {
     devices: bar.chords[0] ? bar.chords[0].devices : [],
     reason: bar.ui.reason, C: bar.ui.C, armed: !!(bar.ui.chain && bar.ui.chain.armed),
   };
+  const mix = lastControls || soloControls();
+  const at = Date.now() / 1000;
+  // one call, not two: every sharers() read appends an alpha sample to the
+  // conditioner, so the strip and the sum must come from the same reading
+  const views = relay ? relay.sharers(at) : [];
+  const heads = views.map(headRowOf);
+  if (relay) lastParts = views.length ? concentrationParts(views[0]) : null;
+  const weights = getConcentrationWeights();
+
+  lastSignals = {
+    mix,
+    ladder: ladderRows(mix, bar),
+    sound: timbreRows(bar.timbre, lastTimbre),
+    voices: voiceRows(bar, { muted: ["lead"], roles: relay ? relay.roles(at) : {} }),
+    heads,
+    weights,
+    parts: lastParts,
+  };
+  lastTimbre = bar.timbre;
+  window.__audio.heads = heads;
+  window.__audio.parts = lastParts;
+  window.__audio.weights = weights;
+
   ui.bar(event);
+  ui.signals(lastSignals);
   if (relay) renderCast();
+}
+
+/**
+ * A weights change: the conditioner re-weights at once, the panel redraws the
+ * sum from the last bar's terms in the same frame, and the band follows at its
+ * next bar (C is read once per bar, which is what keeps a bar internally coherent).
+ */
+function applyWeights(next) {
+  const effective = setConcentrationWeights(next);
+  persistWeights(next);
+  window.__audio.weights = effective;
+  if (lastSignals) ui.signals({ ...lastSignals, weights: effective });
+  return effective;
 }
 
 function onEvent() {
@@ -269,6 +396,10 @@ async function boot() {
   loop.voices.master.connect(analyser);
   requestAnimationFrame(meter);
 
+  // the panel knows the weights before it knows a bar, so the sliders read the
+  // remembered triple from the first frame rather than from the first downbeat
+  ui.signals({ weights: getConcentrationWeights() });
+
   say(`kit ready at ${ctx.sampleRate} Hz · ${ctx.state}. press ▶`);
 }
 
@@ -312,8 +443,24 @@ async function toggle() {
   say(`playing · ${ctx.sampleRate} Hz · lead muted`);
 }
 
-el("play").addEventListener("click", toggle);
-el("export").addEventListener("click", () => { exportWav(); });
+// A mouse click leaves focus on the control it was on, and Space then belongs to
+// that control rather than to the chord. Keyboard activation reports detail 0 and
+// keeps focus, which is what a keyboard user needs.
+el("play").addEventListener("click", (event) => {
+  if (event.detail > 0) event.currentTarget.blur();
+  toggle();
+});
+el("export").addEventListener("click", (event) => {
+  if (event.detail > 0) event.currentTarget.blur();
+  exportWav();
+});
+
+// Same for the sliders: a drag leaves the range focused, and the space that
+// follows would adjust it instead of grabbing. The value is already committed.
+el("transport").addEventListener("pointerup", () => {
+  const active = document.activeElement;
+  if (active && active.tagName === "INPUT" && active.type === "range") active.blur();
+});
 
 el("c").addEventListener("input", (event) => {
   state.C = Number(event.target.value);
@@ -330,11 +477,21 @@ el("cruelty").addEventListener("input", (event) => {
   el("cruelty-out").textContent = state.cruelty.toFixed(2);
 });
 
+// Space grabs a chord. It must not fire while a control is being driven by the
+// keyboard, so the guard is by element rather than by `target === body`: a body
+// guard works exactly once, until the first click moves focus into the page.
+const TYPED = new Set(["INPUT", "TEXTAREA", "SELECT", "BUTTON"]);
+function isTypingTarget(node) {
+  if (!node || typeof node !== "object") return false;
+  if (node.isContentEditable) return true;
+  if (TYPED.has(node.tagName)) return true;
+  return node.tagName === "A" && node.hasAttribute("href");
+}
+
 document.addEventListener("keydown", (event) => {
-  if (event.code === "Space" && event.target === document.body) {
-    event.preventDefault();
-    grab();
-  }
+  if (event.code !== "Space" || isTypingTarget(event.target)) return;
+  event.preventDefault();
+  grab();
 });
 
 // A hidden tab throttles timers to ~1 Hz, which starves a 120 ms lookahead. The
@@ -353,7 +510,9 @@ document.addEventListener("visibilitychange", () => {
 // The page's own handle on the pieces, for the browser gates.
 window.__margoth = {
   state, get idle() { return idle; }, get relay() { return relay; },
-  get loop() { return loop; }, grab, exportWav,
+  get loop() { return loop; }, grab, exportWav, ui,
+  get weights() { return getConcentrationWeights(); },
+  setWeights: (next) => applyWeights(next),
   sweep: () => relay && relay.sweep(),
 };
 

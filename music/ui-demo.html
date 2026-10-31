@@ -50,6 +50,10 @@
 <script type="module">
 import { createGenerator, nextBar } from "./generator.js";
 import { createUI } from "./ui.js";
+import { ladderRows, timbreRows, voiceRows } from "./explain.js";
+import {
+  concentrationFromParts, getConcentrationWeights, setConcentrationWeights, partsFromConcentration,
+} from "./conditioner.js";
 
 const BPM = 132;
 const BAR_MS = (60 / BPM) * 4 * 1000;   // 1818 ms: four beats at 132
@@ -57,6 +61,11 @@ const BAR_MS = (60 / BPM) * 4 * 1000;   // 1818 ms: four beats at 132
 const ui = createUI({
   root: document.getElementById("host"),
   onGrab: () => ui.status("grab: this chord is pinned for two bars"),
+  onWeights: (next) => {
+    setConcentrationWeights(next);
+    // a weights change moves C, so redraw the panel from the last bar at once
+    if (last) draw(last);
+  },
 });
 
 const gen = createGenerator({ seed: 5, tonicMidi: 57, bpm: BPM });
@@ -75,13 +84,25 @@ function CAt(cycleBar) {
 }
 
 /** Controls vary, so the palette and the device rolls are not one frozen draw. */
-function controlsAt(cycleBar) {
+function controlsAt(cycleBar, parts) {
   return {
-    C: CAt(cycleBar),
+    // C is the weighted sum of the three terms, so re-weighting moves the band
+    // here exactly as it does on the live page
+    C: concentrationFromParts(parts, getConcentrationWeights()),
     alphaShare: 0.3 + 0.2 * Math.sin(cycleBar / 6),
     arousal: 0.55 + 0.3 * Math.sin(cycleBar / 5),
     motion: 0.25 + 0.15 * Math.cos(cycleBar / 9),
+    asymmetry: 0.12,
   };
+}
+
+/**
+ * The demo has no headband, so it uses the same rule the live page uses for its
+ * solo wizard: the three terms a single number stands in for, solved so the
+ * default weights reproduce the sweep and a slider still moves C.
+ */
+function partsAt(cycleBar) {
+  return partsFromConcentration(CAt(cycleBar));
 }
 
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
@@ -101,14 +122,39 @@ function levelFor(bar) {
 }
 
 let running = true;
+let last = null;          // the last bar, the controls it used, and its baseline
+let lastTimbre = null;
 
-function advance() {
-  const bar = nextBar(gen, controlsAt(gen.bar));
+/** Draw one frame: the chain from the bar, the signals from what made it. */
+function draw(frame) {
+  const { bar, controls, parts } = frame;
   const level = levelFor(bar);
   ui.bar({ data: bar, bar: bar.index, time: performance.now() / 1000, tempo: bar.tempo });
   ui.setLevel(level.rms, level.peak);
-  ui.status(bar.ui.reason);
-  return bar;
+  ui.signals({
+    mix: controls,
+    ladder: ladderRows(controls, bar),
+    sound: timbreRows(bar.timbre, frame.previous),
+    voices: voiceRows(bar, { muted: ["lead"], roles: {} }),
+    heads: [],
+    weights: getConcentrationWeights(),
+    parts,
+  });
+  lastTimbre = bar.timbre;
+}
+
+function advance() {
+  const cycle = gen.bar;
+  const parts = partsAt(cycle);
+  // the baseline is read before draw() replaces it, so a redraw of the same bar
+  // after a weights change keeps the deltas it was generated with
+  const frame = {
+    bar: null, controls: controlsAt(cycle, parts), parts, previous: lastTimbre,
+  };
+  frame.bar = nextBar(gen, frame.controls);
+  last = frame;
+  draw(frame);
+  return frame.bar;
 }
 
 const pauseButton = document.getElementById("pause");

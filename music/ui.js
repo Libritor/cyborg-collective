@@ -11,18 +11,13 @@
 // generator's own rule, not a guess.
 
 import { NOTE_NAMES, QUALITY, familyById } from "./families.js";
-import { VOICE_BUDGET } from "./generator.js";
+import { VOICE_BUDGET, DEVICE_GATES } from "./generator.js";
+import { concentrationFromParts, CHANNELS } from "./conditioner.js";
+import { DEVICE_LABELS, TIMBRE_LABELS, noteName } from "./explain.js";
 
-// Exactly the plan's six. `cliche` is printed with its accent; the data key is
-// the ASCII one the generator emits.
-const DEVICES = [
-  ["sus", "sus"],
-  ["cliche", "cliché"],
-  ["drone", "drone"],
-  ["mixture", "mixture"],
-  ["climb", "climb"],
-  ["bII", "bII"],
-];
+// The rack's six devices. The display order and accents are explain.js's: the
+// signal ladder names the same devices, and two copies of the table drift.
+const DEVICES = DEVICE_LABELS;
 
 const QUALITY_WORD = {
   min: "minor",
@@ -38,6 +33,19 @@ const QUALITY_WORD = {
 const MAX_REJECTED = 3;
 const RING_R = 26;
 const RING_C = 2 * Math.PI * RING_R;
+// The fixed row sets of the lower blocks. The rows are built once and reused, so
+// these are the keys the panel owns; a payload that names a different key is
+// dropped rather than appended, and a missing one renders "—".
+const CONC_TERMS = ["engagement", "activation", "steadiness"];
+const LADDER_KEYS = ["C", "alphaShare", "arousal", "motion", "asymmetry"];
+const SOUND_LABELS = TIMBRE_LABELS;   // key + label, from the module that formats them
+const VOICE_KEYS = ["drums", "bass", "drone", "pad", "lead"];
+const RAW_BANDS = [
+  ["delta", "δ rel"], ["theta", "θ rel"], ["alpha", "α share"],
+  ["beta", "β share"], ["gamma", "γ rel"],
+];
+const RAW_SLOTS = 8;             // heads drawn at once; more arrive next frame
+const WEIGHT_STEP = 0.05;        // the sliders' step, so a write can be skipped
 const FLOOR_DB = -48;          // the meter's left edge; a mix that lives below
                                // this is not audible, so spending scale on it
                                // would hide the part that is
@@ -53,6 +61,10 @@ const CSS = `
   padding: 10px 12px; display: grid; gap: 10px; text-align: left;
 }
 .mgu-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* The UA rule for [hidden] is a bare tag selector, so any class rule that sets
+   a display beats it: a hidden .mgu-head-row (the empty head slots) and the
+   in-place sound/voice cells kept laying out. One rule, above every one of them. */
+.mgu [hidden] { display: none; }
 .mgu-clock { color: var(--mgu-dim); letter-spacing: .04em; }
 .mgu-status { color: var(--mgu-fg); min-width: 0; overflow-wrap: anywhere; }
 .mgu-status:empty { display: none; }
@@ -132,11 +144,79 @@ const CSS = `
 .mgu-meter-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3f5d55, #8fbfa6); }
 .mgu-meter-peak { position: absolute; top: 0; bottom: 0; width: 2px; left: 0; background: var(--mgu-accent); }
 .mgu-level-text { color: var(--mgu-dim); }
+.mgu-caption { color: var(--mgu-dim); overflow-wrap: anywhere; }
+.mgu-rows { display: grid; gap: 4px; }
+.mgu-row {
+  display: grid; gap: 8px; align-items: baseline;
+  grid-template-columns: 5.2rem 3.2rem minmax(0, 1.15fr) minmax(0, 1fr);
+}
+.mgu-row-signal { color: var(--mgu-bright); }
+.mgu-row-value { color: var(--mgu-bright); text-align: right; }
+.mgu-row-rule { color: var(--mgu-dim); }
+.mgu-row-state { color: var(--mgu-fg); }
+.mgu-row[data-fired="true"] .mgu-row-state { color: var(--mgu-accent); }
+.mgu-lower {
+  display: grid; gap: 12px; align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mgu-conc-row {
+  display: grid; gap: 2px 8px; align-items: center;
+  grid-template-columns: 4.6rem minmax(0, 1fr) 3.8rem;
+}
+.mgu-conc-term { color: var(--mgu-dim); }
+.mgu-conc-bar {
+  grid-column: 1 / -1; height: 6px; background: #1a1a20; border: 1px solid var(--mgu-line);
+  border-radius: 3px; overflow: hidden;
+}
+.mgu-conc-bar > i { display: block; height: 100%; width: 0%; background: #7d8f86; }
+.mgu-conc-weight { color: var(--mgu-dim); text-align: right; }
+.mgu-conc-sum { color: var(--mgu-bright); }
+.mgu-conc input[type="range"] {
+  width: 100%; min-width: 0; margin: 0; accent-color: var(--mgu-accent);
+}
+.mgu-conc input[type="range"]:disabled { opacity: .4; }
+.mgu-sound-row {
+  display: grid; gap: 6px; align-items: baseline;
+  grid-template-columns: 6.5rem minmax(0, 1fr) 3.4rem;
+}
+.mgu-sound-label { color: var(--mgu-dim); }
+.mgu-sound-value { color: var(--mgu-bright); text-align: right; }
+.mgu-sound-delta { color: var(--mgu-dim); text-align: right; }
+.mgu-voice-row {
+  display: grid; gap: 6px; align-items: baseline;
+  grid-template-columns: 3.6rem minmax(0, 1fr) minmax(0, 1fr) 4.2rem;
+}
+.mgu-voice-name { color: var(--mgu-bright); }
+.mgu-voice-driven { color: var(--mgu-dim); }
+.mgu-voice-detail { color: var(--mgu-fg); }
+.mgu-voice-role { color: var(--mgu-accent); text-align: right; }
+.mgu-lamp-gate { color: var(--mgu-dim); font-size: 10px; }
+.mgu-lamp.is-lit .mgu-lamp-gate { color: #7d8f86; }
+.mgu-lamp.is-firing .mgu-lamp-gate { color: var(--mgu-accent); }
+.mgu-raw-rows { display: grid; gap: 3px; overflow-x: auto; }
+.mgu-head-row {
+  display: grid; gap: 6px; align-items: baseline; min-width: 42rem;
+  grid-template-columns:
+    minmax(4.5rem, 1fr) 2.8rem 3rem 3.4rem
+    repeat(5, 3.2rem) minmax(10rem, auto);
+}
+.mgu-head-row > span { white-space: nowrap; }
+.mgu-raw-head {
+  color: var(--mgu-dim); font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+}
+.mgu-num { text-align: right; }
+.mgu-raw-note { color: var(--mgu-dim); }
+.mgu-raw-note[hidden] { display: none; }
 @keyframes mgu-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(224,179,102,.5); }
   50% { box-shadow: 0 0 0 4px rgba(224,179,102,0); }
 }
-@media (max-width: 720px) { .mgu-body { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 900px) { .mgu-lower { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 720px) {
+  .mgu-body { grid-template-columns: minmax(0, 1fr); }
+  .mgu-row { grid-template-columns: 5rem 3rem minmax(0, 1fr); }
+  .mgu-row-rule { grid-column: 1 / -1; }
+}
 @media (prefers-reduced-motion: reduce) {
   .mgu.is-playing .mgu-step[data-state="current"] { animation: none; }
   .mgu-ring-arc { transition: none; }
@@ -162,9 +242,12 @@ const setText = (node, text) => {
   if (node.textContent !== next) node.textContent = next;
 };
 
-const noteName = (midi) => `${NOTE_NAMES[(((midi % 12) + 12) % 12)]}${Math.floor(midi / 12) - 1}`;
-
 const pct = (db) => Math.max(0, Math.min(100, ((db - FLOOR_DB) / -FLOOR_DB) * 100));
+
+const fixed = (v, digits = 2) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "—");
+const signed = (v) => (typeof v === "number" && Number.isFinite(v)
+  ? `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`
+  : "—");
 
 /**
  * The family's steps carry the weight the chain view draws -- how many bars the
@@ -238,7 +321,7 @@ function flash(node) {
   );
 }
 
-export function createUI({ root = document.body, onGrab = null } = {}) {
+export function createUI({ root = document.body, onGrab = null, onWeights = null } = {}) {
   const doc = (root && root.ownerDocument) || document;
   ensureStyle(doc);
 
@@ -266,6 +349,28 @@ export function createUI({ root = document.body, onGrab = null } = {}) {
   statusEl.setAttribute("aria-live", "polite");
   head.appendChild(statusEl);
   section.appendChild(head);
+
+  // The ladder: signal -> rule -> what it did, per bar. Full width and above the
+  // chain, because it is the input the chain below is the output of.
+  const signalsBox = el("section", "mgu-block mgu-signals");
+  signalsBox.setAttribute("data-block", "signals");
+  const signalsCaption = el("div", "mgu-caption", "band: —");
+  const signalList = el("div", "mgu-rows");
+  const signalRows = new Map();
+  for (const key of LADDER_KEYS) {
+    const row = el("div", "mgu-row");
+    row.setAttribute("data-signal", key);
+    row.dataset.fired = "false";
+    const label = el("span", "mgu-row-signal", key);
+    const value = el("span", "mgu-row-value", "—");
+    const rule = el("span", "mgu-row-rule", "");
+    const state = el("span", "mgu-row-state", "—");
+    row.append(label, value, rule, state);
+    signalList.appendChild(row);
+    signalRows.set(key, { row, label, value, rule, state });
+  }
+  signalsBox.append(el("div", "mgu-label", "signals"), signalsCaption, signalList);
+  section.appendChild(signalsBox);
 
   const body = el("div", "mgu-body");
 
@@ -315,7 +420,12 @@ export function createUI({ root = document.body, onGrab = null } = {}) {
     lamp.setAttribute("data-device", name);
     lamp.dataset.on = "false";
     lamp.dataset.fired = "false";
-    lamp.append(el("span", "mgu-lamp-dot"), el("span", "mgu-lamp-name", shown));
+    const gate = DEVICE_GATES[name];
+    lamp.append(
+      el("span", "mgu-lamp-dot"),
+      el("span", "mgu-lamp-name", shown),
+      el("span", "mgu-lamp-gate", gate > 0 ? `≥${gate.toFixed(2)}` : "always"),
+    );
     rack.appendChild(lamp);
     return { name, lamp };
   });
@@ -360,12 +470,112 @@ export function createUI({ root = document.body, onGrab = null } = {}) {
 
   body.appendChild(side);
   section.appendChild(body);
+
+  // ------------------------------------------------------------- the lower row
+  const lower = el("div", "mgu-lower");
+
+  const concBox = el("section", "mgu-block mgu-conc");
+  concBox.setAttribute("data-block", "conc");
+  concBox.appendChild(el("div", "mgu-label", "concentration"));
+  const concRows = new Map();
+  for (const key of CONC_TERMS) {
+    const row = el("div", "mgu-conc-row");
+    const term = el("span", "mgu-conc-term", key);
+    const barWrap = el("div", "mgu-conc-bar");
+    const barFill = el("i");
+    barWrap.appendChild(barFill);
+    const weight = el("span", "mgu-conc-weight", "—");
+    const slider = doc.createElement("input");
+    slider.type = "range";
+    slider.min = "0";
+    slider.max = "1";
+    slider.step = String(WEIGHT_STEP);
+    slider.value = "0";
+    slider.disabled = typeof onWeights !== "function";
+    slider.setAttribute("data-weight", key);
+    slider.setAttribute("aria-label", `${key} weight`);
+    slider.addEventListener("input", () => emitWeights());
+    row.append(term, barWrap, weight, slider);
+    concBox.appendChild(row);
+    concRows.set(key, { row, barFill, weight, slider });
+  }
+  const concSum = el("div", "mgu-conc-sum", "C —");
+  concBox.appendChild(concSum);
+  lower.appendChild(concBox);
+
+  const soundBox = el("section", "mgu-block mgu-sound");
+  soundBox.setAttribute("data-block", "sound");
+  const soundList = el("div", "mgu-rows");
+  const soundRows = new Map();
+  for (const [key, label] of SOUND_LABELS) {
+    const row = el("div", "mgu-sound-row");
+    row.setAttribute("data-sound", key);
+    const labelEl = el("span", "mgu-sound-label", label);
+    const value = el("span", "mgu-sound-value", "—");
+    const delta = el("span", "mgu-sound-delta", "");
+    delta.hidden = true;
+    row.append(labelEl, value, delta);
+    soundList.appendChild(row);
+    soundRows.set(key, { row, label: labelEl, value, delta });
+  }
+  soundBox.append(el("div", "mgu-label", "what C sounds like"), soundList);
+  lower.appendChild(soundBox);
+
+  const voicesBox = el("section", "mgu-block mgu-voices");
+  voicesBox.setAttribute("data-block", "voices");
+  const voiceList = el("div", "mgu-rows");
+  const voiceRowsUi = new Map();
+  for (const key of VOICE_KEYS) {
+    const row = el("div", "mgu-voice-row");
+    row.setAttribute("data-voice", key);
+    const name = el("span", "mgu-voice-name", key);
+    const driven = el("span", "mgu-voice-driven", "");
+    const detail = el("span", "mgu-voice-detail", "—");
+    const role = el("span", "mgu-voice-role", "");
+    role.hidden = true;
+    row.append(name, driven, detail, role);
+    voiceList.appendChild(row);
+    voiceRowsUi.set(key, { row, name, driven, detail, role });
+  }
+  voicesBox.append(el("div", "mgu-label", "voices"), voiceList);
+  lower.appendChild(voicesBox);
+
+  section.appendChild(lower);
+
+  // ------------------------------------------------------- the raw head strip
+  const rawBox = el("section", "mgu-block mgu-raw");
+  rawBox.setAttribute("data-block", "raw");
+  const rawRows = el("div", "mgu-raw-rows");
+  const rawHead = el("div", "mgu-head-row mgu-raw-head");
+  for (const text of ["head", "C", "hr", "rmssd", ...RAW_BANDS.map(([, shown]) => shown), "hsi"]) {
+    rawHead.appendChild(el("span", text === "head" || text === "hsi" ? "" : "mgu-num", text));
+  }
+  rawRows.appendChild(rawHead);
+  const headSlots = [];
+  for (let i = 0; i < RAW_SLOTS; i += 1) {
+    const row = el("div", "mgu-head-row");
+    const who = el("span", "mgu-head-name", "—");
+    const c = el("span", "mgu-num", "—");
+    const hr = el("span", "mgu-num", "—");
+    const rmssd = el("span", "mgu-num", "—");
+    const bands = RAW_BANDS.map(() => el("span", "mgu-num", "—"));
+    const hsi = el("span", "", "—");
+    row.append(who, c, hr, rmssd, ...bands, hsi);
+    row.hidden = true;
+    rawRows.appendChild(row);
+    headSlots.push({ row, who, c, hr, rmssd, bands, hsi });
+  }
+  const rawNote = el("div", "mgu-raw-note", "no headband: the sliders are the wizard");
+  rawBox.append(el("div", "mgu-label", "heads"), rawNote, rawRows);
+  section.appendChild(rawBox);
+
   root.appendChild(section);
 
   let destroyed = false;
   let pathKey = null;
   let nodes = [];
   let entriesNow = [];
+  let lastWeights = null;
 
   // ------------------------------------------------------------------- chain
   function buildPath(entries) {
@@ -518,6 +728,153 @@ export function createUI({ root = document.body, onGrab = null } = {}) {
         : C >= 0.55 ? "locked in" : "holding");
   }
 
+  // ----------------------------------------------------------------- signals
+  /** The three sliders as a weights change: raw values, so the caller can judge. */
+  function emitWeights() {
+    if (typeof onWeights !== "function") return;
+    const next = {};
+    for (const key of CONC_TERMS) next[key] = Number(concRows.get(key).slider.value);
+    onWeights(next);
+  }
+
+  /** One key per row, however the payload names it (signal / key / voice). */
+  function byKeyOf(rows) {
+    const out = new Map();
+    for (const row of Array.isArray(rows) ? rows : []) {
+      if (!row) continue;
+      const key = row.signal ?? row.key ?? row.voice;
+      if (key != null) out.set(key, row);
+    }
+    return out;
+  }
+
+  function renderLadder(rows) {
+    const byKey = byKeyOf(rows);
+    for (const key of LADDER_KEYS) {
+      const slot = signalRows.get(key);
+      const row = byKey.get(key);
+      slot.row.dataset.fired = String(!!row && row.flag === true);
+      setText(slot.label, row && row.label != null ? row.label : key);
+      setText(slot.value, row && row.value != null ? row.value : "—");
+      setText(slot.rule, row && row.rule != null ? row.rule : "");
+      setText(slot.state, row && row.state != null ? row.state : "—");
+    }
+  }
+
+  function renderSound(rows) {
+    const byKey = byKeyOf(rows);
+    for (const [key, label] of SOUND_LABELS) {
+      const slot = soundRows.get(key);
+      const row = byKey.get(key);
+      setText(slot.label, row && row.label != null ? row.label : label);
+      setText(slot.value, row && row.value != null ? row.value : "—");
+      const delta = row && row.delta != null && row.delta !== "" ? row.delta : null;
+      slot.delta.hidden = delta === null;
+      setText(slot.delta, delta === null ? "" : delta);
+    }
+  }
+
+  function renderVoices(rows) {
+    const byKey = byKeyOf(rows);
+    for (const key of VOICE_KEYS) {
+      const slot = voiceRowsUi.get(key);
+      const row = byKey.get(key);
+      setText(slot.name, key);
+      setText(slot.driven, row && row.drivenBy != null ? row.drivenBy : "");
+      setText(slot.detail, row && row.detail != null ? row.detail : "—");
+      const role = row && row.role != null ? String(row.role) : null;
+      slot.role.hidden = role === null;
+      setText(slot.role, role === null ? "" : role);
+    }
+  }
+
+  function renderHeads(heads) {
+    const list = Array.isArray(heads) ? heads : [];
+    rawNote.hidden = list.length > 0;
+    setText(rawNote, list.length ? "" : "no headband: the sliders are the wizard");
+    headSlots.forEach((slot, i) => {
+      const head = list[i];
+      slot.row.hidden = !head;
+      if (!head) {
+        setText(slot.who, "—");
+        setText(slot.c, "—");
+        setText(slot.hr, "—");
+        setText(slot.rmssd, "—");
+        slot.bands.forEach((cell) => setText(cell, "—"));
+        setText(slot.hsi, "—");
+        return;
+      }
+      setText(slot.who, head.name || head.pseudonym || "—");
+      setText(slot.c, fixed(head.C));
+      setText(slot.hr, head.bpm == null ? "—" : String(Math.round(head.bpm)));
+      setText(slot.rmssd, head.rmssd == null ? "—" : String(Math.round(head.rmssd)));
+      RAW_BANDS.forEach(([key], index) => {
+        // alpha and beta are shares of their own power; delta/theta/gamma are the
+        // mean relative power the conditioner already averages
+        const value = key === "alpha" ? head.alphaShare : key === "beta" ? head.betaShare : head[key];
+        setText(slot.bands[index], fixed(value));
+      });
+      setText(slot.hsi, Object.keys(head.hsi || {}).length
+        ? CHANNELS.map((ch) => `${ch} ${head.hsi[ch] ?? "—"}`).join(" · ")
+        : "—");
+    });
+  }
+
+  function renderConcentration(parts, mix) {
+    const w = lastWeights;
+    for (const key of CONC_TERMS) {
+      const slot = concRows.get(key);
+      const term = parts && typeof parts[key] === "number" ? parts[key] : null;
+      const weight = w && typeof w[key] === "number" ? w[key] : null;
+      slot.barFill.style.width = `${term == null ? 0 : Math.round(term * 100)}%`;
+      setText(slot.weight, weight == null ? "—"
+        : term == null ? `×${weight.toFixed(2)}` : `×${weight.toFixed(2)} = ${(term * weight).toFixed(2)}`);
+      if (weight == null || doc.activeElement === slot.slider) continue;
+      // A normalised weight (0.4545) is not on the slider's 0.05 grid, so compare
+      // where the thumb would actually sit: otherwise every bar rewrites a value
+      // the user is in the middle of dragging.
+      const snapped = Math.round(weight / WEIGHT_STEP) * WEIGHT_STEP;
+      if (Math.abs(Number(slot.slider.value) - snapped) > 1e-9) slot.slider.value = String(weight);
+    }
+    const weighted = parts ? concentrationFromParts(parts, w || undefined) : null;
+    const barC = mix && typeof mix.C === "number" ? mix.C : null;
+    setText(concSum, weighted == null
+      ? `C ${barC == null ? "—" : barC.toFixed(2)}`
+      : `C ${weighted.toFixed(2)}`);
+  }
+
+  function renderCaption(mix) {
+    if (!mix) {
+      setText(signalsCaption, "band: —");
+      return;
+    }
+    setText(signalsCaption, `band: ${[
+      `C ${fixed(mix.C)}`,
+      `α ${fixed(mix.alphaShare)}`,
+      `arousal ${fixed(mix.arousal)}`,
+      `motion ${fixed(mix.motion)}`,
+      `asym ${signed(mix.asymmetry)}`,
+    ].join(" · ")}`);
+  }
+
+  /**
+   * Everything the panel says about the inputs. `mix` is the controls the bar was
+   * generated from, `parts` its concentration terms (null with no headband),
+   * `weights` the effective weights, and the three lists are explain.js's rows.
+   */
+  function renderSignals({
+    mix = null, ladder = [], sound = [], voices = [], heads = null, weights = null, parts = null,
+  } = {}) {
+    if (destroyed) return;
+    if (weights) lastWeights = weights;
+    renderCaption(mix);
+    renderLadder(ladder);
+    renderSound(sound);
+    renderVoices(voices);
+    renderHeads(heads);
+    renderConcentration(parts, mix);
+  }
+
   // --------------------------------------------------------------------- api
   function updateBar({ data, bar, tempo } = {}) {
     if (destroyed || !data) return;
@@ -572,5 +929,7 @@ export function createUI({ root = document.body, onGrab = null } = {}) {
     pathKey = null;
   }
 
-  return { bar: updateBar, setPlaying, setLevel, status, destroy };
+  return {
+    bar: updateBar, signals: renderSignals, setPlaying, setLevel, status, destroy,
+  };
 }
