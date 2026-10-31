@@ -32,6 +32,14 @@
   --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
+  /* The room: a cold glow off the top of the paper, a warm one behind the
+     title, and the corners falling away. Tokens, not literals, so light mode
+     can invert the mood instead of tinting black onto cream. */
+  --haze-cold: color-mix(in srgb, var(--cold) 9%, transparent);
+  --haze-warm: color-mix(in srgb, var(--accent) 11%, transparent);
+  --vignette: color-mix(in srgb, #000 55%, transparent);
+  --lift: color-mix(in srgb, var(--ink) 7%, transparent);
+
   --page: 980px;
   --gutter: 24px;
 }
@@ -53,6 +61,11 @@
     --cold: #3d6373;
     --warm: #a8443f;
     --good: #3f7059;
+
+    --haze-cold: color-mix(in srgb, var(--cold) 8%, transparent);
+    --haze-warm: color-mix(in srgb, var(--accent) 13%, transparent);
+    --vignette: color-mix(in srgb, #6b5a38 9%, transparent);
+    --lift: color-mix(in srgb, #fff 70%, transparent);
   }
 }
 
@@ -60,11 +73,18 @@
 
 body {
   margin: 0;
-  background: var(--paper);
   color: var(--ink);
   font: 15px/1.55 var(--sans);
   -webkit-font-smoothing: antialiased;
   overflow-wrap: break-word;
+  background-color: var(--paper);
+  /* three layers: steel off the top, gold behind the masthead, and the paper
+     falling into shadow at the corners */
+  background-image:
+    radial-gradient(120% 46% at 50% -14%, var(--haze-warm), transparent 66%),
+    radial-gradient(90% 34% at 50% -2%, var(--haze-cold), transparent 72%),
+    radial-gradient(130% 110% at 50% 22%, transparent 46%, var(--vignette) 100%);
+  background-repeat: no-repeat;
 }
 
 body > header,
@@ -76,25 +96,69 @@ body > footer {
 }
 
 /* --------------------------------------------------------------- the sleeve */
+/* Centred, like a sleeve title: a mark, a tracked-out kicker flanked by
+   hairlines, the name in display serif with a faint warm bloom, the blurb in
+   italic serif, and a rule with a gold centre to close the header. */
 .mg-top {
-  padding-top: 46px;
-  padding-bottom: 26px;
-  border-bottom: 1px solid var(--rule);
+  padding-top: 58px;
+  padding-bottom: 54px;
+  text-align: center;
+}
+
+/* the mark: a small gold lozenge, the only filled shape above the fold */
+.mg-top::before {
+  content: "";
+  display: block;
+  width: 7px;
+  height: 7px;
+  margin: 0 auto 26px;
+  background: var(--accent);
+  transform: rotate(45deg);
+  opacity: .85;
+  box-shadow: 0 0 18px 2px var(--haze-warm);
+}
+
+/* the closing rule: hairline in from both sides, gold at the centre */
+.mg-top::after {
+  content: "";
+  display: block;
+  width: min(460px, 76%);
+  height: 1px;
+  margin: 40px auto 0;
+  background: linear-gradient(90deg,
+    transparent, var(--line) 14%, var(--accent) 50%, var(--line) 86%, transparent);
+  opacity: .8;
 }
 
 .mg-kicker {
-  margin: 0 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
   font: 11px/1 var(--mono);
-  letter-spacing: .16em;
+  letter-spacing: .22em;
   text-transform: uppercase;
   color: var(--dim);
 }
 
+.mg-kicker::before,
+.mg-kicker::after {
+  content: "";
+  width: 36px;
+  height: 1px;
+}
+
+.mg-kicker::before { background: linear-gradient(90deg, transparent, var(--line)); }
+.mg-kicker::after { background: linear-gradient(90deg, var(--line), transparent); }
+
 h1 {
-  margin: 0;
-  font: 400 34px/1.15 var(--serif);
-  letter-spacing: -0.01em;
+  margin: 20px 0 0;
+  font: 400 clamp(32px, 4.4vw, 50px)/1.06 var(--serif);
+  letter-spacing: .004em;
   color: var(--ink);
+  text-wrap: balance;
+  /* a bloom, not a glow: enough to lift the name off the paper, not to halo it */
+  text-shadow: 0 1px 34px var(--haze-warm);
 }
 
 h2 {
@@ -104,12 +168,17 @@ h2 {
 }
 
 .mg-sub {
-  margin: 12px 0 0;
-  max-width: 62ch;
+  margin: 18px auto 0;
+  max-width: 50ch;
+  font: italic 17px/1.55 var(--serif);
   color: var(--dim);
+  text-wrap: pretty;
 }
 
 /* -------------------------------------------------------------- the console */
+/* Centred like a rack front panel: the action, the three dials, then the level
+   behind a hairline. Depth comes from one inset highlight and one shadow, so
+   the bar reads as a strip of metal rather than a coloured box. */
 .mg-bar {
   position: sticky;
   top: 0;
@@ -117,48 +186,63 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 20px;
+  justify-content: center;
+  gap: 12px 22px;
   margin: 0;
-  padding: 10px max(var(--gutter), calc((100% - var(--page)) / 2));
-  background: color-mix(in srgb, var(--paper) 82%, transparent);
-  border-bottom: 1px solid var(--rule);
-  backdrop-filter: blur(6px);
+  padding: 12px max(var(--gutter), calc((100% - var(--page)) / 2));
+  background: color-mix(in srgb, var(--paper) 74%, transparent);
+  border-bottom: 1px solid var(--line);
+  box-shadow:
+    inset 0 1px 0 var(--lift),
+    0 18px 40px -26px var(--haze-warm);
+  backdrop-filter: blur(12px) saturate(115%);
 }
 
 .mg-bar button {
   font: 11px/1 var(--mono);
-  letter-spacing: .12em;
+  letter-spacing: .14em;
   text-transform: uppercase;
   color: var(--ink);
   background: var(--surface-2);
   border: 1px solid var(--line);
   border-radius: 3px;
-  padding: 7px 12px;
+  padding: 8px 14px;
   cursor: pointer;
+  box-shadow: inset 0 1px 0 var(--lift);
+  transition: border-color .15s linear, color .15s linear, box-shadow .15s linear;
 }
 
-.mg-bar button:hover { border-color: var(--accent); }
+.mg-bar button:hover {
+  border-color: var(--accent);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--lift), 0 0 16px -4px var(--haze-warm);
+}
 .mg-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.mg-bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.mg-bar button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: inset 0 0 12px -6px var(--haze-warm);
+}
 
 .mg-hint {
   font: 11px/1.4 var(--mono);
   color: var(--faint);
   max-width: 34ch;
+  text-align: center;
 }
 
 .mg-ctl {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   color: var(--dim);
   font: 10px/1 var(--mono);
-  letter-spacing: .14em;
+  letter-spacing: .16em;
   text-transform: uppercase;
 }
 
 .mg-ctl input[type="range"] {
-  width: 92px;
+  width: 88px;
   margin: 0;
   accent-color: var(--accent);
 }
@@ -173,15 +257,17 @@ h2 {
   text-align: right;
 }
 
+/* the level sits behind a hairline, the way a meter does on a real panel */
 .mg-level {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-left: auto;
+  padding-left: 22px;
+  border-left: 1px solid var(--rule);
 }
 
 #meter {
-  width: 180px;
+  width: 150px;
   height: 3px;
   background: var(--line);
   border-radius: 2px;
@@ -192,6 +278,7 @@ h2 {
   height: 100%;
   width: 0%;
   background: var(--meter-fill);
+  box-shadow: 0 0 10px -2px var(--haze-warm);
   transition: width .06s linear;
 }
 
@@ -340,15 +427,30 @@ footer a { color: var(--cold); text-decoration: none; border-bottom: 1px solid t
 footer a:hover { border-bottom-color: var(--cold); }
 footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+@media (max-width: 1000px) {
+  .mg-bar { gap: 10px 16px; }
+  .mg-ctl { gap: 7px; letter-spacing: .12em; }
+  .mg-ctl input[type="range"] { width: 68px; }
+  .mg-level { padding-left: 16px; gap: 8px; }
+  #meter { width: 104px; }
+}
+
 @media (max-width: 720px) {
   :root { --gutter: 16px; }
-  .mg-top { padding-top: 30px; }
-  h1 { font-size: 26px; }
+  .mg-top { padding-top: 38px; padding-bottom: 38px; }
+  .mg-top::after { margin-top: 28px; }
+  h1 { font-size: clamp(28px, 8.4vw, 34px); }
+  .mg-sub { font-size: 15px; max-width: 34ch; }
+  .mg-kicker::before,
+  .mg-kicker::after { width: 18px; }
   .mg-params-list { grid-template-columns: minmax(0, 1fr); }
-  .mg-level { margin-left: 0; }
-  #meter { width: 120px; }
+  .mg-bar { gap: 10px 14px; padding-block: 10px; }
+  .mg-level { padding-left: 0; border-left: 0; }
+  .mg-ctl input[type="range"] { width: 72px; }
+  #meter { width: 104px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   #meterbar { transition: none; }
+  .mg-bar button { transition: none; }
 }
