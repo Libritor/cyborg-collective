@@ -105,6 +105,30 @@ let outOfBar = 0;
 check(offGrid === 0 && outOfBar === 0,
   `every event lands on a 16th inside its bar (${offGrid} off-grid, ${outOfBar} outside)`);
 
+// chooseVoicing() can return a null voicing when nothing fits the register
+// window (generator.js:139, a case generator.js itself guards for the lead). The
+// pad must skip that chord rather than throw: inside the live loop a throw costs
+// the rest of the bar, not just the chord.
+const hollowBar = {
+  index: 0, tempo: 132, family: null, vamp: false,
+  chords: [{ step: 0, label: "X", quality: "min", voicing: null, devices: [], rejected: [] }],
+  bass: [{ step: 0, midi: 33, dur: 2, vel: 0.8 }],
+  drums: [{ step: 0, hit: "kick", vel: 1 }],
+  lead: [], drone: null, timbre: { bassCutoff: 500 },
+  ui: { C: 0.5, devices: [], chain: null, reason: "" },
+};
+let hollowError = null;
+let hollowEvents = [];
+try {
+  hollowEvents = arrangeBar(hollowBar, 0);
+} catch (err) {
+  hollowError = err;
+}
+check(hollowError === null, `a chord with no voicing does not throw (${hollowError ? hollowError.message : "none"})`);
+check(hollowEvents.every((e) => e.kind !== "pad"), "a chord with no voicing emits no pad event");
+check(hollowEvents.some((e) => e.kind === "drum") && hollowEvents.some((e) => e.kind === "bass"),
+  "the rest of that bar still plays");
+
 check(Math.abs(duration - 80 * s132 * 16) < 1e-9, `the run is ${duration.toFixed(3)}s of bars`);
 
 const report = failures.length

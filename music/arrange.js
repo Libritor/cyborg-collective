@@ -39,6 +39,12 @@ export function arrangeBar(bar, barTime, { muted = [] } = {}) {
 
   // Harmony first: one pad segment per chord entry, ending where the next starts.
   bar.chords.forEach((chord, index) => {
+    // chooseVoicing() returns a null voicing when nothing fits the register window
+    // (generator.js:139), and generator.js already guards that exact case for the
+    // lead. Playing it would throw inside the loop and take the rest of the bar's
+    // notes with it, so the chord is skipped: a bar with no pad beats a bar that
+    // dies mid-note.
+    if (!chord.voicing || !chord.voicing.length) return;
     const nextStep = index + 1 < bar.chords.length ? bar.chords[index + 1].step : 16;
     const dur = (nextStep - chord.step) * s - SEGMENT_GAP_S;
     if (dur < MIN_SEGMENT_S) return;

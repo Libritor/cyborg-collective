@@ -218,9 +218,14 @@ function clicheLine(chord) {
 
 function ensureStyle(doc) {
   if (!doc || !doc.head) return;
-  if (doc.head.querySelector("style[data-mg-ui]")) return;
+  // The style holder gets its OWN attribute: tagging it `data-mg-ui` put the
+  // marker on two elements, and since <head> precedes <body>, a probe using
+  // querySelector('[data-mg-ui]') silently measured the stylesheet -- reporting a
+  // 0x0, display:none "chain view" whose textContent was the CSS. One marker, one
+  // meaning.
+  if (doc.head.querySelector("style[data-mg-ui-style]")) return;
   const style = doc.createElement("style");
-  style.setAttribute("data-mg-ui", "");
+  style.setAttribute("data-mg-ui-style", "");
   style.textContent = CSS;
   doc.head.appendChild(style);
 }

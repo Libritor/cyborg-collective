@@ -342,6 +342,87 @@ check(blip2.status().admitted === outageCast, "the cast survives the outage inta
 check(JSON.stringify(blip2.roles(now())) === outageRoles, "the roles do not reshuffle during the outage");
 blip2.close();
 
+// ------------------------------------- a reconnect reads the new roster
+// Both directions, because only one of them can regress quietly: the same roster
+// coming back must change nothing, and a smaller one must still prune a head.
+console.log("a reconnect reads the roster");
+clock.t = 1200;
+const reconnectSocket = fakeSocket();
+const reconnectCalls = { sharers: [], leave: [], stale: [] };
+const reconnect = createRelay({
+  url: "ws://127.0.0.1:1/live",
+  allow: ["alpha-head", "beta-head"],
+  clock: now,
+  reconnectMs: 2,
+  Socket: reconnectSocket,
+  onSharers: (list) => reconnectCalls.sharers.push(list.map((v) => v.pseudonym)),
+  onLeave: (pseudonym, reason) => reconnectCalls.leave.push([pseudonym, reason]),
+  onStale: (pseudonym) => reconnectCalls.stale.push(pseudonym),
+});
+reconnectSocket.made[0].onopen();
+reconnect.ingest({ t: "snapshot", people: [{ pseudonym: "alpha-head", last: {} }, { pseudonym: "beta-head", last: {} }] });
+feed(reconnect, "alpha-head", ALPHA_HEAD, 4);
+feed(reconnect, "beta-head", BETA_HEAD, 4);
+const reRoles = JSON.stringify(reconnect.roles(now()));
+const reCastCalls = reconnectCalls.sharers.length;
+
+reconnectSocket.made[0].onclose();
+await sleep(10);
+if (reconnectSocket.made[1]) reconnectSocket.made[1].onopen();
+reconnect.ingest({ t: "snapshot", people: [{ pseudonym: "alpha-head", last: {} }, { pseudonym: "beta-head", last: {} }] });
+check(JSON.stringify(reconnect.roles(now())) === reRoles,
+  "a same-roster reconnect keeps the roles byte-identical");
+check(reconnectCalls.sharers.length === reCastCalls, "a same-roster reconnect announces no cast change");
+check(reconnectCalls.leave.length === 0 && reconnectCalls.stale.length === 0,
+  "a same-roster reconnect neither drops nor stales a head");
+
+reconnect.ingest({ t: "snapshot", people: [{ pseudonym: "alpha-head", last: {} }] });
+check(reconnectCalls.leave.length === 1 && reconnectCalls.leave[0][0] === "beta-head",
+  "a smaller roster still prunes the missing head as a leave");
+check(reconnect.sharers(now()).every((v) => v.pseudonym === "alpha-head"),
+  "only the head still in the roster is heard");
+reconnect.close();
+
+// ------------------------- consent is structural, not a matter of weight
+// A head that was never opened to the music must not be able to move the band.
+// Assert it where it is exact: its frames must never reach the conditioner at
+// all, and the admitted head must condition identically beside it. A bar-stream
+// comparison would be the wrong instrument -- view() appends an alpha sample per
+// call, so two instances probed a different number of times drift apart in their
+// EMA and disagree for reasons that have nothing to do with consent.
+console.log("a refused head cannot move the music");
+
+/**
+ * Build a relay, feed it, and read the admitted head's concentration as the
+ * FIRST probe. Order is the whole point: view() appends an alpha sample every
+ * time it runs, so any extra probe on one instance before the comparison moves
+ * that instance's EMA and manufactures the difference the test is looking for.
+ */
+function conditionedC(extraHeads = []) {
+  const { relay: r } = openRelay({ allow: ["heard"] });
+  const people = [{ pseudonym: "heard", last: {} }, ...extraHeads.map((p) => ({ pseudonym: p, last: {} }))];
+  r.ingest({ t: "snapshot", people });
+  feed(r, "heard", ALPHA_HEAD, 6);
+  if (extraHeads.length) feed(r, extraHeads[0], BETA_HEAD, 6);
+  return { relay: r, C: r.sharers(now())[0].C };
+}
+
+const aloneCase = conditionedC();
+const mutedCase = conditionedC(["muted"]);
+check(aloneCase.C === mutedCase.C,
+  `a refused head leaves the admitted head's concentration bit-identical (${aloneCase.C} vs ${mutedCase.C})`);
+
+const mutedRow = mutedCase.relay.all(now()).find((r) => r.pseudonym === "muted");
+check(mutedRow && mutedRow.frames === 0 && mutedRow.age === null,
+  `a refused head's thirty frames never reach the conditioner (frames ${mutedRow ? mutedRow.frames : "missing"})`);
+check(mutedRow && mutedRow.label === NOT_OPENED, `the refused head is labelled "${NOT_OPENED}"`);
+check(mutedCase.relay.status().refused === 1, "the extra head is recorded and counted as refused");
+check(mutedCase.relay.sharers(now()).every((v) => v.pseudonym === "heard"),
+  "only the admitted head is in the band");
+
+aloneCase.relay.close();
+mutedCase.relay.close();
+
 // --------------------------------------------------------------------- consent
 console.log("consent");
 process.env.MAR_GOTH_ALLOW = "env-head, opt-head";
