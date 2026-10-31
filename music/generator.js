@@ -187,6 +187,45 @@ export function crueltyFactor(cruelty) {
   return Math.min(4, Math.max(0, k));
 }
 
+/**
+ * The thresholds the grammar actually applies, named once. Every number below is
+ * read by the rule it belongs to *and* by the page that explains that rule, so a
+ * caption cannot describe a rule with a threshold the generator does not use.
+ */
+export const GRAMMAR = Object.freeze({
+  hats16Above: 0.6,      // hats go from 8ths to 16ths above this C
+  openHatBase: 0.3,      // open hat: p = base + alpha share
+  ghostKickAbove: 0.6,   // ghost kick: p = max(0, arousal - this)
+  fillTomsAbove: 0.05,   // the bar-4 fill is toms above this motion, snares below
+  lockBars: 4,           // bars above hats16Above before the band is "locked"
+  releaseDrop: 0.2,      // a drop this far under the peak arms the open chord
+  leadHighAbove: 0,      // asymmetry at or above this takes the top lead window
+  susP: 0.25,            // the sus4 tension, per bar, one bar in four
+});
+
+/**
+ * The two rolls cruelty scales, with the caps that keep them from becoming
+ * certainties. `advanceChord` reads these and the page prints them.
+ */
+export const CRUELTY_ROLLS = Object.freeze({
+  mixture: Object.freeze({ base: 0.25, cap: 0.6 }),   // the subdominant swap
+  bII: Object.freeze({ base: 0.12, cap: 0.5 }),       // the phrygian Neapolitan
+});
+
+/**
+ * How C becomes sound rather than grammar: each field is a floor plus a ramp that
+ * starts at `from` and opens over `span`, with a few fields also carrying a
+ * straight `linear` term in C. Named here so the page can print the arithmetic
+ * instead of a paraphrase of it.
+ */
+export const TIMBRE_RAMPS = Object.freeze({
+  bassCutoff: Object.freeze({ from: 0.55, span: 0.45, floor: 400, rise: 500, linear: 100 }),
+  padCutoff: Object.freeze({ from: 0.3, span: 0.7, floor: 1200, rise: 1800, linear: 0 }),
+  padSend: Object.freeze({ from: 0.6, span: 0.4, floor: 0.25, rise: 0.5, linear: 0.25 }),
+  leadDelayFb: Object.freeze({ from: 0.75, span: 0.25, floor: 0.32, rise: 0.05, linear: 0 }),
+  saturation: Object.freeze({ from: 0.65, span: 0.35, floor: 0, rise: 2, linear: 0 }),
+});
+
 function pickFamily(gen, C) {
   if (gen.pinFamily) return familyById(gen.pinFamily);
   const weighted = FAMILIES.map((family) => {
@@ -271,12 +310,13 @@ function advanceChord(gen, C, devices) {
   // mixture: the major/minor subdominant swap, the oldest trick in the book
   let playStep = step;
   if (devices.includes("mixture") && (step.label === "IV" || step.label === "iv")
-      && gen.rng() < Math.min(0.6, 0.25 * k)) {
+      && gen.rng() < Math.min(CRUELTY_ROLLS.mixture.cap, CRUELTY_ROLLS.mixture.base * k)) {
     playStep = { ...step, q: step.q === "maj" ? "min" : "maj" };
     used.push("mixture");
   }
   // bII: the phrygian Neapolitan, only once the pressure is high
-  if (devices.includes("bII") && gen.family.mode === "minor" && gen.rng() < Math.min(0.5, 0.12 * k)) {
+  if (devices.includes("bII") && gen.family.mode === "minor"
+      && gen.rng() < Math.min(CRUELTY_ROLLS.bII.cap, CRUELTY_ROLLS.bII.base * k)) {
     playStep = { ...playStep, deg: 1, q: "maj", label: "bII" };
     used.push("bII");
   }
@@ -324,20 +364,20 @@ function drumBar(gen, C, controls, barIndex) {
   const hits = [];
   for (let beat = 0; beat < 4; beat += 1) hits.push({ step: beat * 4, hit: "kick", vel: 1 });
   hits.push({ step: 4, hit: "snare", vel: 0.9 }, { step: 12, hit: "snare", vel: 0.9 });
-  const sixteenths = C > 0.6;
+  const sixteenths = C > GRAMMAR.hats16Above;
   for (let s = 0; s < STEPS_PER_BAR; s += sixteenths ? 1 : 2) {
     if (s === 4 || s === 12) continue;
     hits.push({ step: s, hit: "hatC", vel: sixteenths ? 0.32 : 0.38 });
   }
-  if (gen.rng() < 0.3 + clamp01(controls.alphaShare || 0)) {
+  if (gen.rng() < GRAMMAR.openHatBase + clamp01(controls.alphaShare || 0)) {
     hits.push({ step: 14, hit: "hatO", vel: 0.5 });
   }
-  if (gen.rng() < Math.max(0, (controls.arousal || 0) - 0.6)) {
+  if (gen.rng() < Math.max(0, (controls.arousal || 0) - GRAMMAR.ghostKickAbove)) {
     hits.push({ step: 15, hit: "kick", vel: 0.6 });
   }
-  if (gen.locked >= 4) hits.push({ step: 11, hit: "snare", vel: 0.35 });  // the band locks
+  if (gen.locked >= GRAMMAR.lockBars) hits.push({ step: 11, hit: "snare", vel: 0.35 });  // the band locks
   if (barIndex % 4 === 3) {
-    const toms = (controls.motion || 0) > 0.05;
+    const toms = (controls.motion || 0) > GRAMMAR.fillTomsAbove;
     for (let i = 0; i < 4; i += 1) {
       hits.push({ step: 12 + i, hit: toms ? (i % 2 ? "tomH" : "tomL") : "snare", vel: 0.5 + i * 0.12 });
     }
@@ -391,7 +431,7 @@ function autoLeadBar(gen, chord, controls) {
   const voicing = chord && chord.voicing;
   if (!voicing || !voicing.length) return [];
   const pcs = [...new Set(voicing.map((m) => ((m % 12) + 12) % 12))];
-  const high = (controls.asymmetry || 0) >= 0;
+  const high = (controls.asymmetry || 0) >= GRAMMAR.leadHighAbove;
   const [lo, hi] = high ? LEAD_HIGH : REGISTER.lead;
   const notes = [];
   for (const [index, step] of [0, 4, 8, 12].entries()) {
@@ -411,21 +451,24 @@ function autoLeadBar(gen, chord, controls) {
 
 // --------------------------------------------------------------------- timbre
 export function timbreAt(C) {
+  const ramp = (r) => clamp01((C - r.from) / r.span);
+  const field = (r) => r.floor + r.rise * ramp(r) + r.linear * C;
   return {
-    bassCutoff: 400 + 500 * clamp01((C - 0.55) / 0.45) + 100 * C,
-    padCutoff: 1200 + 1800 * clamp01((C - 0.3) / 0.7),
-    padSend: 0.25 + 0.5 * clamp01((C - 0.6) / 0.4) + 0.25 * C,
-    leadDelayFb: 0.32 + 0.05 * clamp01((C - 0.75) / 0.25),
-    saturation: 2 * clamp01((C - 0.65) / 0.35),
+    bassCutoff: field(TIMBRE_RAMPS.bassCutoff),
+    padCutoff: field(TIMBRE_RAMPS.padCutoff),
+    padSend: field(TIMBRE_RAMPS.padSend),
+    leadDelayFb: field(TIMBRE_RAMPS.leadDelayFb),
+    saturation: field(TIMBRE_RAMPS.saturation),
   };
 }
 
 // --------------------------------------------------------------------- release
 function updateRelease(gen, C) {
-  if (C > 0.6) gen.locked += 1;
+  if (C > GRAMMAR.hats16Above) gen.locked += 1;
   else gen.locked = 0;
-  if (gen.locked >= 4) gen.peak = Math.max(gen.peak ?? 0, C);
-  if (gen.peak !== null && gen.peak > 0.6 && C <= gen.peak - 0.2) {
+  if (gen.locked >= GRAMMAR.lockBars) gen.peak = Math.max(gen.peak ?? 0, C);
+  if (gen.peak !== null && gen.peak > GRAMMAR.hats16Above
+      && C <= gen.peak - GRAMMAR.releaseDrop) {
     gen.armed = true;    // letting go is what opens the sky
     gen.peak = null;
   }
@@ -490,7 +533,7 @@ export function nextBar(gen, controls = {}) {
       rejected: chord.rejected,
     });
     // a sus tension, resolved two beats later: never on the last 8th of the bar
-    if (devices.includes("sus") && !chord.cliche && gen.rng() < 0.25) {
+    if (devices.includes("sus") && !chord.cliche && gen.rng() < GRAMMAR.susP) {
       const sus = buildChord(gen, { deg: chord.root - gen.tonicMidi, q: "sus4", label: chord.degree }, "minor", false);
       bar.chords.push({
         step: 8, label: sus.label, degree: chord.degree, root: chord.root,

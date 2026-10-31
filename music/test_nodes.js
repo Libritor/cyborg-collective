@@ -4,10 +4,13 @@
 import {
   GRAPH, signalGraph, harmonyGraph, stepEntries, describeRejection, gateText,
 } from "./nodes.js";
-import { DEVICE_GATES, devicesAt, FAMILIES } from "./generator.js";
+import {
+  DEVICE_GATES, GRAMMAR, CRUELTY_REFERENCE, CRUELTY_ROLLS, LEAD_HIGH, REGISTER,
+  VOTE_WEIGHT, FAMILIES, devicesAt, aggregate, createGenerator, nextBar, timbreAt,
+} from "./generator.js";
 import { WEIGHT_DEFAULTS } from "./conditioner.js";
 import {
-  PARAMETERS, DEVICE_DOCS, DEVICE_LABELS, ladderRows, parameterFor,
+  PARAMETERS, DEVICE_DOCS, DEVICE_LABELS, ladderRows, parameterFor, noteName,
 } from "./explain.js";
 
 let assertions = 0;
@@ -369,9 +372,76 @@ check(PARAMETERS.every((entry) => entry.label && entry.does && entry.source && e
 const rowIds = ladderRows({}, {}).map((row) => row.signal);
 check(rowIds.every((id) => parameterFor(id) != null),
   `every ladder row has an explanation (${rowIds.filter((id) => !parameterFor(id)).join(",") || "all"})`);
-check(parameterFor("cruelty").does.includes("0.15"),
-  "cruelty's explanation names the reference its default is measured against");
 check(parameterFor("nope") === null, "an unknown id is null, not a guessed entry");
+
+// The explanations carry the arithmetic, and the arithmetic is the code's: these
+// assertions fail if a threshold moves in the generator and its sentence does not.
+const doc = (id) => [parameterFor(id).does, ...(parameterFor(id).how || [])].join(" ");
+check(PARAMETERS.every((entry) => Array.isArray(entry.how) && entry.how.length >= 3),
+  "every entry explains its mechanism, not just its name");
+check(PARAMETERS.every((entry) => entry.how.every((line) => typeof line === "string"
+  && line.length > 8 && line.trim().endsWith("."))),
+"and every line is a finished sentence rather than a stub");
+const docText = PARAMETERS.map((entry) => doc(entry.id)).join(" ");
+check(!/NaN|undefined|\[object/.test(docText), "no interpolated number failed to render");
+
+const gateTiers = [...new Set(Object.values(DEVICE_GATES).filter((gate) => gate > 0))].sort((a, b) => a - b);
+check(gateTiers.every((gate) => doc("C").includes(`from C ${gate.toFixed(2)}`)),
+  `the ladder sentence names every gate the generator enforces (${gateTiers.join(", ")})`);
+check(doc("C").includes("sus is open at any C"),
+  "and says plainly that the always-on device is always on");
+check(["0.30", "0.60", "0.90"].every((C) => doc("C").includes(`${Math.round(timbreAt(Number(C)).bassCutoff)} Hz`)),
+  "the timbre numbers in C's explanation are what timbreAt actually returns");
+check(doc("C").includes(GRAMMAR.hats16Above.toFixed(2)) && doc("alphaShare").includes(GRAMMAR.openHatBase.toFixed(2)),
+  "the hat thresholds are the grammar's, not a transcription");
+check(doc("arousal").includes(GRAMMAR.ghostKickAbove.toFixed(2))
+  && doc("motion").includes(GRAMMAR.fillTomsAbove.toFixed(2)),
+"the ghost kick and fill thresholds likewise");
+check(doc("asymmetry").includes(noteName(LEAD_HIGH[0])) && doc("asymmetry").includes(noteName(REGISTER.lead[0])),
+  `the lead windows named are LEAD_HIGH and REGISTER.lead (${noteName(LEAD_HIGH[0])}..${noteName(LEAD_HIGH[1])} / ${noteName(REGISTER.lead[0])}..${noteName(REGISTER.lead[1])})`);
+check(doc("cruelty").includes(CRUELTY_REFERENCE.toFixed(2)),
+  "cruelty's explanation names the reference its default is measured against");
+check(doc("cruelty").includes(CRUELTY_ROLLS.mixture.cap.toFixed(2))
+  && doc("cruelty").includes(CRUELTY_ROLLS.bII.cap.toFixed(2)),
+"and the caps that stop the rolls becoming certainties");
+check(doc("hsi").includes(String(VOTE_WEIGHT.silent)) && doc("hsi").includes(String(VOTE_WEIGHT.contact)),
+  "contact's explanation uses the vote weights the aggregator applies");
+check(doc("weights").includes(WEIGHT_DEFAULTS.engagement.toFixed(2)),
+  "the weights' explanation prints the defaults it documents");
+
+// bpm's claim is that the Muse does not touch it: assert the aggregator has no
+// tempo to give, so the sentence cannot become a lie.
+const soloView = {
+  pseudonym: "p", name: "n", label: "", C: 0.6, alphaShare: 0.4, betaShare: 0.5, asymmetry: 0.1,
+  arousal: 0.7, motion: 0.2, inContact: true, age: 0, gone: false, steadiness: 0.6, hsi: {}, rel: {},
+  bpm: 148, rmssd: 40,
+};
+check(aggregate([soloView], 1).bpm === undefined,
+  "the Muse cannot set the tempo: aggregate() returns no bpm at all");
+check(parameterFor("bpm").how[0].startsWith("Not modulated by the Muse"),
+  "and bpm's first line says so, instead of implying otherwise");
+
+// Raising cruelty only ever adds devices. Measured, because the claim is in the
+// panel: the same rolls are compared against a higher threshold.
+let removed = 0;
+let fired = 0;
+for (let seed = 1; seed <= 12; seed += 1) {
+  const low = createGenerator({ seed, tonicMidi: 57, cruelty: 0.3 });
+  const high = createGenerator({ seed, tonicMidi: 57, cruelty: 0.6 });
+  for (let i = 0; i < 20; i += 1) {
+    const controls = { C: 0.6, alphaShare: 0.3, arousal: 0.5, motion: 0.2 };
+    const a = nextBar(low, controls);
+    const b = nextBar(high, controls);
+    const jarring = (bar) => ((bar.chords[0] && bar.chords[0].devices) || [])
+      .filter((name) => name === "mixture" || name === "bII");
+    for (const name of jarring(a)) {
+      fired += 1;
+      if (!jarring(b).includes(name)) removed += 1;
+    }
+  }
+}
+check(fired > 10 && removed === 0,
+  `cruelty only ever adds: ${fired} low-cruelty firings, ${removed} taken away by raising it`);
 
 console.log("device table");
 check(DEVICE_DOCS.length === 6, `six devices are documented (${DEVICE_DOCS.length})`);

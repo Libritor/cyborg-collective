@@ -582,11 +582,16 @@ export function mountParameters({ root } = {}) {
       " ",
       el("span", "mg-chip", `${entry.kind} · ${entry.range}`),
     );
-    details.append(
-      summary,
-      el("div", "mg-param-body", entry.does),
-      el("p", "mg-src", `from ${entry.source}`),
-    );
+    details.append(summary, el("div", "mg-param-body", entry.does));
+    // the arithmetic, line by line: generated in explain.js from the constants the
+    // generator acts on, so a formula here cannot describe a rule that changed
+    const how = Array.isArray(entry.how) ? entry.how : [];
+    if (how.length) {
+      const list = el("ul", "mg-how");
+      for (const line of how) list.appendChild(el("li", null, line));
+      details.appendChild(list);
+    }
+    details.appendChild(el("p", "mg-src", `from ${entry.source}`));
     list.appendChild(details);
   }
 

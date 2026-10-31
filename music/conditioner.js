@@ -28,6 +28,18 @@ const CONTACT = new Set([1, 2]);   // hsi 1 good, 2 ok; 3 poor, 4 none
 // weight *means*: 0.4/0.3/0.3 and 1/1/1 both sum to one.
 export const WEIGHT_DEFAULTS = Object.freeze({ engagement: 0.4, activation: 0.3, steadiness: 0.3 });
 
+/**
+ * The arithmetic of the three terms, named so the page can print the real formula
+ * rather than a paraphrase of it. Every number here is used by the term it
+ * describes.
+ */
+export const TERM_SCALE = Object.freeze({
+  betaFloor: 0.15,        // engagement = (beta share - floor) / betaSpan
+  betaSpan: 0.35,
+  alphaSpan: 0.12,        // steadiness = 1 - sd(alpha share) / alphaSpan
+  steadinessWindowS: 8,   // ...over this many seconds of alpha share
+});
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 /** Three non-negative finite weights summing to 1; bad terms fall back one by one. */
@@ -210,14 +222,14 @@ export function view(sharer, now) {
   if (typeof alphaShare === "number") {
     const history = sharer.alphaHistory;
     history.push([now, alphaShare]);
-    while (history.length && now - history[0][0] > 8) history.shift();
+    while (history.length && now - history[0][0] > TERM_SCALE.steadinessWindowS) history.shift();
   }
   let steadiness = 0.5;
   if (sharer.alphaHistory.length >= 3) {
     const values = sharer.alphaHistory.map(([, v]) => v);
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
-    steadiness = 1 - clamp(Math.sqrt(variance) / 0.12, 0, 1);
+    steadiness = 1 - clamp(Math.sqrt(variance) / TERM_SCALE.alphaSpan, 0, 1);
   }
 
   const out = {
@@ -271,7 +283,9 @@ export function concentrationParts(v) {
   const view = v || {};
   const betaShare = view.betaShare === null || view.betaShare === undefined ? null : view.betaShare;
   return {
-    engagement: betaShare === null ? 0.3 : clamp((betaShare - 0.15) / 0.35, 0, 1),
+    engagement: betaShare === null
+      ? 0.3
+      : clamp((betaShare - TERM_SCALE.betaFloor) / TERM_SCALE.betaSpan, 0, 1),
     activation: view.arousal === null || view.arousal === undefined ? 0.3 : clamp(view.arousal, 0, 1),
     steadiness: typeof view.steadiness === "number" ? view.steadiness : 0.5,
     age: typeof view.age === "number" ? view.age : Infinity,

@@ -456,6 +456,37 @@ main > section + section { margin-top: 26px; }
   font-size: 14px;
 }
 
+/* The arithmetic: a hairline on the left, each line its own claim, numerals in
+   the mono face so the formulas line up and can be read at a glance. */
+.mg-how {
+  margin: 10px 0 0;
+  padding: 0 0 0 14px;
+  max-width: 62ch;
+  list-style: none;
+  border-left: 1px solid var(--rule);
+  display: grid;
+  gap: 6px;
+}
+
+.mg-how > li {
+  font: 13px/1.5 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted, var(--dim));
+  text-wrap: pretty;
+}
+
+.mg-how > li::before {
+  content: "";
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  margin-right: 8px;
+  vertical-align: middle;
+  background: var(--accent);
+  opacity: .55;
+  transform: rotate(45deg);
+}
+
 .mg-src {
   margin: 6px 0 0;
   font: 11px/1.5 var(--mono);
