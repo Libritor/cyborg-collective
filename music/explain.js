@@ -29,6 +29,142 @@ export const LADDER_RULES = Object.freeze({
   asymmetry: "lead register: at or above 0 the lead plays high",
 });
 
+/**
+ * Every parameter the page prints, once, with the sentence that explains it.
+ *
+ * The panel above and the "what the numbers mean" section below the stage are
+ * both generated from this list, so an explanation cannot describe a rule the
+ * instrument no longer has: the words live next to the data, and `nodes.js`
+ * reads the same table for the graph notes. `kind` groups a row for the chip
+ * (`signal`, `transport`, `weight`, `raw`); `range` is what the control or the
+ * field can actually hold; `source` says where the number comes from.
+ */
+export const PARAMETERS = Object.freeze([
+  {
+    id: "C",
+    label: "C",
+    kind: "signal",
+    range: "0 – 1",
+    source: "the weighted sum of the three terms",
+    does: "Sets the whole ladder: how many of the six devices are open, 8th or 16th hats, and every timbre below.",
+  },
+  {
+    id: "alphaShare",
+    label: "α",
+    kind: "signal",
+    range: "0 – 1",
+    source: "the headband view (conditioner.js's view)",
+    does: "Relative alpha as a share of α+θ+β. After 0.30 it opens a hat on the and of 4.",
+  },
+  {
+    id: "arousal",
+    label: "arousal",
+    kind: "signal",
+    range: "0 – 1",
+    source: "the headband view (conditioner.js's view)",
+    does: "The headband's gated activation. Above 0.60 it adds a ghost kick before the downbeat.",
+  },
+  {
+    id: "motion",
+    label: "motion",
+    kind: "signal",
+    range: "0 – 1",
+    source: "the headband view (conditioner.js's view)",
+    does: "Head movement from the IMU. Above 0.05 the bar-4 fill is toms; below it, snares.",
+  },
+  {
+    id: "asymmetry",
+    label: "asymmetry",
+    kind: "signal",
+    range: "−1 – 1",
+    source: "the headband view (conditioner.js's view)",
+    does: "AF8 minus AF7 relative alpha. At or above 0 the lead plays high; below it, down an octave.",
+  },
+  {
+    id: "bpm",
+    label: "bpm",
+    kind: "transport",
+    range: "90 – 160",
+    source: "the transport",
+    does: "Tempo. The scheduler keeps one grid per bar and changes it only at a downbeat.",
+  },
+  {
+    id: "cruelty",
+    label: "cruelty",
+    kind: "transport",
+    range: "0 – 0.6",
+    source: "the transport",
+    does: "How far the band reaches for the jarring device: mode mixture and bII fire at 0.25×k and 0.12×k, where k = cruelty / 0.15. At 0.15 it is the published band.",
+  },
+  {
+    id: "weights",
+    label: "weights",
+    kind: "weight",
+    range: "0 – 1 each",
+    source: "the three sliders",
+    does: "What engagement, activation and steadiness count for. Normalised, so only the ratio matters.",
+  },
+  {
+    id: "bands",
+    label: "bands",
+    kind: "raw",
+    range: "—",
+    source: "the relay frame",
+    does: "δ θ γ are mean relative power per electrode; α and β are shares of α+θ+β.",
+  },
+  {
+    id: "hsi",
+    label: "hsi",
+    kind: "raw",
+    range: "1 – 4",
+    source: "the relay frame",
+    does: "Electrode contact: 1 good, 2 ok, 3 poor, 4 none. Under 3 of 4 in contact the sharer has no vote.",
+  },
+]);
+
+/** The parameter entry for an id, or null: one lookup, so no page re-invents it. */
+export function parameterFor(id) {
+  return PARAMETERS.find((entry) => entry.id === id) || null;
+}
+
+/**
+ * The six devices, in rack order, with the gate that opens them and the rule
+ * they play. `gate` is read from the generator's table rather than restated, so
+ * a threshold moved in the grammar moves the page with it.
+ */
+export const DEVICE_DOCS = Object.freeze([
+  {
+    id: "sus",
+    gate: DEVICE_GATES.sus,
+    does: "A sus4 chord on step 8 that resolves back on step 12, one bar in four, never on the last 8th.",
+  },
+  {
+    id: "cliche",
+    gate: DEVICE_GATES.cliche,
+    does: "The 7th descends a semitone inside the held root, and the pad yields an octave.",
+  },
+  {
+    id: "drone",
+    gate: DEVICE_GATES.drone,
+    does: "A tonic pedal in the tenor register, held clear of the bass.",
+  },
+  {
+    id: "mixture",
+    gate: DEVICE_GATES.mixture,
+    does: "The subdominant swaps major for minor.",
+  },
+  {
+    id: "climb",
+    gate: DEVICE_GATES.climb,
+    does: "The bar is a bII or bIII of the phrygian path: the climb.",
+  },
+  {
+    id: "bII",
+    gate: DEVICE_GATES.bII,
+    does: "The phrygian Neapolitan: the flattest second the mode has.",
+  },
+]);
+
 const DASH = "—";
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);

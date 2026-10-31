@@ -4,62 +4,40 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MarGoth — the band, live</title>
-<style>
-  :root { color-scheme: dark; --line: #2a2a2a; --dim: #777; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 2rem 1.5rem 4rem; max-width: 56rem;
-    font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
-    background: #0d0d0f; color: #ddd;
-  }
-  h1 { font-size: .95rem; letter-spacing: .14em; text-transform: uppercase; color: #999; margin: 0 0 .25rem; }
-  .sub { color: var(--dim); margin: 0 0 1.75rem; }
-  section { border-top: 1px solid var(--line); padding: 1.25rem 0; }
-  #transport { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; }
-  button {
-    font: inherit; color: #eee; background: #1b1b1f; border: 1px solid #333;
-    border-radius: 3px; padding: .5rem 1.1rem; cursor: pointer;
-  }
-  button:hover { border-color: #555; }
-  button[aria-pressed="true"] { background: #2b1414; border-color: #6b2b2b; color: #f2b8b8; }
-  button[hidden] { display: none; }
-  label { display: flex; gap: .5rem; align-items: center; color: var(--dim); }
-  input[type="range"] { width: 7rem; accent-color: #8a6cff; }
-  output { color: #ddd; min-width: 2.6rem; text-align: right; }
-  #meter { width: 8rem; height: .55rem; background: #1b1b1f; border: 1px solid #333; border-radius: 3px; }
-  #meterbar { height: 100%; width: 0%; background: #8a6cff; transition: width .05s linear; }
-  #label { color: #b9a9ff; margin: .75rem 0 0; }
-  #cast { display: grid; gap: .4rem; }
-  .wizard { display: flex; gap: .6rem; align-items: baseline; flex-wrap: wrap; }
-  .wizard .who { color: #ddd; }
-  .wizard .role { font-size: .8em; padding: .05rem .45rem; border: 1px solid #3a5a3a; border-radius: 999px; color: #d8f0d8; }
-  .wizard .refused { color: #e08c8c; font-size: .9em; }
-  .wizard[data-stale="true"] .who { color: #665; }
-  #status { color: var(--dim); min-height: 1.5rem; }
-  footer { color: #555; margin-top: 2rem; }
-  a { color: #8a6cff; }
-</style>
+<link rel="stylesheet" href="./margoth.css?v=1">
 </head>
 <body>
-<h1>The Chains of Margoth and the Wizards of SixthSense</h1>
-<p class="sub" id="sub">the band as the generator decides it. nothing here is a recording.</p>
+<header class="mg-top">
+  <p class="mg-kicker">Cyborg Collective · instrument</p>
+  <h1>The Chains of Margoth</h1>
+  <p class="mg-sub">and the wizards of SixthSense — the band as the generator decides it.
+     nothing here is a recording.</p>
+</header>
 
-<section id="transport">
+<section class="mg-bar" id="transport">
   <button id="play" aria-pressed="false">▶ listen</button>
   <button id="export" hidden>export wav</button>
-  <label>C <input id="c" type="range" min="0" max="1" step="0.01" value="0.45"><output id="c-out">0.45</output></label>
-  <label>bpm <input id="bpm" type="range" min="90" max="160" step="1" value="132"><output id="bpm-out">132</output></label>
-  <label>cruelty <input id="cruelty" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="cruelty-out">0.15</output></label>
-  <div id="meter"><div id="meterbar"></div></div>
+  <label class="mg-ctl"><span>C</span><input id="c" type="range" min="0" max="1" step="0.01" value="0.45"><output id="c-out">0.45</output></label>
+  <label class="mg-ctl"><span>bpm</span><input id="bpm" type="range" min="90" max="160" step="1" value="132"><output id="bpm-out">132</output></label>
+  <label class="mg-ctl"><span>cruelty</span><input id="cruelty" type="range" min="0" max="0.6" step="0.01" value="0.15"><output id="cruelty-out">0.15</output></label>
+  <div class="mg-level"><div id="meter"><div id="meterbar"></div></div><span id="meter-text">—</span></div>
 </section>
 
-<section id="mount" aria-label="chain view"></section>
+<main>
+  <section id="mount" aria-label="the instrument"></section>
+  <section id="cast" aria-label="wizards" hidden></section>
+  <section class="mg-params" id="params" aria-labelledby="params-h">
+    <h2 id="params-h">what the numbers mean</h2>
+    <p class="mg-params-sub">Every parameter the panel prints, and the rule it feeds. The graphs
+       above draw the same table: a live edge is a rule that fired in the last bar.</p>
+  </section>
+  <p id="label" hidden></p>
+</main>
 
-<section id="cast" aria-label="wizards" hidden></section>
+<p id="status" role="status" aria-live="polite">prerendering the kit…</p>
 
-<p id="label" hidden></p>
-<p id="status">prerendering the kit…</p>
 <footer>
+  the band is generated per bar, never replayed ·
   gates: <a href="./test_audio.html?section=kit">kit</a> ·
   <a href="./test_audio.html?section=voices">voices</a> ·
   <a href="./ui-demo.html">ui demo</a>

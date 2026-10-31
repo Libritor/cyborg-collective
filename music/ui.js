@@ -8,16 +8,17 @@
 // The UI decides nothing. Everything shown is either a field of the bar payload
 // or a restatement of the family data it names; where a number is derived (a
 // rejected voicing's reason, the cliché's descending 7th) the derivation is the
-// generator's own rule, not a guess.
+// generator's own rule, not a guess. The two graphs are `nodes.js`'s: this file
+// paints what it is handed and computes no topology of its own.
 
 import { NOTE_NAMES, QUALITY, familyById } from "./families.js";
-import { VOICE_BUDGET, DEVICE_GATES } from "./generator.js";
 import { concentrationFromParts, CHANNELS } from "./conditioner.js";
-import { DEVICE_LABELS, TIMBRE_LABELS, noteName } from "./explain.js";
-
-// The rack's six devices. The display order and accents are explain.js's: the
-// signal ladder names the same devices, and two copies of the table drift.
-const DEVICES = DEVICE_LABELS;
+import {
+  DEVICE_LABELS, DEVICE_DOCS, PARAMETERS, TIMBRE_LABELS, noteName, parameterFor,
+} from "./explain.js";
+import {
+  signalGraph, harmonyGraph, stepEntries, describeRejection,
+} from "./nodes.js";
 
 const QUALITY_WORD = {
   min: "minor",
@@ -46,135 +47,155 @@ const RAW_BANDS = [
 ];
 const RAW_SLOTS = 8;             // heads drawn at once; more arrive next frame
 const WEIGHT_STEP = 0.05;        // the sliders' step, so a write can be skipped
-const FLOOR_DB = -48;          // the meter's left edge; a mix that lives below
-                               // this is not audible, so spending scale on it
-                               // would hide the part that is
+const EDGE_STUB = 26;            // how far left of a voice an input from the other graph reaches
 const SVG = "http://www.w3.org/2000/svg";
+const DASH = "—";
 
 const CSS = `
 .mgu {
-  --mgu-fg: #cfcfd6; --mgu-bright: #f0eef0; --mgu-dim: #6f6f7d;
-  --mgu-line: #2b2b34; --mgu-panel: #121216; --mgu-accent: #e0b366;
-  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
-  color: var(--mgu-fg); background: var(--mgu-panel);
-  border: 1px solid var(--mgu-line); border-radius: 6px;
-  padding: 10px 12px; display: grid; gap: 10px; text-align: left;
+  --mgu-fg: var(--ink, #cfcfd6);
+  --mgu-bright: var(--ink, #f0eef0);
+  --mgu-dim: var(--dim, #6f6f7d);
+  --mgu-faint: var(--faint, #5f5c6a);
+  --mgu-line: var(--line, #2b2b34);
+  --mgu-rule: var(--rule, #1d1d26);
+  --mgu-panel: var(--surface, #121216);
+  --mgu-panel-2: var(--surface-2, #17171d);
+  --mgu-accent: var(--accent, #e0b366);
+  --mgu-cold: var(--cold, #86a7b6);
+  --mgu-warm: var(--warm, #e07373);
+  --mgu-good: var(--good, #8fbfa6);
+  --mgu-serif: var(--serif, "Iowan Old Style", Palatino, ui-serif, serif);
+  font: 12px/1.5 var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-variant-numeric: tabular-nums;
+  color: var(--mgu-fg);
+  background: var(--mgu-panel);
+  border: 1px solid var(--mgu-line);
+  border-radius: 10px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 18px;
+  text-align: left;
+  box-shadow: inset 0 1px 0 var(--mgu-rule);
 }
-.mgu-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 /* The UA rule for [hidden] is a bare tag selector, so any class rule that sets
    a display beats it: a hidden .mgu-head-row (the empty head slots) and the
    in-place sound/voice cells kept laying out. One rule, above every one of them. */
 .mgu [hidden] { display: none; }
+
+/* ------------------------------------------------------------------- header */
+.mgu-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
 .mgu-clock { color: var(--mgu-dim); letter-spacing: .04em; }
-.mgu-status { color: var(--mgu-fg); min-width: 0; overflow-wrap: anywhere; }
-.mgu-status:empty { display: none; }
+.mgu-chain-title { font: 15px/1.25 var(--mgu-serif); color: var(--mgu-bright); }
+.mgu-chain-meta { color: var(--mgu-dim); margin-left: auto; }
 .mgu-grab {
-  font: inherit; color: var(--mgu-fg); background: #1a1a22;
+  font: inherit; color: var(--mgu-fg); background: var(--mgu-panel-2);
   border: 1px solid var(--mgu-line); border-radius: 4px;
-  padding: 2px 9px; cursor: pointer; margin-left: auto;
+  padding: 2px 9px; cursor: pointer;
 }
 .mgu-grab:hover { border-color: var(--mgu-accent); color: var(--mgu-bright); }
 .mgu-grab:focus-visible { outline: 2px solid var(--mgu-accent); outline-offset: 2px; }
-.mgu-body { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 12px; align-items: start; }
-.mgu-side { display: grid; gap: 12px; align-content: start; }
-.mgu-block { display: grid; gap: 6px; padding: 8px; border: 1px solid var(--mgu-line); border-radius: 4px; align-content: start; }
+
+/* ------------------------------------------------------------------- blocks */
+.mgu-block { display: grid; gap: 8px; align-content: start; min-width: 0; }
 .mgu-label {
-  font-size: 10px; letter-spacing: .09em; text-transform: uppercase; color: var(--mgu-dim);
+  font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--mgu-faint); padding-bottom: 6px;
+  border-bottom: 1px solid var(--mgu-rule);
 }
-.mgu-chain-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.mgu-chain-title { color: var(--mgu-bright); }
-.mgu-chain-meta { color: var(--mgu-dim); margin-left: auto; }
-.mgu-path { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; align-items: flex-start; }
-.mgu-step {
-  position: relative; padding: 6px 9px 11px; min-width: 58px; color: var(--mgu-dim);
-  border: 1px solid var(--mgu-line); border-radius: 4px; background: #17171d;
+.mgu-caption { color: var(--mgu-dim); overflow-wrap: anywhere; }
+.mgu-reason {
+  margin: 0; font: italic 14px/1.5 var(--mgu-serif);
+  color: var(--mgu-dim); overflow-wrap: anywhere;
 }
-.mgu-step[data-state="done"] { opacity: .45; }
-.mgu-step[data-state="ahead"] { opacity: .6; }
-.mgu-step[data-state="current"] { color: var(--mgu-bright); border-color: var(--mgu-accent); }
-.mgu-step[data-state="next"] { color: var(--mgu-fg); border-style: dashed; }
-.mgu.is-playing .mgu-step[data-state="current"] { animation: mgu-pulse 1.7s ease-in-out infinite; }
-.mgu-step.is-open .mgu-step-label { text-decoration: underline dotted; text-underline-offset: 3px; }
-.mgu-step-tag { font-size: 9px; letter-spacing: .06em; color: var(--mgu-dim); margin-left: 4px; }
-.mgu-step[data-state="current"] .mgu-step-tag { color: var(--mgu-accent); }
-.mgu-step-weight {
-  position: absolute; left: 9px; right: 9px; bottom: 4px; height: 2px; background: #23232c;
+
+/* ------------------------------------------------------------------- graphs */
+.mgu-graph { margin: 0; overflow-x: auto; }
+.mgu-graph-svg { display: block; width: 100%; min-width: 520px; height: auto; }
+.mgu-node-rect { fill: var(--mgu-panel-2); stroke: var(--mgu-line); stroke-width: 1; }
+.mgu-node-pip { fill: var(--mgu-line); }
+.mgu-node-label {
+  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px;
+  fill: var(--mgu-fg);
 }
-.mgu-step-weight > i { display: block; height: 100%; background: currentColor; opacity: .55; }
-.mgu-rejected { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; align-content: start; }
-.mgu-reject { color: var(--mgu-dim); }
-.mgu-reject-notes { color: #55555f; }
-.mgu-reject-why { color: #8a8a96; }
-.mgu-reason { margin: 0; color: var(--mgu-fg); overflow-wrap: anywhere; }
-.mgu-chord { font-size: 26px; line-height: 1.15; color: var(--mgu-bright); }
+.mgu-node-value {
+  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px;
+  fill: var(--mgu-bright); font-variant-numeric: tabular-nums;
+}
+.mgu-node[data-live="true"] .mgu-node-pip { fill: var(--mgu-accent); }
+.mgu-node[data-state="current"] .mgu-node-rect { stroke: var(--mgu-accent); stroke-width: 1.5; }
+/* The open chord is dashed whether or not the chain is standing on it, so a
+   family whose open chord is the current step keeps both readings. */
+.mgu-node[data-open="true"] .mgu-node-rect {
+  stroke: var(--mgu-accent); stroke-width: 1.5; stroke-dasharray: 5 3;
+  animation: mgu-dash 1.2s linear infinite;
+}
+.mgu-node[data-state="armed"] .mgu-node-rect {
+  stroke: var(--mgu-warm); stroke-width: 1.5; stroke-dasharray: none; animation: none;
+}
+.mgu-edge {
+  fill: none; stroke: var(--mgu-line); stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.mgu-edge[data-live="true"] { stroke: var(--mgu-cold); stroke-width: 1.5; }
+.mgu-edge[data-dashed="true"] { stroke-dasharray: 4 3; }
+.mgu-edge-label {
+  font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 10px;
+  fill: var(--mgu-cold);
+}
+
+/* --------------------------------------------------------- the chain sidecar */
+.mgu-harmony-grid {
+  display: grid; gap: 18px; align-items: start;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+.mgu-harmony-side { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.mgu-chord { font: 400 30px/1.1 var(--mgu-serif); color: var(--mgu-bright); }
 .mgu-meta { color: var(--mgu-dim); }
 .mgu-cliche { color: var(--mgu-accent); }
 .mgu-lookahead { color: var(--mgu-dim); }
-.mgu-rack { display: flex; flex-wrap: wrap; gap: 5px; }
-.mgu-lamp {
-  display: inline-flex; align-items: center; gap: 5px; padding: 3px 7px;
-  border: 1px solid var(--mgu-line); border-radius: 999px; color: var(--mgu-dim);
+.mgu-rejected { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; align-content: start; }
+.mgu-reject { color: var(--mgu-dim); }
+.mgu-reject-notes { color: var(--mgu-faint); }
+.mgu-reject-why { color: var(--mgu-dim); }
+
+/* -------------------------------------------------------------- ladder + conc */
+.mgu-row2 {
+  display: grid; gap: 18px; align-items: start;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
 }
-.mgu-lamp-dot { width: 7px; height: 7px; border-radius: 50%; background: #2a2a33; }
-.mgu-lamp.is-lit { color: var(--mgu-fg); border-color: #3c4b52; }
-.mgu-lamp.is-lit .mgu-lamp-dot { background: #7d8f86; }
-.mgu-lamp.is-firing { color: var(--mgu-bright); border-color: var(--mgu-accent); }
-.mgu-lamp.is-firing .mgu-lamp-dot { background: var(--mgu-accent); box-shadow: 0 0 7px rgba(224,179,102,.85); }
-.mgu-ring-wrap { position: relative; width: 88px; height: 88px; }
-.mgu-ring-svg { width: 88px; height: 88px; display: block; }
-.mgu-ring-track { fill: none; stroke: #262630; stroke-width: 5; }
-.mgu-ring-arc {
-  fill: none; stroke: var(--mgu-accent); stroke-width: 5; stroke-linecap: round;
-  transition: stroke-dasharray .22s linear, stroke .2s linear;
-}
-.mgu-ring-wrap { display: grid; place-items: center; }
-.mgu-ring-value {
-  position: absolute; inset: 0; display: grid; place-items: center;
-  font-size: 15px; color: var(--mgu-bright);
-}
-.mgu-ring[data-armed="true"] .mgu-ring-arc { stroke: #e07373; }
-.mgu-ring[data-open="true"] .mgu-ring-arc { stroke: #8fbfa6; }
-.mgu-ring-state { color: var(--mgu-dim); }
-.mgu-ring[data-armed="true"] .mgu-ring-state { color: #e07373; }
-.mgu-ring[data-open="true"] .mgu-ring-state { color: #8fbfa6; }
-.mgu-meter {
-  position: relative; height: 9px; background: #1a1a20;
-  border: 1px solid var(--mgu-line); border-radius: 3px; overflow: hidden;
-}
-.mgu-meter-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3f5d55, #8fbfa6); }
-.mgu-meter-peak { position: absolute; top: 0; bottom: 0; width: 2px; left: 0; background: var(--mgu-accent); }
-.mgu-level-text { color: var(--mgu-dim); }
-.mgu-caption { color: var(--mgu-dim); overflow-wrap: anywhere; }
 .mgu-rows { display: grid; gap: 4px; }
 .mgu-row {
   display: grid; gap: 8px; align-items: baseline;
-  grid-template-columns: 5.2rem 3.2rem minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: 5.2rem 3.4rem minmax(0, 1fr);
 }
 .mgu-row-signal { color: var(--mgu-bright); }
 .mgu-row-value { color: var(--mgu-bright); text-align: right; }
-.mgu-row-rule { color: var(--mgu-dim); }
 .mgu-row-state { color: var(--mgu-fg); }
 .mgu-row[data-fired="true"] .mgu-row-state { color: var(--mgu-accent); }
-.mgu-lower {
-  display: grid; gap: 12px; align-items: start;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 .mgu-conc-row {
   display: grid; gap: 2px 8px; align-items: center;
   grid-template-columns: 4.6rem minmax(0, 1fr) 3.8rem;
 }
 .mgu-conc-term { color: var(--mgu-dim); }
 .mgu-conc-bar {
-  grid-column: 1 / -1; height: 6px; background: #1a1a20; border: 1px solid var(--mgu-line);
-  border-radius: 3px; overflow: hidden;
+  grid-column: 1 / -1; height: 6px; background: var(--mgu-panel-2);
+  border: 1px solid var(--mgu-line); border-radius: 3px; overflow: hidden;
 }
-.mgu-conc-bar > i { display: block; height: 100%; width: 0%; background: #7d8f86; }
+.mgu-conc-bar > i { display: block; height: 100%; width: 0%; background: var(--mgu-good); }
 .mgu-conc-weight { color: var(--mgu-dim); text-align: right; }
 .mgu-conc-sum { color: var(--mgu-bright); }
 .mgu-conc input[type="range"] {
   width: 100%; min-width: 0; margin: 0; accent-color: var(--mgu-accent);
 }
 .mgu-conc input[type="range"]:disabled { opacity: .4; }
+
+/* ---------------------------------------------------------------- sound/voices */
+.mgu-row3 {
+  display: grid; gap: 24px; align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.mgu-row3 > .mgu-block + .mgu-block { border-left: 1px solid var(--mgu-rule); padding-left: 24px; }
 .mgu-sound-row {
   display: grid; gap: 6px; align-items: baseline;
   grid-template-columns: 6.5rem minmax(0, 1fr) 3.4rem;
@@ -190,9 +211,26 @@ const CSS = `
 .mgu-voice-driven { color: var(--mgu-dim); }
 .mgu-voice-detail { color: var(--mgu-fg); }
 .mgu-voice-role { color: var(--mgu-accent); text-align: right; }
-.mgu-lamp-gate { color: var(--mgu-dim); font-size: 10px; }
-.mgu-lamp.is-lit .mgu-lamp-gate { color: #7d8f86; }
-.mgu-lamp.is-firing .mgu-lamp-gate { color: var(--mgu-accent); }
+
+/* --------------------------------------------------------------------- ring */
+.mgu-ring-wrap { position: relative; width: 88px; height: 88px; display: grid; place-items: center; }
+.mgu-ring-svg { width: 88px; height: 88px; display: block; }
+.mgu-ring-track { fill: none; stroke: var(--mgu-line); stroke-width: 5; }
+.mgu-ring-arc {
+  fill: none; stroke: var(--mgu-accent); stroke-width: 5; stroke-linecap: round;
+  transition: stroke-dasharray .22s linear, stroke .2s linear;
+}
+.mgu-ring-value {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 15px; color: var(--mgu-bright);
+}
+.mgu-ring[data-armed="true"] .mgu-ring-arc { stroke: var(--mgu-warm); }
+.mgu-ring[data-open="true"] .mgu-ring-arc { stroke: var(--mgu-good); }
+.mgu-ring-state { color: var(--mgu-dim); }
+.mgu-ring[data-armed="true"] .mgu-ring-state { color: var(--mgu-warm); }
+.mgu-ring[data-open="true"] .mgu-ring-state { color: var(--mgu-good); }
+
+/* ---------------------------------------------------------------------- raw */
 .mgu-raw-rows { display: grid; gap: 3px; overflow-x: auto; }
 .mgu-head-row {
   display: grid; gap: 6px; align-items: baseline; min-width: 42rem;
@@ -202,23 +240,21 @@ const CSS = `
 }
 .mgu-head-row > span { white-space: nowrap; }
 .mgu-raw-head {
-  color: var(--mgu-dim); font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--mgu-faint); font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
 }
 .mgu-num { text-align: right; }
 .mgu-raw-note { color: var(--mgu-dim); }
-.mgu-raw-note[hidden] { display: none; }
-@keyframes mgu-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(224,179,102,.5); }
-  50% { box-shadow: 0 0 0 4px rgba(224,179,102,0); }
-}
-@media (max-width: 900px) { .mgu-lower { grid-template-columns: minmax(0, 1fr); } }
-@media (max-width: 720px) {
-  .mgu-body { grid-template-columns: minmax(0, 1fr); }
-  .mgu-row { grid-template-columns: 5rem 3rem minmax(0, 1fr); }
-  .mgu-row-rule { grid-column: 1 / -1; }
+
+@keyframes mgu-dash { to { stroke-dashoffset: -16; } }
+
+@media (max-width: 900px) {
+  .mgu-row3 { grid-template-columns: minmax(0, 1fr); }
+  .mgu-row3 > .mgu-block + .mgu-block { border-left: 0; padding-left: 0; }
+  .mgu-row2 { grid-template-columns: minmax(0, 1fr); }
+  .mgu-harmony-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .mgu.is-playing .mgu-step[data-state="current"] { animation: none; }
+  .mgu-node[data-open="true"] .mgu-node-rect { animation: none; }
   .mgu-ring-arc { transition: none; }
 }
 `;
@@ -230,7 +266,7 @@ const el = (tag, className, text) => {
   return node;
 };
 
-const svgEl = (tag, attrs) => {
+const svgEl = (tag, attrs = {}) => {
   const node = document.createElementNS(SVG, tag);
   for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, String(value));
   return node;
@@ -242,53 +278,10 @@ const setText = (node, text) => {
   if (node.textContent !== next) node.textContent = next;
 };
 
-const pct = (db) => Math.max(0, Math.min(100, ((db - FLOOR_DB) / -FLOOR_DB) * 100));
-
-const fixed = (v, digits = 2) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : "—");
+const fixed = (v, digits = 2) => (typeof v === "number" && Number.isFinite(v) ? v.toFixed(digits) : DASH);
 const signed = (v) => (typeof v === "number" && Number.isFinite(v)
   ? `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`
-  : "—");
-
-/**
- * The family's steps carry the weight the chain view draws -- how many bars the
- * node holds. The chain payload carries labels only, so the list it names is
- * recovered by matching labels: `alt` is the chorus rotation of the same family,
- * and a family that has been rebuilt from a bare label list falls back to one
- * bar per node rather than inventing a rhythm.
- */
-function stepEntries(family, labels) {
-  if (!family) return labels.map((label) => ({ label, bars: 1, cliche: false }));
-  const lists = [family.steps, family.alt].filter(Boolean);
-  const match = lists.find((list) => list.length === labels.length
-    && list.every((stepItem, i) => stepItem.label === labels[i]));
-  if (match) return match.map((stepItem) => ({
-    label: stepItem.label, bars: stepItem.bars, cliche: !!stepItem.cliche,
-  }));
-  return labels.map((label) => ({ label, bars: 1, cliche: false }));
-}
-
-/**
- * Why a candidate lost, from what the bar actually carries.
- *
- * `nextBar` copies a chord *without* its `movement` field, so the winner's cost
- * is not available to a view and comparing a rejected cost against it would
- * invent a number ("cost 3 > 0" when the winner most likely cost 3 as well).
- * What the data does support: a candidate over the budget lost to a cheaper
- * voicing; a zero-cost candidate tied the winner (costs are non-negative, so the
- * winner cost 0 too) and lost the span tie-break; anything in between only
- * establishes that the winner moved no further.
- */
-function describeRejection(entry) {
-  if (typeof entry === "string") return { notes: entry, why: "" };
-  if (Array.isArray(entry)) return { notes: entry.map(noteName).join(" "), why: "" };
-  if (!entry || typeof entry !== "object") return { notes: "", why: "" };
-  const notes = Array.isArray(entry.voicing) ? entry.voicing.map(noteName).join(" ") : String(entry.label ?? "");
-  if (entry.reason) return { notes, why: String(entry.reason) };
-  if (typeof entry.cost !== "number") return { notes, why: "" };
-  if (entry.cost > VOICE_BUDGET) return { notes, why: `voice-leading ${entry.cost} > ${VOICE_BUDGET}` };
-  if (entry.cost === 0) return { notes, why: "same cost · span tie-break" };
-  return { notes, why: `cost ${entry.cost} · winner moved no further` };
-}
+  : DASH);
 
 /** The cliché's moving voice: the 7th descends a semitone inside the held root. */
 function clicheLine(chord) {
@@ -313,14 +306,228 @@ function ensureStyle(doc) {
   doc.head.appendChild(style);
 }
 
-function flash(node) {
-  if (typeof node.animate !== "function") return;
-  node.animate(
-    [{ transform: "scale(1)" }, { transform: "scale(1.07)" }, { transform: "scale(1)" }],
-    { duration: 420, easing: "ease-out" },
-  );
+// -------------------------------------------------------------------- drawings
+/**
+ * A graph host: one <svg> kept for the life of the panel, its children rebuilt
+ * only when the node-key string changes and mutated in place otherwise.
+ */
+function makeGraph(name) {
+  const svg = svgEl("svg", {
+    class: "mgu-graph-svg", role: "img", preserveAspectRatio: "xMidYMin meet",
+  });
+  svg.setAttribute("data-graph", name);
+  return { svg, key: null, nodes: new Map(), edges: new Map() };
 }
 
+const midY = (node) => node.y + node.h / 2;
+const baseline = (node) => node.y + node.h / 2 + 4;
+
+function edgePath(from, to) {
+  const x1 = from.x + from.w;
+  const y1 = midY(from);
+  const x2 = to.x;
+  const y2 = midY(to);
+  return `M ${x1} ${y1} C ${x1 + 12} ${y1}, ${x2 - 12} ${y2}, ${x2} ${y2}`;
+}
+
+/**
+ * Paint a graph. `summary` is the one sentence a screen reader gets instead of
+ * the drawing; it is assembled from the nodes, so it cannot describe a bar the
+ * graph is not showing.
+ */
+function drawGraph(host, graph, summary) {
+  const svg = host.svg;
+  svg.setAttribute("viewBox", `0 0 ${graph.width} ${graph.height}`);
+  svg.setAttribute("aria-label", summary);
+
+  const key = `${graph.nodes.map((n) => `${n.id}|${n.kind}|${n.label}|${n.note}|${n.x},${n.y},${n.w},${n.h}`).join(";")}`
+    + `#${graph.edges.map((e) => `${e.from}>${e.to}`).join(",")}`;
+
+  if (key !== host.key) {
+    svg.textContent = "";
+    const byId = new Map(graph.nodes.map((node) => [node.id, node]));
+
+    const edgeLayer = svgEl("g", { class: "mgu-edges" });
+    host.edges = new Map();
+    for (const edge of graph.edges) {
+      const to = byId.get(edge.to);
+      if (!to) continue;
+      const from = byId.get(edge.from);
+      const path = svgEl("path", { class: "mgu-edge" });
+      let labelNode = null;
+      if (from) {
+        path.setAttribute("d", edgePath(from, to));
+      } else {
+        // A source in the other graph has no node here: it enters as a short
+        // stub at the target's own row, so the line reads as "this came from
+        // the harmony" instead of being drawn across the whole canvas.
+        const y = midY(to);
+        const x = Math.max(0, to.x - EDGE_STUB);
+        path.setAttribute("d", `M ${x} ${y} L ${to.x} ${y}`);
+      }
+      edgeLayer.appendChild(path);
+      if (edge.label) {
+        labelNode = svgEl("text", { class: "mgu-edge-label" });
+        if (from) {
+          labelNode.setAttribute("x", String(Math.round((from.x + from.w + to.x) / 2)));
+          labelNode.setAttribute("y", String(Math.round((midY(from) + midY(to)) / 2 - 6)));
+        } else {
+          labelNode.setAttribute("x", String(Math.max(0, to.x - EDGE_STUB)));
+          labelNode.setAttribute("y", String(to.y - 2));
+        }
+        labelNode.textContent = edge.label;
+        edgeLayer.appendChild(labelNode);
+      }
+      host.edges.set(`${edge.from}>${edge.to}`, { path });
+    }
+    svg.appendChild(edgeLayer);
+
+    const nodeLayer = svgEl("g", { class: "mgu-nodes" });
+    host.nodes = new Map();
+    for (const node of graph.nodes) {
+      const group = svgEl("g", { class: "mgu-node" });
+      group.setAttribute("data-node", node.id);
+      group.setAttribute("data-kind", node.kind);
+      group.setAttribute("data-live", "false");
+      group.setAttribute("data-open", "false");
+      const rect = svgEl("rect", {
+        class: "mgu-node-rect",
+        x: node.x, y: node.y, width: node.w, height: node.h, rx: 3,
+      });
+      const pip = svgEl("rect", {
+        class: "mgu-node-pip",
+        x: node.x + 1, y: node.y + 6, width: 2, height: node.h - 12,
+      });
+      const label = svgEl("text", {
+        class: "mgu-node-label", x: node.x + 10, y: baseline(node),
+      });
+      const value = svgEl("text", {
+        class: "mgu-node-value", x: node.x + node.w - 8, y: baseline(node),
+      });
+      value.setAttribute("text-anchor", "end");
+      // the sentence a node cannot fit in 190px: the rule or gate it restates
+      const title = svgEl("title");
+      group.append(title, rect, pip, label, value);
+      nodeLayer.appendChild(group);
+      host.nodes.set(node.id, { group, label, value, title });
+    }
+    svg.appendChild(nodeLayer);
+    host.key = key;
+  }
+
+  // 22 edges and 23 nodes a bar: mutate, never re-create.
+  for (const edge of graph.edges) {
+    const slot = host.edges.get(`${edge.from}>${edge.to}`);
+    if (!slot) continue;
+    slot.path.setAttribute("data-live", String(!!edge.live));
+    slot.path.setAttribute("data-dashed", String(!!edge.dashed));
+  }
+  for (const node of graph.nodes) {
+    const slot = host.nodes.get(node.id);
+    if (!slot) continue;
+    slot.group.setAttribute("data-live", String(!!node.live));
+    slot.group.setAttribute("data-state", node.state || "");
+    slot.group.setAttribute("data-open", String(!!node.open));
+    setText(slot.label, node.label);
+    setText(slot.value, node.value);
+    setText(slot.title, [node.label, node.value, node.note].filter(Boolean).join(" · "));
+  }
+}
+
+/** The live path, in words, for the graph's aria-label. */
+function signalSummary(graph) {
+  const find = (id) => graph.nodes.find((node) => node.id === id) || null;
+  const C = find("C");
+  const gates = find("gates");
+  const firing = graph.nodes.filter((node) => node.kind === "rule" && node.live).map((n) => n.label);
+  const playing = graph.nodes.filter((node) => node.kind === "voice" && node.live).map((n) => n.label);
+  return [
+    C && C.value !== DASH ? `C ${C.value}, ${gates ? gates.note : ""}` : "no signal yet",
+    `rules firing: ${firing.join(", ") || "none"}`,
+    `voices playing: ${playing.join(", ") || "none"}`,
+  ].filter(Boolean).join("; ");
+}
+
+function harmonySummary(graph, chain) {
+  const current = graph.nodes.find((node) => node.state === "current" || node.state === "armed") || null;
+  const chords = graph.nodes.filter((node) => node.id.startsWith("chord:")).map((node) => node.label);
+  const bits = [];
+  if (current) {
+    const steps = graph.nodes.filter((node) => node.id.startsWith("step:"));
+    const index = steps.indexOf(current);
+    bits.push(`step ${index + 1} of ${steps.length}: ${current.label}`);
+    if (current.state === "armed") bits.push("armed to open");
+  } else if (graph.nodes.length === 1) {
+    bits.push(`${graph.nodes[0].label}, ${graph.nodes[0].value}`);
+  }
+  if (chords.length) bits.push(`this bar: ${chords.join(", ")}`);
+  if (chain && chain.open) bits.push(`open ${chain.open}`);
+  return bits.join("; ") || "the chain";
+}
+
+// ------------------------------------------------------------ the documents
+/**
+ * The parameter section: every number the panel prints, with the rule it feeds.
+ * The panel and this section are generated from the same table in explain.js, so
+ * an explanation cannot describe a rule the instrument no longer has.
+ */
+export function mountParameters({ root } = {}) {
+  if (!root) return;
+  const list = el("div", "mg-params-list");
+  for (const entry of PARAMETERS) {
+    const details = el("details", "mg-param");
+    details.setAttribute("data-param", entry.id);
+    const summary = el("summary");
+    // the chip sits apart visually by the flex gap; the space keeps it apart when
+    // the summary is read out or copied as text
+    summary.append(
+      el("span", "mg-param-label", entry.label),
+      " ",
+      el("span", "mg-chip", `${entry.kind} · ${entry.range}`),
+    );
+    details.append(
+      summary,
+      el("div", "mg-param-body", entry.does),
+      el("p", "mg-src", `from ${entry.source}`),
+    );
+    list.appendChild(details);
+  }
+
+  const devices = el("details", "mg-param mg-param-devices");
+  devices.setAttribute("data-param", "devices");
+  const devicesSummary = el("summary");
+  devicesSummary.append(
+    el("span", "mg-param-label", "devices"),
+    " ",
+    el("span", "mg-chip", "six gates"),
+  );
+  const devicesBody = el("div", "mg-param-body");
+  mountDevices({ root: devicesBody });
+  devices.append(devicesSummary, devicesBody);
+  list.appendChild(devices);
+
+  root.appendChild(list);
+}
+
+/** The six devices, each with the gate that opens it and the rule it plays. */
+export function mountDevices({ root } = {}) {
+  if (!root) return;
+  for (const doc of DEVICE_DOCS) {
+    const found = DEVICE_LABELS.find(([name]) => name === doc.id);
+    const details = el("details", "mg-param mg-param-device");
+    details.setAttribute("data-device-doc", doc.id);
+    const summary = el("summary");
+    summary.append(
+      el("span", "mg-param-label", found ? found[1] : doc.id),
+      " ",
+      el("span", "mg-chip", doc.gate > 0 ? `gate ≥${doc.gate.toFixed(2)}` : "always on"),
+    );
+    details.append(summary, el("div", "mg-param-body", doc.does));
+    root.appendChild(details);
+  }
+}
+
+// ------------------------------------------------------------------- the panel
 export function createUI({ root = document.body, onGrab = null, onWeights = null } = {}) {
   const doc = (root && root.ownerDocument) || document;
   ensureStyle(doc);
@@ -333,55 +540,32 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
   // ---------------------------------------------------------------- transport
   const head = el("div", "mgu-head");
   const clock = el("span", "mgu-clock", "bar —");
-  head.appendChild(clock);
-
-  let grabButton = null;
+  const chainTitle = el("span", "mgu-chain-title", DASH);
+  const chainMeta = el("span", "mgu-chain-meta");
+  head.append(clock, chainTitle, chainMeta);
   if (typeof onGrab === "function") {
-    grabButton = el("button", "mgu-grab", "grab");
+    const grabButton = el("button", "mgu-grab", "grab");
     grabButton.type = "button";
     grabButton.setAttribute("data-mg-grab", "");
     grabButton.setAttribute("aria-keyshortcuts", "Space");
     grabButton.addEventListener("click", () => onGrab());
     head.appendChild(grabButton);
   }
-
-  const statusEl = el("span", "mgu-status");
-  statusEl.setAttribute("aria-live", "polite");
-  head.appendChild(statusEl);
   section.appendChild(head);
 
-  // The ladder: signal -> rule -> what it did, per bar. Full width and above the
-  // chain, because it is the input the chain below is the output of.
-  const signalsBox = el("section", "mgu-block mgu-signals");
-  signalsBox.setAttribute("data-block", "signals");
-  const signalsCaption = el("div", "mgu-caption", "band: —");
-  const signalList = el("div", "mgu-rows");
-  const signalRows = new Map();
-  for (const key of LADDER_KEYS) {
-    const row = el("div", "mgu-row");
-    row.setAttribute("data-signal", key);
-    row.dataset.fired = "false";
-    const label = el("span", "mgu-row-signal", key);
-    const value = el("span", "mgu-row-value", "—");
-    const rule = el("span", "mgu-row-rule", "");
-    const state = el("span", "mgu-row-state", "—");
-    row.append(label, value, rule, state);
-    signalList.appendChild(row);
-    signalRows.set(key, { row, label, value, rule, state });
-  }
-  signalsBox.append(el("div", "mgu-label", "signals"), signalsCaption, signalList);
-  section.appendChild(signalsBox);
+  // ------------------------------------------------------- 1. the harmonic chain
+  const harmonyBox = el("section", "mgu-block mgu-harmony");
+  harmonyBox.setAttribute("data-block", "harmony");
+  const harmonyFigure = el("figure", "mgu-graph");
+  const harmonyHost = makeGraph("harmony");
+  harmonyFigure.appendChild(harmonyHost.svg);
 
-  const body = el("div", "mgu-body");
-
-  // 1. chain view -------------------------------------------------------------
-  const chainBox = el("section", "mgu-block mgu-chain");
-  chainBox.appendChild(el("div", "mgu-label", "chain"));
-  const chainHead = el("div", "mgu-chain-head");
-  const chainTitle = el("span", "mgu-chain-title", "—");
-  const chainMeta = el("span", "mgu-chain-meta");
-  chainHead.append(chainTitle, chainMeta);
-  const pathEl = el("ol", "mgu-path");
+  const harmonySide = el("div", "mgu-harmony-side");
+  const chartChord = el("div", "mgu-chord", DASH);
+  const chartMeta = el("div", "mgu-meta");
+  const chartCliche = el("div", "mgu-cliche");
+  chartCliche.hidden = true;
+  const chartNext = el("div", "mgu-lookahead");
   const rejectedList = el("ul", "mgu-rejected");
   const rejectSlots = [];
   for (let i = 0; i < MAX_REJECTED; i += 1) {
@@ -395,88 +579,50 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     rejectedList.appendChild(li);
     rejectSlots.push({ li, notes, why });
   }
-  const reasonEl = el("p", "mgu-reason", "");
-  chainBox.append(chainHead, pathEl, rejectedList, reasonEl);
-  body.appendChild(chainBox);
+  harmonySide.append(chartChord, chartMeta, chartCliche, chartNext, rejectedList);
 
-  // 2, 3, 4, 5 stack on the right --------------------------------------------
-  const side = el("div", "mgu-side");
+  const harmonyGrid = el("div", "mgu-harmony-grid");
+  harmonyGrid.append(harmonyFigure, harmonySide);
+  harmonyBox.append(el("div", "mgu-label", "the chain"), harmonyGrid);
+  section.appendChild(harmonyBox);
 
-  const chartBox = el("section", "mgu-block mgu-chart");
-  chartBox.appendChild(el("div", "mgu-label", "chart"));
-  const chartChord = el("div", "mgu-chord", "—");
-  const chartMeta = el("div", "mgu-meta");
-  const chartCliche = el("div", "mgu-cliche");
-  chartCliche.hidden = true;
-  const chartNext = el("div", "mgu-lookahead");
-  chartBox.append(chartChord, chartMeta, chartCliche, chartNext);
-  side.appendChild(chartBox);
+  // -------------------------------------------------------- 2. the signal chain
+  const signalsBox = el("section", "mgu-block mgu-signals");
+  signalsBox.setAttribute("data-block", "signals");
+  const signalsCaption = el("div", "mgu-caption", "band: —");
+  const signalFigure = el("figure", "mgu-graph");
+  const signalHost = makeGraph("signal");
+  signalFigure.appendChild(signalHost.svg);
+  signalsBox.append(el("div", "mgu-label", "the signals"), signalFigure, signalsCaption);
+  section.appendChild(signalsBox);
 
-  const devicesBox = el("section", "mgu-block mgu-devices");
-  devicesBox.appendChild(el("div", "mgu-label", "devices"));
-  const rack = el("div", "mgu-rack");
-  const lamps = DEVICES.map(([name, shown]) => {
-    const lamp = el("span", "mgu-lamp");
-    lamp.setAttribute("data-device", name);
-    lamp.dataset.on = "false";
-    lamp.dataset.fired = "false";
-    const gate = DEVICE_GATES[name];
-    lamp.append(
-      el("span", "mgu-lamp-dot"),
-      el("span", "mgu-lamp-name", shown),
-      el("span", "mgu-lamp-gate", gate > 0 ? `≥${gate.toFixed(2)}` : "always"),
-    );
-    rack.appendChild(lamp);
-    return { name, lamp };
-  });
-  devicesBox.appendChild(rack);
-  side.appendChild(devicesBox);
+  // --------------------------------------------------------- 3. ladder and conc
+  const row2 = el("div", "mgu-row2");
 
-  const ringBox = el("section", "mgu-block mgu-ring");
-  ringBox.appendChild(el("div", "mgu-label", "lock-in"));
-  ringBox.dataset.armed = "false";
-  ringBox.dataset.open = "false";
-  const ringWrap = el("div", "mgu-ring-wrap");
-  ringWrap.setAttribute("role", "img");
-  const ringSvg = svgEl("svg", { class: "mgu-ring-svg", viewBox: "0 0 60 60", "aria-hidden": "true" });
-  const ringTrack = svgEl("circle", {
-    class: "mgu-ring-track", cx: 30, cy: 30, r: RING_R,
-  });
-  const ringArc = svgEl("circle", {
-    class: "mgu-ring-arc", cx: 30, cy: 30, r: RING_R, transform: "rotate(-90 30 30)",
-  });
-  ringArc.setAttribute("stroke-dasharray", `0 ${RING_C.toFixed(2)}`);
-  ringSvg.append(ringTrack, ringArc);
-  const ringValue = el("span", "mgu-ring-value", "0.00");
-  ringWrap.append(ringSvg, ringValue);
-  const ringState = el("div", "mgu-ring-state");
-  ringBox.append(ringWrap, ringState);
-  side.appendChild(ringBox);
-
-  const levelBox = el("section", "mgu-block mgu-level");
-  levelBox.appendChild(el("div", "mgu-label", "level"));
-  const meter = el("div", "mgu-meter");
-  meter.setAttribute("role", "meter");
-  meter.setAttribute("aria-valuemin", String(FLOOR_DB));
-  meter.setAttribute("aria-valuemax", "0");
-  meter.setAttribute("aria-valuenow", String(FLOOR_DB));
-  meter.setAttribute("aria-label", "master level, dBFS");
-  const meterFill = el("div", "mgu-meter-fill");
-  const meterPeak = el("div", "mgu-meter-peak");
-  meter.append(meterFill, meterPeak);
-  const levelText = el("div", "mgu-level-text", "level —");
-  levelBox.append(meter, levelText);
-  side.appendChild(levelBox);
-
-  body.appendChild(side);
-  section.appendChild(body);
-
-  // ------------------------------------------------------------- the lower row
-  const lower = el("div", "mgu-lower");
+  const ladderBox = el("section", "mgu-block mgu-ladder");
+  ladderBox.setAttribute("data-block", "ladder");
+  const ladderList = el("div", "mgu-rows");
+  const signalRows = new Map();
+  for (const key of LADDER_KEYS) {
+    const row = el("div", "mgu-row");
+    row.setAttribute("data-signal", key);
+    row.dataset.fired = "false";
+    const entry = parameterFor(key);
+    // the rule, one hover away instead of a fourth column that pushed the row
+    // out of the panel: the sentence itself lives in explain.js
+    if (entry) row.title = entry.does;
+    const label = el("span", "mgu-row-signal", entry ? entry.label : key);
+    const value = el("span", "mgu-row-value", DASH);
+    const state = el("span", "mgu-row-state", DASH);
+    row.append(label, value, state);
+    ladderList.appendChild(row);
+    signalRows.set(key, { row, label, value, state });
+  }
+  ladderBox.append(el("div", "mgu-label", "the ladder"), ladderList);
+  row2.appendChild(ladderBox);
 
   const concBox = el("section", "mgu-block mgu-conc");
   concBox.setAttribute("data-block", "conc");
-  concBox.appendChild(el("div", "mgu-label", "concentration"));
   const concRows = new Map();
   for (const key of CONC_TERMS) {
     const row = el("div", "mgu-conc-row");
@@ -484,7 +630,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     const barWrap = el("div", "mgu-conc-bar");
     const barFill = el("i");
     barWrap.appendChild(barFill);
-    const weight = el("span", "mgu-conc-weight", "—");
+    const weight = el("span", "mgu-conc-weight", DASH);
     const slider = doc.createElement("input");
     slider.type = "range";
     slider.min = "0";
@@ -500,8 +646,12 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     concRows.set(key, { row, barFill, weight, slider });
   }
   const concSum = el("div", "mgu-conc-sum", "C —");
-  concBox.appendChild(concSum);
-  lower.appendChild(concBox);
+  concBox.append(el("div", "mgu-label", "concentration"), concSum);
+  row2.appendChild(concBox);
+  section.appendChild(row2);
+
+  // -------------------------------------------------- 4. sound, voices, lock-in
+  const row3 = el("div", "mgu-row3");
 
   const soundBox = el("section", "mgu-block mgu-sound");
   soundBox.setAttribute("data-block", "sound");
@@ -511,7 +661,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     const row = el("div", "mgu-sound-row");
     row.setAttribute("data-sound", key);
     const labelEl = el("span", "mgu-sound-label", label);
-    const value = el("span", "mgu-sound-value", "—");
+    const value = el("span", "mgu-sound-value", DASH);
     const delta = el("span", "mgu-sound-delta", "");
     delta.hidden = true;
     row.append(labelEl, value, delta);
@@ -519,7 +669,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     soundRows.set(key, { row, label: labelEl, value, delta });
   }
   soundBox.append(el("div", "mgu-label", "what C sounds like"), soundList);
-  lower.appendChild(soundBox);
+  row3.appendChild(soundBox);
 
   const voicesBox = el("section", "mgu-block mgu-voices");
   voicesBox.setAttribute("data-block", "voices");
@@ -530,7 +680,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     row.setAttribute("data-voice", key);
     const name = el("span", "mgu-voice-name", key);
     const driven = el("span", "mgu-voice-driven", "");
-    const detail = el("span", "mgu-voice-detail", "—");
+    const detail = el("span", "mgu-voice-detail", DASH);
     const role = el("span", "mgu-voice-role", "");
     role.hidden = true;
     row.append(name, driven, detail, role);
@@ -538,11 +688,29 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     voiceRowsUi.set(key, { row, name, driven, detail, role });
   }
   voicesBox.append(el("div", "mgu-label", "voices"), voiceList);
-  lower.appendChild(voicesBox);
+  row3.appendChild(voicesBox);
 
-  section.appendChild(lower);
+  const ringBox = el("section", "mgu-block mgu-ring");
+  ringBox.setAttribute("data-block", "ring");
+  ringBox.dataset.armed = "false";
+  ringBox.dataset.open = "false";
+  const ringWrap = el("div", "mgu-ring-wrap");
+  ringWrap.setAttribute("role", "img");
+  const ringSvg = svgEl("svg", { class: "mgu-ring-svg", viewBox: "0 0 60 60", "aria-hidden": "true" });
+  const ringTrack = svgEl("circle", { class: "mgu-ring-track", cx: 30, cy: 30, r: RING_R });
+  const ringArc = svgEl("circle", {
+    class: "mgu-ring-arc", cx: 30, cy: 30, r: RING_R, transform: "rotate(-90 30 30)",
+  });
+  ringArc.setAttribute("stroke-dasharray", `0 ${RING_C.toFixed(2)}`);
+  ringSvg.append(ringTrack, ringArc);
+  const ringValue = el("span", "mgu-ring-value", "0.00");
+  ringWrap.append(ringSvg, ringValue);
+  const ringState = el("div", "mgu-ring-state");
+  ringBox.append(el("div", "mgu-label", "lock-in"), ringWrap, ringState);
+  row3.appendChild(ringBox);
+  section.appendChild(row3);
 
-  // ------------------------------------------------------- the raw head strip
+  // ------------------------------------------------------- 5. the raw head strip
   const rawBox = el("section", "mgu-block mgu-raw");
   rawBox.setAttribute("data-block", "raw");
   const rawRows = el("div", "mgu-raw-rows");
@@ -554,12 +722,12 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
   const headSlots = [];
   for (let i = 0; i < RAW_SLOTS; i += 1) {
     const row = el("div", "mgu-head-row");
-    const who = el("span", "mgu-head-name", "—");
-    const c = el("span", "mgu-num", "—");
-    const hr = el("span", "mgu-num", "—");
-    const rmssd = el("span", "mgu-num", "—");
-    const bands = RAW_BANDS.map(() => el("span", "mgu-num", "—"));
-    const hsi = el("span", "", "—");
+    const who = el("span", "mgu-head-name", DASH);
+    const c = el("span", "mgu-num", DASH);
+    const hr = el("span", "mgu-num", DASH);
+    const rmssd = el("span", "mgu-num", DASH);
+    const bands = RAW_BANDS.map(() => el("span", "mgu-num", DASH));
+    const hsi = el("span", "", DASH);
     row.append(who, c, hr, rmssd, ...bands, hsi);
     row.hidden = true;
     rawRows.appendChild(row);
@@ -569,68 +737,35 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
   rawBox.append(el("div", "mgu-label", "heads"), rawNote, rawRows);
   section.appendChild(rawBox);
 
+  // ------------------------------------------------------ 6. why this bar exists
+  const reasonEl = el("p", "mgu-reason", "");
+  section.appendChild(reasonEl);
+
   root.appendChild(section);
 
   let destroyed = false;
-  let pathKey = null;
-  let nodes = [];
   let entriesNow = [];
   let lastWeights = null;
+  let lastData = null;
 
   // ------------------------------------------------------------------- chain
-  function buildPath(entries) {
-    pathEl.textContent = "";
-    const maxBars = entries.reduce((max, entry) => Math.max(max, entry.bars), 1) || 1;
-    nodes = entries.map((entry, i) => {
-      const li = el("li", "mgu-step");
-      li.setAttribute("data-step", String(i));
-      const label = el("span", "mgu-step-label", entry.label);
-      const tag = el("span", "mgu-step-tag", entry.cliche ? "cliché" : "");
-      const weight = el("span", "mgu-step-weight");
-      const fill = el("i");
-      fill.style.width = `${Math.round((entry.bars / maxBars) * 100)}%`;
-      weight.appendChild(fill);
-      li.append(label, tag, weight);
-      pathEl.appendChild(li);
-      return { li };
-    });
-  }
-
   function renderChain(chain) {
     const labels = chain && Array.isArray(chain.steps) ? chain.steps : [];
     const family = chain && chain.family ? familyById(chain.family) : null;
-    const entries = stepEntries(family, labels);
-    entriesNow = entries;
-    const key = `${chain && chain.family ? chain.family : ""}|${labels.join(",")}`
-      + `|${entries.map((entry) => `${entry.bars}${entry.cliche ? "c" : ""}`).join(",")}`;
-    if (key !== pathKey) {
-      buildPath(entries);
-      pathKey = key;
-    }
+    entriesNow = stepEntries(family, labels);
 
     const position = chain && Number.isFinite(chain.position) ? chain.position : 0;
     const total = labels.length;
-    const currentIndex = position > 0 ? Math.min(position - 1, Math.max(total - 1, 0)) : -1;
-    const nextIndex = position < total ? position : -1;
     const open = chain && chain.open ? chain.open : null;
 
     setText(chainTitle, chain && chain.title ? chain.title : "transition");
-    const meta = total ? `${Math.max(0, Math.min(position, total))}/${total}` : "—";
+    const meta = total ? `${Math.max(0, Math.min(position, total))}/${total}` : DASH;
     const held = chain && Number.isFinite(chain.held) ? chain.held : null;
     setText(chainMeta, [
       meta,
       held != null && total ? `${held} bar${held === 1 ? "" : "s"} left` : "",
       open ? `open ${open}` : "",
     ].filter(Boolean).join(" · "));
-
-    nodes.forEach(({ li }, i) => {
-      const state = i === currentIndex ? "current"
-        : i < currentIndex ? "done"
-          : i === nextIndex ? "next"
-            : "ahead";
-      li.dataset.state = state;
-      li.classList.toggle("is-open", !!open && entries[i].label === open);
-    });
   }
 
   function renderRejected(chord) {
@@ -666,7 +801,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
         chord.cliche ? "cliché" : "",
       ].filter(Boolean).join(" · "));
     } else {
-      setText(chartChord, "—");
+      setText(chartChord, DASH);
       setText(chartMeta, "no chord");
     }
 
@@ -690,29 +825,6 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     setText(chartNext, parts.join(" · "));
   }
 
-  // ----------------------------------------------------------------- devices
-  function renderDevices(unlocked, fired) {
-    for (const { name, lamp } of lamps) {
-      const lit = unlocked.includes(name);
-      const firing = fired.includes(name);
-      lamp.dataset.on = String(lit);
-      lamp.dataset.fired = String(firing);
-      lamp.classList.toggle("is-lit", lit);
-      lamp.classList.toggle("is-firing", firing);
-      if (firing) flash(lamp);
-    }
-  }
-
-  function firedDevices(data) {
-    const out = new Set();
-    const chords = Array.isArray(data.chords) ? data.chords : [];
-    for (const chord of chords) {
-      const devices = chord && Array.isArray(chord.devices) ? chord.devices : [];
-      for (const device of devices) out.add(device);
-    }
-    return [...out];
-  }
-
   // -------------------------------------------------------------------- ring
   function renderRing(ui, chain) {
     const C = Number.isFinite(ui.C) ? Math.min(1, Math.max(0, ui.C)) : 0;
@@ -722,7 +834,8 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     const open = !!ui.release;
     ringBox.dataset.armed = String(armed);
     ringBox.dataset.open = String(open);
-    ringWrap.setAttribute("aria-label", `lock-in ${C.toFixed(2)}${armed ? ", armed" : ""}${open ? ", open chord" : ""}`);
+    ringWrap.setAttribute("aria-label",
+      `lock-in ${C.toFixed(2)}${armed ? ", armed" : ""}${open ? ", open chord" : ""}`);
     setText(ringState, open ? "open chord: the lock let go"
       : armed ? "armed: the drop opens the chord"
         : C >= 0.55 ? "locked in" : "holding");
@@ -755,9 +868,8 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       const row = byKey.get(key);
       slot.row.dataset.fired = String(!!row && row.flag === true);
       setText(slot.label, row && row.label != null ? row.label : key);
-      setText(slot.value, row && row.value != null ? row.value : "—");
-      setText(slot.rule, row && row.rule != null ? row.rule : "");
-      setText(slot.state, row && row.state != null ? row.state : "—");
+      setText(slot.value, row && row.value != null ? row.value : DASH);
+      setText(slot.state, row && row.state != null ? row.state : DASH);
     }
   }
 
@@ -767,7 +879,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       const slot = soundRows.get(key);
       const row = byKey.get(key);
       setText(slot.label, row && row.label != null ? row.label : label);
-      setText(slot.value, row && row.value != null ? row.value : "—");
+      setText(slot.value, row && row.value != null ? row.value : DASH);
       const delta = row && row.delta != null && row.delta !== "" ? row.delta : null;
       slot.delta.hidden = delta === null;
       setText(slot.delta, delta === null ? "" : delta);
@@ -781,7 +893,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       const row = byKey.get(key);
       setText(slot.name, key);
       setText(slot.driven, row && row.drivenBy != null ? row.drivenBy : "");
-      setText(slot.detail, row && row.detail != null ? row.detail : "—");
+      setText(slot.detail, row && row.detail != null ? row.detail : DASH);
       const role = row && row.role != null ? String(row.role) : null;
       slot.role.hidden = role === null;
       setText(slot.role, role === null ? "" : role);
@@ -796,18 +908,18 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       const head = list[i];
       slot.row.hidden = !head;
       if (!head) {
-        setText(slot.who, "—");
-        setText(slot.c, "—");
-        setText(slot.hr, "—");
-        setText(slot.rmssd, "—");
-        slot.bands.forEach((cell) => setText(cell, "—"));
-        setText(slot.hsi, "—");
+        setText(slot.who, DASH);
+        setText(slot.c, DASH);
+        setText(slot.hr, DASH);
+        setText(slot.rmssd, DASH);
+        slot.bands.forEach((cell) => setText(cell, DASH));
+        setText(slot.hsi, DASH);
         return;
       }
-      setText(slot.who, head.name || head.pseudonym || "—");
+      setText(slot.who, head.name || head.pseudonym || DASH);
       setText(slot.c, fixed(head.C));
-      setText(slot.hr, head.bpm == null ? "—" : String(Math.round(head.bpm)));
-      setText(slot.rmssd, head.rmssd == null ? "—" : String(Math.round(head.rmssd)));
+      setText(slot.hr, head.bpm == null ? DASH : String(Math.round(head.bpm)));
+      setText(slot.rmssd, head.rmssd == null ? DASH : String(Math.round(head.rmssd)));
       RAW_BANDS.forEach(([key], index) => {
         // alpha and beta are shares of their own power; delta/theta/gamma are the
         // mean relative power the conditioner already averages
@@ -815,8 +927,8 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
         setText(slot.bands[index], fixed(value));
       });
       setText(slot.hsi, Object.keys(head.hsi || {}).length
-        ? CHANNELS.map((ch) => `${ch} ${head.hsi[ch] ?? "—"}`).join(" · ")
-        : "—");
+        ? CHANNELS.map((ch) => `${ch} ${head.hsi[ch] ?? DASH}`).join(" · ")
+        : DASH);
     });
   }
 
@@ -827,7 +939,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       const term = parts && typeof parts[key] === "number" ? parts[key] : null;
       const weight = w && typeof w[key] === "number" ? w[key] : null;
       slot.barFill.style.width = `${term == null ? 0 : Math.round(term * 100)}%`;
-      setText(slot.weight, weight == null ? "—"
+      setText(slot.weight, weight == null ? DASH
         : term == null ? `×${weight.toFixed(2)}` : `×${weight.toFixed(2)} = ${(term * weight).toFixed(2)}`);
       if (weight == null || doc.activeElement === slot.slider) continue;
       // A normalised weight (0.4545) is not on the slider's 0.05 grid, so compare
@@ -839,7 +951,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     const weighted = parts ? concentrationFromParts(parts, w || undefined) : null;
     const barC = mix && typeof mix.C === "number" ? mix.C : null;
     setText(concSum, weighted == null
-      ? `C ${barC == null ? "—" : barC.toFixed(2)}`
+      ? `C ${barC == null ? DASH : barC.toFixed(2)}`
       : `C ${weighted.toFixed(2)}`);
   }
 
@@ -857,6 +969,17 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     ].join(" · ")}`);
   }
 
+  /** Both graphs, from the bar that is on screen and the mix that made it. */
+  function renderGraphs(mix) {
+    const data = lastData || {};
+    const chain = (data.ui && data.ui.chain) || null;
+    const family = chain && chain.family ? familyById(chain.family) : null;
+    const harmony = harmonyGraph(data, chain, family);
+    drawGraph(harmonyHost, harmony, harmonySummary(harmony, chain));
+    const signal = signalGraph(mix, data);
+    drawGraph(signalHost, signal, signalSummary(signal));
+  }
+
   /**
    * Everything the panel says about the inputs. `mix` is the controls the bar was
    * generated from, `parts` its concentration terms (null with no headband),
@@ -868,6 +991,7 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     if (destroyed) return;
     if (weights) lastWeights = weights;
     renderCaption(mix);
+    renderGraphs(mix);
     renderLadder(ladder);
     renderSound(sound);
     renderVoices(voices);
@@ -880,8 +1004,9 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     if (destroyed || !data) return;
     const index = Number.isFinite(bar) ? bar : (Number.isFinite(data.index) ? data.index : null);
     const bpm = Number.isFinite(tempo) ? tempo : (Number.isFinite(data.tempo) ? data.tempo : null);
-    setText(clock, `bar ${index == null ? "—" : index}${bpm == null ? "" : ` · ${Math.round(bpm)} bpm`}`);
+    setText(clock, `bar ${index == null ? DASH : index}${bpm == null ? "" : ` · ${Math.round(bpm)} bpm`}`);
 
+    lastData = data;
     const ui = data.ui || {};
     const chain = ui.chain || null;
     const chord = Array.isArray(data.chords) && data.chords.length ? data.chords[0] : null;
@@ -889,7 +1014,6 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     renderChain(chain);
     renderRejected(chord);
     renderChart(data, chain, chord);
-    renderDevices(Array.isArray(ui.devices) ? ui.devices : [], firedDevices(data));
     renderRing(ui, chain);
     setText(reasonEl, ui.reason || "");
   }
@@ -901,22 +1025,6 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
     section.classList.toggle("is-playing", on);
   }
 
-  function setLevel(rmsDb, peakDb) {
-    if (destroyed) return;
-    const rms = Number.isFinite(rmsDb) ? rmsDb : null;
-    const peak = Number.isFinite(peakDb) ? peakDb : null;
-    meterFill.style.width = `${rms == null ? 0 : pct(rms)}%`;
-    meterPeak.style.left = `${peak == null ? 0 : pct(peak)}%`;
-    setText(levelText, rms == null ? "level —"
-      : `${rms.toFixed(1)} dBFS rms · peak ${peak == null ? "—" : peak.toFixed(1)}`);
-    meter.setAttribute("aria-valuenow", String(rms == null ? FLOOR_DB : Math.round(rms)));
-  }
-
-  function status(text) {
-    if (destroyed) return;
-    setText(statusEl, text == null ? "" : String(text));
-  }
-
   function destroy() {
     if (destroyed) return;
     destroyed = true;
@@ -924,12 +1032,11 @@ export function createUI({ root = document.body, onGrab = null, onWeights = null
       for (const animation of section.getAnimations({ subtree: true })) animation.cancel();
     }
     section.remove();
-    nodes = [];
     entriesNow = [];
-    pathKey = null;
+    lastData = null;
+    harmonyHost.key = null;
+    signalHost.key = null;
   }
 
-  return {
-    bar: updateBar, signals: renderSignals, setPlaying, setLevel, status, destroy,
-  };
+  return { bar: updateBar, signals: renderSignals, setPlaying, destroy };
 }

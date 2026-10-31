@@ -17,7 +17,7 @@ import {
 import { createVoices } from "./voices.js";
 import { createLoop } from "./loop.js";
 import { playEvent } from "./arrange.js";
-import { createUI } from "./ui.js";
+import { createUI, mountParameters } from "./ui.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle, encodeWav } from "./idle.js";
 import { ladderRows, timbreRows, voiceRows } from "./explain.js";
@@ -145,7 +145,8 @@ function grab() {
   say("held: this chord runs two more bars");
 }
 
-function say(text) { ui.status(text); el("status").textContent = text; }
+// One status line, and it is the page's: the panel no longer keeps a second.
+function say(text) { el("status").textContent = text; }
 
 /** One raw head row for the panel's strip: what the conditioner actually sees. */
 function headRowOf(view) {
@@ -236,8 +237,11 @@ function meter() {
   const rms = Math.sqrt(sum / levelData.length);
   window.__audio.rms = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
   window.__audio.peak = peak > 0 ? 20 * Math.log10(peak) : -Infinity;
-  ui.setLevel(window.__audio.rms, window.__audio.peak);
+  // One level display, and it is the transport's: the panel's meter is gone.
   el("meterbar").style.width = `${Math.min(100, Math.max(0, (window.__audio.rms + 60) / 60 * 100))}%`;
+  el("meter-text").textContent = window.__audio.rms === -Infinity
+    ? "—"
+    : `${window.__audio.rms.toFixed(1)} / ${window.__audio.peak.toFixed(1)} dBFS`;
   if (relay && performance.now() - castAt > 400) {
     castAt = performance.now();
     renderCast();
@@ -340,6 +344,10 @@ async function exportWav() {
 // ----------------------------------------------------------------------- boot
 
 async function boot() {
+  // The words before the sound: this needs no audio context, so the section is
+  // complete even if the kit never renders.
+  mountParameters({ root: el("params") });
+
   try {
     kit = await renderKit(ctx.sampleRate);
   } catch (err) {

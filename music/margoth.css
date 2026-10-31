@@ -1,0 +1,350 @@
+/* MarGoth: the sleeve, the console, and the words under them.
+ *
+ * One stylesheet for both music pages: the design tokens, the page chrome and
+ * the parameter section. The panel keeps its own scoped CSS inside ui.js --
+ * it has to work wherever it is injected -- and reads these tokens with
+ * fallbacks, so the panel is legible on a page that never links this file.
+ *
+ * No webfonts: both pages must work offline, and nothing else on this site
+ * loads an external asset. The type is the reader's own Iowan/Palatino and
+ * SF Mono.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --paper: #0b0b0d;
+  --surface: #121216;
+  --surface-2: #17171d;
+  --ink: #e9e7ec;
+  --dim: #8d8a97;
+  --faint: #5f5c6a;
+  --line: #272733;
+  --rule: #1d1d26;
+
+  --accent: #e0b366;   /* gold: the locked, current path */
+  --cold: #86a7b6;     /* steel: a live edge on the signal side */
+  --warm: #e07373;     /* armed, or refused */
+  --good: #8fbfa6;
+  --meter-fill: var(--accent);
+
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", ui-serif, serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --page: 980px;
+  --gutter: 24px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+
+    --paper: #f6f4f0;
+    --surface: #fffdf8;
+    --surface-2: #efece5;
+    --ink: #1a191c;
+    --dim: #5f5c66;
+    --faint: #8c8892;
+    --line: #d9d4ca;
+    --rule: #e4dfd5;
+
+    --accent: #8a6a2f;
+    --cold: #3d6373;
+    --warm: #a8443f;
+    --good: #3f7059;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px/1.55 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+}
+
+body > header,
+body > main,
+body > footer {
+  max-width: var(--page);
+  margin-inline: auto;
+  padding-inline: var(--gutter);
+}
+
+/* --------------------------------------------------------------- the sleeve */
+.mg-top {
+  padding-top: 46px;
+  padding-bottom: 26px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mg-kicker {
+  margin: 0 0 14px;
+  font: 11px/1 var(--mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+h1 {
+  margin: 0;
+  font: 400 34px/1.15 var(--serif);
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+h2 {
+  margin: 0 0 6px;
+  font: 400 20px/1.2 var(--serif);
+  letter-spacing: -0.005em;
+}
+
+.mg-sub {
+  margin: 12px 0 0;
+  max-width: 62ch;
+  color: var(--dim);
+}
+
+/* -------------------------------------------------------------- the console */
+.mg-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+  margin: 0;
+  padding: 10px max(var(--gutter), calc((100% - var(--page)) / 2));
+  background: color-mix(in srgb, var(--paper) 82%, transparent);
+  border-bottom: 1px solid var(--rule);
+  backdrop-filter: blur(6px);
+}
+
+.mg-bar button {
+  font: 11px/1 var(--mono);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: 7px 12px;
+  cursor: pointer;
+}
+
+.mg-bar button:hover { border-color: var(--accent); }
+.mg-bar button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mg-bar button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+
+.mg-hint {
+  font: 11px/1.4 var(--mono);
+  color: var(--faint);
+  max-width: 34ch;
+}
+
+.mg-ctl {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--dim);
+  font: 10px/1 var(--mono);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.mg-ctl input[type="range"] {
+  width: 92px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.mg-ctl output {
+  min-width: 2.8em;
+  font: 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  text-align: right;
+}
+
+.mg-level {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+#meter {
+  width: 180px;
+  height: 3px;
+  background: var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#meterbar {
+  height: 100%;
+  width: 0%;
+  background: var(--meter-fill);
+  transition: width .06s linear;
+}
+
+#meter-text {
+  font: 11px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--dim);
+  min-width: 10ch;
+}
+
+/* The transport hides its export button with an attribute, and the UA rule for
+   [hidden] is a bare tag selector: any class rule that sets a display beats it. */
+.mg-bar [hidden],
+main [hidden] { display: none; }
+
+/* ------------------------------------------------------------------- the stage */
+main { padding-block: 26px 8px; }
+main > section + section { margin-top: 26px; }
+#mount:empty { display: none; }
+
+#cast { display: grid; gap: 6px; }
+
+.wizard {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.wizard .who { color: var(--ink); }
+
+.wizard .role {
+  font: 10px/1 var(--mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--good) 55%, var(--line));
+  border-radius: 999px;
+  color: var(--good);
+}
+
+.wizard .refused { color: var(--warm); font-size: 12px; }
+.wizard[data-stale="true"] .who { color: var(--faint); }
+
+#label {
+  margin: 18px 0 0;
+  color: var(--accent);
+  font: 13px/1.5 var(--mono);
+}
+
+/* --------------------------------------------------------- what the numbers mean */
+.mg-params {
+  padding-top: 30px;
+  border-top: 1px solid var(--rule);
+}
+
+.mg-params-sub {
+  margin: 0 0 22px;
+  max-width: 66ch;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.mg-params-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 30px;
+  align-items: start;
+}
+
+.mg-param {
+  border-bottom: 1px solid var(--rule);
+  padding: 10px 0 12px;
+}
+
+.mg-param > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+  font: 15px/1.4 var(--serif);
+  color: var(--ink);
+}
+
+.mg-param > summary::-webkit-details-marker { display: none; }
+.mg-param > summary::after {
+  content: "+";
+  margin-left: auto;
+  font: 12px/1 var(--mono);
+  color: var(--faint);
+}
+
+.mg-param[open] > summary::after { content: "−"; }
+.mg-param > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.mg-param-label { flex: 0 0 auto; }
+
+.mg-chip {
+  font: 10px/1 var(--mono);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.mg-param-body {
+  margin: 8px 0 0;
+  max-width: 58ch;
+  color: var(--dim);
+  font-size: 14px;
+}
+
+.mg-src {
+  margin: 6px 0 0;
+  font: 11px/1.5 var(--mono);
+  color: var(--faint);
+}
+
+/* ------------------------------------------------------------------- the foot */
+#status {
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+  min-height: 1.6em;
+  color: var(--dim);
+  font: 11px/1.6 var(--mono);
+  letter-spacing: .02em;
+}
+
+footer {
+  padding-top: 14px;
+  padding-bottom: 52px;
+  color: var(--faint);
+  font: 11px/1.7 var(--mono);
+  border-top: 1px solid var(--rule);
+  margin-top: 26px;
+}
+
+footer a { color: var(--cold); text-decoration: none; border-bottom: 1px solid transparent; }
+footer a:hover { border-bottom-color: var(--cold); }
+footer a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 720px) {
+  :root { --gutter: 16px; }
+  .mg-top { padding-top: 30px; }
+  h1 { font-size: 26px; }
+  .mg-params-list { grid-template-columns: minmax(0, 1fr); }
+  .mg-level { margin-left: 0; }
+  #meter { width: 120px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #meterbar { transition: none; }
+}

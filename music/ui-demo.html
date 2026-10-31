@@ -3,53 +3,53 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MarGoth — chain view</title>
-<style>
-  :root { color-scheme: dark; }
-  body {
-    margin: 0; padding: 22px; background: #0c0c10; color: #cfcfd6;
-    font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
-  }
-  header, .controls, #host { max-width: 980px; margin: 0 auto; }
-  header { margin-bottom: 12px; }
-  h1 { font-size: 15px; font-weight: 500; margin: 0 0 6px; color: #f0eef0; }
-  header p { margin: 0; color: #7b7b88; max-width: 78ch; }
-  .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-  .controls button {
-    font: inherit; color: #cfcfd6; background: #17171d; border: 1px solid #2b2b34;
-    border-radius: 4px; padding: 3px 11px; cursor: pointer;
-  }
-  .controls button:hover { border-color: #e0b366; color: #f0eef0; }
-  .controls button:focus-visible { outline: 2px solid #e0b366; outline-offset: 2px; }
-  .controls span { color: #7b7b88; }
-</style>
+<title>MarGoth — the chain, bar by bar</title>
+<link rel="stylesheet" href="./margoth.css?v=1">
 </head>
 <body>
-<header>
-  <h1>The Chains of Margoth — chain view</h1>
-  <p>
+<header class="mg-top">
+  <p class="mg-kicker">Cyborg Collective · the chain view</p>
+  <h1>The Chains of Margoth</h1>
+  <p class="mg-sub">
     One bar per 1.8 s from the real generator (seed 5, A minor). C climbs 0.2 → 0.95
     over 20 bars, holds for 20, then drops to 0.25 for 4: a drop after a peak is what
     arms the open chord. Where the drop lands on a held chord the ring shows
     <code>armed</code> and the open chord follows on the next change (bar 84 → 85 in
     the second cycle); where it lands on a change bar the generator consumes the flag
     in that same bar, so that release arrives with no preceding <code>armed</code> bar
-    (the first cycle's bar 40). No audio -- the level meter is derived from the bar's
-    own content, not from a signal.
+    (the first cycle's bar 40). No audio: the level shown in the bar is derived from
+    the bar's own content, not from a signal.
   </p>
 </header>
 
-<div class="controls">
+<section class="mg-bar" id="transport">
   <button id="pause" type="button">pause</button>
   <button id="step" type="button">step one bar</button>
-  <span id="hint">space or return on a focused button also works</span>
-</div>
+  <span id="hint" class="mg-hint">space or return on a focused button also works</span>
+  <div class="mg-level"><div id="meter"><div id="meterbar"></div></div><span id="meter-text">—</span></div>
+</section>
 
-<div id="host"></div>
+<main>
+  <section id="host" aria-label="the instrument"></section>
+  <section class="mg-params" id="params" aria-labelledby="params-h">
+    <h2 id="params-h">what the numbers mean</h2>
+    <p class="mg-params-sub">Every parameter the panel prints, and the rule it feeds. The graphs
+       above draw the same table: a live edge is a rule that fired in the last bar.</p>
+  </section>
+</main>
+
+<p id="status" role="status" aria-live="polite">starting the clock…</p>
+
+<footer>
+  the band is generated per bar, never replayed ·
+  <a href="./listen.html">listen</a> ·
+  gates: <a href="./test_audio.html?section=kit">kit</a> ·
+  <a href="./test_audio.html?section=voices">voices</a>
+</footer>
 
 <script type="module">
 import { createGenerator, nextBar } from "./generator.js";
-import { createUI } from "./ui.js";
+import { createUI, mountParameters } from "./ui.js";
 import { ladderRows, timbreRows, voiceRows } from "./explain.js";
 import {
   concentrationFromParts, getConcentrationWeights, setConcentrationWeights, partsFromConcentration,
@@ -58,9 +58,13 @@ import {
 const BPM = 132;
 const BAR_MS = (60 / BPM) * 4 * 1000;   // 1818 ms: four beats at 132
 
+const statusLine = document.getElementById("status");
+const meterbar = document.getElementById("meterbar");
+const meterText = document.getElementById("meter-text");
+
 const ui = createUI({
   root: document.getElementById("host"),
-  onGrab: () => ui.status("grab: this chord is pinned for two bars"),
+  onGrab: () => { statusLine.textContent = "grab: this chord is pinned for two bars"; },
   onWeights: (next) => {
     setConcentrationWeights(next);
     // a weights change moves C, so redraw the panel from the last bar at once
@@ -130,7 +134,8 @@ function draw(frame) {
   const { bar, controls, parts } = frame;
   const level = levelFor(bar);
   ui.bar({ data: bar, bar: bar.index, time: performance.now() / 1000, tempo: bar.tempo });
-  ui.setLevel(level.rms, level.peak);
+  meterbar.style.width = `${clamp((level.rms + 60) / 60 * 100, 0, 100)}%`;
+  meterText.textContent = `${level.rms.toFixed(1)} / ${level.peak.toFixed(1)} dBFS`;
   ui.signals({
     mix: controls,
     ladder: ladderRows(controls, bar),
@@ -161,6 +166,9 @@ const pauseButton = document.getElementById("pause");
 const stepButton = document.getElementById("step");
 const hint = document.getElementById("hint");
 
+mountParameters({ root: document.getElementById("params") });
+statusLine.textContent = "clock running · one bar per 1.8 s";
+
 ui.setPlaying(true);
 advance();
 setInterval(() => { if (running) advance(); }, BAR_MS);
@@ -169,7 +177,7 @@ pauseButton.addEventListener("click", () => {
   running = !running;
   ui.setPlaying(running);
   pauseButton.textContent = running ? "pause" : "play";
-  hint.textContent = running ? "clock running" : "clock stopped -- step to inspect a bar";
+  hint.textContent = running ? "space or return on a focused button also works" : "clock stopped -- step to inspect a bar";
 });
 
 stepButton.addEventListener("click", () => advance());

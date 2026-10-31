@@ -175,6 +175,18 @@ export function devicesAt(C) {
   return Object.keys(DEVICE_GATES).filter((name) => value >= DEVICE_GATES[name]);
 }
 
+// Cruelty is how far the band reaches for the jarring device. It was stored and
+// set but never read, so the transport's third slider moved nothing. It scales
+// the two rolls that decide how often the harmony gets ugly, divided by its own
+// default: at 0.15 k is exactly 1, so every bar published before this still
+// generates bit for bit, and the slider can only ever make the band *more*
+// itself in the direction it points.
+export const CRUELTY_REFERENCE = 0.15;
+export function crueltyFactor(cruelty) {
+  const k = Number.isFinite(cruelty) ? cruelty / CRUELTY_REFERENCE : 1;
+  return Math.min(4, Math.max(0, k));
+}
+
 function pickFamily(gen, C) {
   if (gen.pinFamily) return familyById(gen.pinFamily);
   const weighted = FAMILIES.map((family) => {
@@ -251,15 +263,20 @@ function advanceChord(gen, C, devices) {
   let used = [];
   if (cliche && C >= 0.3) used.push("cliche");
 
+  // One factor for both rolls, read here so the two draws stay in the same order
+  // and the rng stream does not shift: at the reference cruelty k is 1 and both
+  // thresholds are the constants they were.
+  const k = crueltyFactor(gen.cruelty);
+
   // mixture: the major/minor subdominant swap, the oldest trick in the book
   let playStep = step;
   if (devices.includes("mixture") && (step.label === "IV" || step.label === "iv")
-      && gen.rng() < 0.25) {
+      && gen.rng() < Math.min(0.6, 0.25 * k)) {
     playStep = { ...step, q: step.q === "maj" ? "min" : "maj" };
     used.push("mixture");
   }
   // bII: the phrygian Neapolitan, only once the pressure is high
-  if (devices.includes("bII") && gen.family.mode === "minor" && gen.rng() < 0.12) {
+  if (devices.includes("bII") && gen.family.mode === "minor" && gen.rng() < Math.min(0.5, 0.12 * k)) {
     playStep = { ...playStep, deg: 1, q: "maj", label: "bII" };
     used.push("bII");
   }

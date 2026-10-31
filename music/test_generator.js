@@ -4,6 +4,7 @@
 import {
   createGenerator, nextBar, aggregate, devicesAt, timbreAt, seedFromText,
   REGISTER, VOICE_BUDGET, STEPS_PER_BAR, movementCost,
+  CRUELTY_REFERENCE, crueltyFactor,
 } from "./generator.js";
 import {
   createSharer, push, view, concentration, HOLD_S, STALE_S, DECAY_S, C_FLOOR,
@@ -365,6 +366,30 @@ for (const family of FAMILIES) {
 }
 check(EXIT_CADENCE.length === 3 && EXIT_CADENCE[0].base === "major",
   "a major family hands back through iv -> bVII -> i, never on a downbeat");
+
+// ------------------------------------------------------------------ cruelty
+console.log("cruelty");
+check(crueltyFactor(CRUELTY_REFERENCE) === 1,
+  `the reference cruelty is exactly k=1 (${crueltyFactor(CRUELTY_REFERENCE)})`);
+// The load-bearing one: the default must leave the published music untouched.
+const plain = playBars(createGenerator({ seed: 99, tonicMidi: TONIC }), 12);
+const explicit = playBars(createGenerator({ seed: 99, tonicMidi: TONIC, cruelty: 0.15 }), 12);
+check(JSON.stringify(plain) === JSON.stringify(explicit),
+  "the default cruelty is a no-op: twelve bars are bit-identical");
+const reachedAt = (cruelty) => {
+  const gen = createGenerator({ seed: 41, tonicMidi: TONIC, cruelty });
+  let seen = 0;
+  for (let i = 0; i < 60; i += 1) {
+    const bar = nextBar(gen, { C: 0.9, alphaShare: 0.3, arousal: 0.6, motion: 0.3 });
+    if (bar.chords.some((chord) => chord.devices.includes("bII")
+      || chord.devices.includes("mixture"))) seen += 1;
+  }
+  return seen;
+};
+const harsh = reachedAt(0);
+check(harsh === 0, `at cruelty 0 the band never reaches for bII or mixture (${harsh} bars)`);
+const cruel = reachedAt(0.6);
+check(cruel > 0, `at cruelty 0.6 it does (${cruel} bars of 60)`);
 
 const report = failures.length
   ? `\nFAIL ${failures.length} of ${assertions} assertions\n  - ${failures.join("\n  - ")}`
