@@ -261,11 +261,25 @@ sines, gated 180 ms; hats 6 detuned squares ≥6 kHz; bass two saws ±7 cents + 
 + chorus; lead pulse 25% + saw, lowpass 4 kHz. Master: compressor (3:1, 8 ms) and
 a −1 dBFS safety gain.
 
-> **Superseded by `music/kit.js`.** The step 1–4 build settled the numbers there,
-> and that file is the single source for hit synthesis — the kick falls 120→44 Hz
-> (a sine that starts at 58 Hz has no click to speak of), the snare gate is 150 ms,
-> and the grammar never emits `clap` or `rim`, so the kit is six hits. The bus
-> topology and the impulse above survived unchanged.
+> **Superseded by `music/kit.js` and `music/voices.js`.** The step 1–4 build
+> settled the numbers there, and that file is the single source for hit synthesis
+> — the kick falls 120→44 Hz (a sine that starts at 58 Hz has no click to speak
+> of), the snare gate is 150 ms, and the grammar never emits `clap` or `rim`, so
+> the kit is six hits.
+>
+> The bus topology is `music/voices.js`, and it differs from the line above in
+> three places. **Bass is dry** (`bass → chorus` was never built; a detuned chorus
+> on a two-saw bass fights the pad for the same widening). **The snare's send is
+> an ordinary reverb send** at 0.35 — the gate is on the snare itself (150 ms), not
+> on its reverb, so nothing is gated from the tail. **The hats share that one
+> reverb** at 0.1 rather than getting a short room of their own. Toms get 0.2, so
+> the bar-four fill sits in the same space as the snare it stands in for. The
+> impulse did survive unchanged: 2.6 s, 20 ms of real silence, decorrelated
+> channels, shared by every send.
+>
+> One correction to the chain: the −1 dBFS safety gain is a fader at 0.5, not
+> 0.89. At 0.89 the master peaks at +2.9 dBFS — a hard clip that stayed invisible
+> while the WaveShaper was clamping the mix first.
 
 ## 8. UI: the chain is the instrument
 

@@ -35,14 +35,39 @@ function saturationCurve(amount) {
   return curve;
 }
 
+// The voice sum reaches about 5.2 peak -- two detuned saws plus a sub on the
+// bass, four saws on the pad, and the kit's transients landing together. A
+// WaveShaperNode's curve covers [-1, 1] only: every sample beyond that lands on
+// the curve's endpoint, which is a hard clip, not saturation, and it would put a
+// clipped signal in front of the compressor while making a headroom measurement
+// look healthy. One trim at the sum puts the loudest measured mix at 0.80 and the
+// clamp edge at 6.7, and makeUp below restores the level the trim removed.
+const MIX_TRIM = 0.15;
+
+// The output fader. 0.89 was chosen for a chain whose compressor came out at
+// about 1.0; measured on the four-bar arrangement the compressor's output peaks
+// at 1.57, so 0.89 put the master at +2.9 dBFS -- a hard clip at the device
+// output, hidden until the WaveShaper stopped clamping first. 0.5 lands the
+// loudest measured mix near -2 dBFS: under the ceiling with margin for a hotter
+// arrangement, which keeps the whole chain linear at the destination.
+const OUT_TRIM = 0.5;
+
 export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   // ------------------------------------------------------------------ master
-  // sum -> soft clip -> compressor -> trim -> out. The trim is the -1 dBFS
-  // ceiling; the compressor is what makes four voices sit like a band instead of
-  // four tracks at once.
+  // sum -> soft clip -> compressor -> fader -> out. The compressor is what makes
+  // four voices sit like a band instead of four tracks at once; the fader is the
+  // ceiling.
   const input = ctx.createGain();
+  input.gain.value = MIX_TRIM;
   const shaper = ctx.createWaveShaper();
   shaper.curve = null;              // a null curve passes the signal through
+  // Compensation: the trim above exists only to put the mix inside the curve's
+  // [-1, 1] domain, so the level is restored straight after it. Small signals are
+  // unity again and the compressor keeps the operating point it had, which is
+  // what stops the trim from re-balancing the band (voices near the threshold
+  // would otherwise lose their makeup gain).
+  const makeUp = ctx.createGain();
+  makeUp.gain.value = 1 / MIX_TRIM;
   const compressor = ctx.createDynamicsCompressor();
   compressor.threshold.value = -18;
   compressor.knee.value = 12;
@@ -50,10 +75,11 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   compressor.attack.value = 0.008;
   compressor.release.value = 0.25;
   const master = ctx.createGain();
-  master.gain.value = 0.89;         // -1 dBFS of safety before the device output
+  master.gain.value = OUT_TRIM;
 
   input.connect(shaper);
-  shaper.connect(compressor);
+  shaper.connect(makeUp);
+  makeUp.connect(compressor);
   compressor.connect(master);
   master.connect(ctx.destination);
 
@@ -301,7 +327,10 @@ export function createVoices(ctx, kit, { bpm = 132 } = {}) {
   return {
     play,
     setTimbre,
-    buses: { reverb: reverbIn, chorus: chorusIn, delay: delayIn },
+    // `sum` is the voice mix before the shaper. It is exposed so the level going
+    // into a [-1,1] curve can be measured instead of assumed; the three sends are
+    // the effect buses.
+    buses: { sum: input, reverb: reverbIn, chorus: chorusIn, delay: delayIn },
     master,
   };
 }

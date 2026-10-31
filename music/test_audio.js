@@ -244,7 +244,7 @@ function arrange(bars, { seed = 3, tonicMidi = 57, bpm = 132, controls }) {
   return { events, timbres, barLength, duration: bars * barLength };
 }
 
-async function renderStem(kit, arrangement, kinds, seconds) {
+async function renderStem(kit, arrangement, kinds, seconds, { tap = "master" } = {}) {
   const ctx = new OfflineAudioContext(1, Math.ceil(seconds * SAMPLE_RATE), SAMPLE_RATE);
   const voices = createVoices(ctx, kit, { bpm: 132 });
   for (const { at, value } of arrangement.timbres) voices.setTimbre(value, at);
@@ -254,6 +254,12 @@ async function renderStem(kit, arrangement, kinds, seconds) {
     if (event.kind === "bass") voices.play.bass(event.midi, event.time, event.dur, event.vel);
     if (event.kind === "pad") voices.play.pad(event.voicing, event.time, event.dur);
     if (event.kind === "lead") voices.play.lead(event.midi, event.time, event.dur, event.vel);
+  }
+  if (tap === "sum") {
+    // Cut the sum from the saturator and listen to it directly: this is the
+    // signal the WaveShaper's curve actually receives.
+    voices.buses.sum.disconnect();
+    voices.buses.sum.connect(ctx.destination);
   }
   return ctx.startRendering();
 }
@@ -292,6 +298,17 @@ async function runVoices() {
   const mixPeak = db(peakOf(mixData));
   const mixRms = db(rmsOf(mixData));
   check(mixPeak <= -0.9, `the full mix peaks at ${dbText(mixPeak)} <= -0.9 dBFS (${dbText(mixRms)} RMS)`);
+
+  // The master peak above would pass just as happily on a clipped mix, so the
+  // signal actually entering the WaveShaper is measured here: its curve only
+  // covers [-1, 1], and anything past that is a hard clip wearing a saturator's
+  // name. The voice sum measured 5.2 peak before this was gain staged.
+  const sum = await renderStem(kit, arrangement, ["drum", "bass", "pad", "lead"], seconds, { tap: "sum" });
+  const sumPeak = peakOf(sum.getChannelData(0));
+  check(sumPeak <= 1.0,
+    `the voice sum peaks at ${sumPeak.toFixed(3)}, inside the shaper's [-1, 1] domain (no clamp)`);
+  check(sumPeak >= 0.4,
+    `the voice sum peaks above 0.4, so the saturator is actually being driven (${sumPeak.toFixed(3)})`);
 
   // The bass owns the sub; the pad does not. If a pad ever sat down there the
   // two would fight and neither would read as weight.
