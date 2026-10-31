@@ -100,14 +100,20 @@ an endorsement. Every family is transposable to any tonic (default A minor).
 
 **Devices** (the things pressure actually unlocks):
 
-| Device | Musical content | Cost |
+| Device | Musical content | Implementation |
 |---|---|---|
-| `cliche` | descend the 7th chromatically under a held root, one step per beat | needs 2–4 beats, no other device |
-| `sus` | raise the 4th or 2nd in an upper voice, resolve to the chord after 1–2 beats | 1–2 beats |
-| `mixture` | swap IV↔iv, or I→bVII in minor | instant |
-| `climb` | step the root up a whole step (bVI→bVII→I) | one chord event |
-| `open` | land on the family's open chord (maj7, wide voicing, +reverb) | one chord event |
-| `drone` | hold a pedal root under a moving chord (open strings) | 2+ bars |
+| `cliche` | descend the 7th chromatically under a held root, one step per beat | the `milky` path's `maj7 → 7` steps; pad yields an octave |
+| `sus` | raise the 4th or 2nd in an upper voice, resolve after 1–2 beats | extra chord events at steps 8 and 12, never on the last 8th |
+| `mixture` | swap IV↔iv (the major/minor subdominant) | `p = 0.25` on any step labelled `IV`/`iv`, marked `mixture` |
+| `bII` | the phrygian Neapolitan | `p = 0.12` at `C ≥ 0.75`, replacing that bar's chord, marked `bII` |
+| `climb` | step the root up a whole step (bVI→bVII→I) | the `spellbound` ascent bars, marked `climb` |
+| `open` | land on the family's open chord (maj7, wide, +reverb) | armed by a concentration drop, flagged `ui.release` |
+| `drone` | hold the pedal under a moving chord | `bar.drone`, tonic, ≥ an octave above the bass |
+
+**Every device the chart advertises is proven to sound.** The test sweeps all
+families at `C = 0.9` and fails if `devicesAt()` lists a device that never
+appears in a bar — the chart is the product, so an unlocked-but-unplayable lamp
+would be a lie.
 
 ## 4. Pressure: density, not frequency
 
@@ -192,8 +198,11 @@ is still applied on top, as colour.)
 sum of voice displacements after normalising both chords to their lowest note,
 because a deliberate register shift is orchestration and a bad voice leading is a
 bad voice leading — conflating them rejected the cliché outright, and the chord
-never changed. Budget: 5 semitones; over budget the chord is **held** rather than
-jumped, except at a phrase boundary, which is where a band is allowed to lift.
+never changed. Budget: 5 semitones; over budget the chord is **held**, and a held
+step is **retried** on the next bar rather than skipped (skipping loses the
+descending 7th and can exhaust a family before its open chord). After two
+attempts the step plays anyway and the reason says so: a band that stalls forever
+is worse than a change that is not perfect, and the chart shows the difference.
 
 **Inner voice**: during a cliché one voice owns a monotonic descent and no other
 device may take it. **Pad glide**: 20 ms portamento on a change, 120 ms attack on a
@@ -221,7 +230,11 @@ and collided with the bass's own fifth (E2 under an A minor bar), which is exact
 why the rule is about *register*, not about turning the pedal on and off.
 
 **Lead (auto mode)**: mono pulse+saw, 60 ms portamento, dotted-8th delay; chord
-tones on beats 1 and 3, no repeated pitch, tritone above root only over `bII`.
+tones on beats 1 and 3, and **never the same pitch twice in a row** — where the
+register has no other candidate for that chord tone the beat rests instead of
+repeating. The register is bounded (A4..A5, or A4..F5 when frontal asymmetry is
+positive): the first version fired the anti-repeat guard *before* folding and
+emitted the same note four times a bar.
 
 **The human/machine handshake.** The page cannot know whether an external rig is
 being played, so the transport carries a large, unmistakable **Mute Auto-Lead**
@@ -292,7 +305,7 @@ session's summary, not a replay of it" — the catalogue holds summaries only.
 
 ## 11. Verification
 
-**S1 is done: `node music/test_generator.js` → `PASS 57 assertions`.** The pure
+**S1 is done: `node music/test_generator.js` → `PASS 66 assertions`.** The pure
 chain, the conditioner, the grammar and the registers are all pinned. What that
 suite actually found, and fixed, is worth more than the pass count:
 
@@ -301,8 +314,10 @@ suite actually found, and fixed, is worth more than the pass count:
 | Bass register | the "bass" played at A2..G3, its fifth came out at E3, and `iv`'s root folded onto the drone at unison | `fold()` allowed `hi + 11`, so a one-octave window was really two |
 | The line cliché never played | the *signature device* was silently held every bar | voice leading was measured on absolute MIDI, so the pad's deliberate octave yield for the cliché read as a 46-semitone jump and blew the budget |
 | Every bar ran at `C = 0.3` | the climb, `bII` and the release could never fire in production | `aggregate()` read `e[key]` on `{s, w}` wrappers, and `view()` never exposed `C`, so both fell through to the default — the unit test only exercised `concentration()` directly |
+| Devices the chart could not play | `mixture` and `bII` were advertised by `devicesAt()` and applied nowhere | they were design notes, not code; now implemented with probabilities and covered by a sweep that fails if any advertised device never sounds |
+| The lead played one note | four identical pitches per bar on a tonic chord | the anti-repeat guard ran before the fold, and a narrow register left no alternative pitch, so the guard had nothing to choose |
 | Drone rule | a fifth pedal collided with the bass's own fifth | the rule was stated as pitch-class purity; it has to be register separation |
-| Vamp | a solo wizard's absence was gated on raw age | gated on what the bleed *reaches*: `C ≤ C_FLOOR + 0.05` after `DECAY_S` |
+| Vamp | a solo wizard's absence was gated on raw age | gated on what the bleed *reaches*: `C ≤ C_FLOOR + 0.05` after `DECAY_S`, now for any number of wizards who have all gone |
 
 The suite, in order: determinism (same seed → same twelve bars, different seed →
 different piece, `seedFromText` stable), conditioning (hold on missing, never
@@ -325,7 +340,7 @@ screenshot of chain view + chart strip), and your A/B against the references.
 
 | Slice | Deliverable | Done when |
 |---|---|---|
-| S1 ✅ | `conditioner.js` + `families.js` + `generator.js`: controls → chain events (chords with devices, bass, drums) | `node music/test_generator.js` PASS 57 |
+| S1 ✅ | `conditioner.js` + `families.js` + `generator.js`: controls → chain events (chords with devices, bass, drums) | `node music/test_generator.js` PASS 66 |
 | S2 | `audio.js`: prerendered drums, voice chains, scheduler, master bus | fixture page plays a full band; screenshot + stem counts |
 | S3 | `ui.js`: chain view, chart strip, device rack, ring, transport | chart follows the generator in a live render |
 | S4 | `app.js` seam + consent gate + multi-wizard roles | two simulated wizards get two roles; a stale one hands over |

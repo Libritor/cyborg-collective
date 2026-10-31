@@ -155,8 +155,10 @@ check(holdLengths.length > 0 && holdLengths.every((n) => n >= 1 && n <= 4),
 
 // --------------------------------------------------------- voice leading (§5)
 console.log("voice leading");
-const moves = chords.filter((chord) => chord.rejected).length;
-check(moves >= 0, "candidates record what lost, for the chain view");
+const moves = chords.filter((chord) => Array.isArray(chord.rejected)).length;
+check(moves === chords.length, "every chord records the candidates it beat");
+const rejectedSomewhere = chords.some((chord) => chord.rejected.length > 0);
+check(rejectedSomewhere, "the voice-leading search had alternatives to reject");
 const withinBudget = [];
 let prevVoicing = null;
 for (const bar of bars) {
@@ -168,11 +170,50 @@ for (const bar of bars) {
     prevVoicing = voicing;
   }
 }
-check(withinBudget.filter((m) => m > VOICE_BUDGET).length <= 3,
-  `changes stay inside the ${VOICE_BUDGET}-semitone budget except at phrase lifts`);
+const overBudget = bars.filter((bar) => bar.chords.length && bar.ui.reason.includes("ran out"));
+check(overBudget.length === 0,
+  `no change exceeds the ${VOICE_BUDGET}-semitone budget in a normal run (${withinBudget.filter((m) => m > VOICE_BUDGET).length} over)`);
 const padNotes = chords.flatMap((chord) => chord.voicing || []);
 check(padNotes.every((m) => m >= REGISTER.padYielding[0] && m <= REGISTER.pad[1]),
   "the pad never leaves its register, even while it yields to a cliché");
+
+// a step that cannot be voice-led is retried, not skipped (forced white-box:
+// in normal runs the families are close enough that the budget never binds)
+const retryGen = createGenerator({ seed: 2, tonicMidi: TONIC, pinFamily: "milky" });
+nextBar(retryGen, { C: 0.5 });
+retryGen.previous = [60, 61, 71];      // shape [0,1,11]: nothing voice-leads into it
+retryGen.barsLeft = 0;
+const heldBar = nextBar(retryGen, { C: 0.5 });
+check(heldBar.ui.reason.includes("held:"),
+  "an unvoiceable change is held instead of jumping");
+const retried = nextBar(retryGen, { C: 0.5 });
+check(retried.ui.reason.includes("held:"),
+  "the held step is retried on the next bar, not skipped");
+const accepted = nextBar(retryGen, { C: 0.5 });
+check(accepted.ui.reason.includes("ran out") && accepted.chords.length > 0
+  && accepted.chords[0].degree === "i(maj7)",
+  "after two attempts the held step plays anyway, so a hold can never stall or skip");
+
+// every advertised device must be playable, or the chart is lying
+console.log("device coverage");
+const emittedDevices = new Set();
+for (const family of FAMILIES) {
+  const gen = createGenerator({ seed: 12, tonicMidi: TONIC, pinFamily: family.id });
+  for (let i = 0; i < 120; i += 1) {
+    const bar = nextBar(gen, { C: 0.9, alphaShare: 0.5, arousal: 0.8 });
+    for (const chord of bar.chords) for (const device of chord.devices || []) emittedDevices.add(device);
+    if (bar.drone !== null) emittedDevices.add("drone");
+    if (bar.ui.release) emittedDevices.add("open");
+  }
+}
+const advertised = devicesAt(0.9);
+const unplayable = advertised.filter((device) => !emittedDevices.has(device));
+check(unplayable.length === 0,
+  `every advertised device actually sounds (${advertised.length} checked, missing: ${unplayable.join(",") || "none"})`);
+check(advertised.includes("mixture") && emittedDevices.has("mixture"),
+  "mixture is applied to the subdominant, not just advertised");
+check(advertised.includes("bII") && emittedDevices.has("bII"),
+  "the phrygian bII substitution is really played");
 
 // ------------------------------------------------------------- registers (§5)
 console.log("registers");
@@ -295,9 +336,26 @@ const leadChecks = leadBars.flatMap((bar) => {
 });
 check(leadChecks.length > 0 && leadChecks.every(Boolean),
   "every lead note on a beat is a chord tone (the lead obeys the harmony)");
+const leadStreaks = leadBars.filter((bar) => bar.lead.some((note, i) =>
+  i > 0 && bar.lead[i - 1].midi === note.midi));
+check(leadStreaks.length === 0, "the lead never repeats a pitch back to back");
 const leadSteps = leadBars.flatMap((bar) => bar.lead.map((n) => n.midi));
-check(leadSteps.every((m) => m >= REGISTER.lead[0] && m <= REGISTER.lead[1] + 12),
-  "the auto lead stays in the lead register");
+check(leadSteps.every((m) => m >= REGISTER.lead[0] && m <= REGISTER.lead[1]),
+  "the auto lead stays inside its register, with no octave of slack");
+
+// every step of every family must be playable, or a family is lying about itself
+const unplayed = [];
+for (const family of FAMILIES) {
+  const gen = createGenerator({ seed: 8, tonicMidi: TONIC, pinFamily: family.id });
+  const played = new Set();
+  for (let i = 0; i < 160; i += 1) {
+    const bar = nextBar(gen, { C: 0.5, alphaShare: 0.3, arousal: 0.5 });
+    for (const chord of bar.chords) if (chord.degree) played.add(chord.degree);
+  }
+  for (const step of family.steps) if (!played.has(step.label)) unplayed.push(`${family.id}:${step.label}`);
+}
+check(unplayed.length === 0,
+  `every family step is emitted at least once (missing: ${unplayed.join(",") || "none"})`);
 
 // ---------------------------------------------------------------- families
 console.log("families");

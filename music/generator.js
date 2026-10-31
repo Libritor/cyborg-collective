@@ -70,6 +70,7 @@ export function createGenerator({ seed = 1, tonicMidi = 57, bpm = 132, cruelty =
     armed: false,
     peak: null,
     locked: 0,
+    holdCount: 0,
     cHistory: [],
     familyCounts: {},
     phrases: 0,
@@ -245,19 +246,57 @@ function advanceChord(gen, C, devices) {
   }
   const step = steps[gen.pos];
   const cliche = !!step.cliche && devices.includes("cliche");
-  const candidate = buildChord(gen, step, gen.family.mode, cliche && C >= 0.3);
-  let reason = `${gen.family.title}: ${step.label}`;
-  if (cliche && C >= 0.3) reason += " (cliché owns the top voice; pad yields an octave)";
-  // a change that cannot be voice-led is not played: the chord is held instead.
-  // At a phrase boundary a lift is allowed -- that is where a band changes key.
+  let used = [];
+  if (cliche && C >= 0.3) used.push("cliche");
+
+  // mixture: the major/minor subdominant swap, the oldest trick in the book
+  let playStep = step;
+  if (devices.includes("mixture") && (step.label === "IV" || step.label === "iv")
+      && gen.rng() < 0.25) {
+    playStep = { ...step, q: step.q === "maj" ? "min" : "maj" };
+    used.push("mixture");
+  }
+  // bII: the phrygian Neapolitan, only once the pressure is high
+  if (devices.includes("bII") && gen.family.mode === "minor" && gen.rng() < 0.12) {
+    playStep = { ...playStep, deg: 1, q: "maj", label: "bII" };
+    used.push("bII");
+  }
+
+  const candidate = buildChord(gen, playStep, gen.family.mode, cliche && C >= 0.3);
+  let reason = `${gen.family.title}: ${playStep.label}`;
+  if (used.includes("cliche")) {
+    reason += " (cliché owns the top voice; pad yields an octave)";
+  }
+  if (used.includes("mixture")) reason += " (mode mixture on the subdominant)";
+  if (used.includes("bII")) reason += " (phrygian Neapolitan)";
+  // the climb is a property of the phrygian path, so label the bars that are it
+  if (gen.family.id === "spellbound"
+      && (playStep.label === "bII" || playStep.label === "bIII")) {
+    used.push("climb");
+    reason += " (climbing)";
+  }
+
+  // a change that cannot be voice-led is not played: retry the same step next
+  // bar (a held step is not a skipped step -- skipping loses the descending 7th
+  // of the cliché, and can exhaust a family without ever playing its open chord).
+  // At a phrase boundary a lift is allowed: that is where a band changes key.
   const atBoundary = gen.pos === 0;
-  if (gen.previous && candidate.movement > VOICE_BUDGET && !atBoundary) {
+  if (gen.previous && candidate.movement > VOICE_BUDGET && !atBoundary
+      && gen.holdCount < 2) {
+    gen.holdCount += 1;
     gen.barsLeft = 1;
     return `${reason} — held: movement ${candidate.movement} > ${VOICE_BUDGET}`;
   }
+  if (gen.previous && candidate.movement > VOICE_BUDGET && !atBoundary) {
+    reason += " (played after two attempts: voice leading ran out)";
+  }
+
+  gen.holdCount = 0;
+  candidate.devices = used;
   gen.current = candidate;
-  gen.barsLeft = step.bars;
+  gen.barsLeft = playStep.bars;
   gen.previous = candidate.voicing;
+  gen.pos += 1;                 // consumed only once it actually plays
   return reason;
 }
 
@@ -315,19 +354,31 @@ function droneBar(gen, devices) {
 }
 
 // ----------------------------------------------------------------------- lead
+/**
+ * One chord tone per beat, placed inside the register and never repeating a
+ * pitch. The anti-repeat guard used to run *before* the fold, so for a tonic
+ * chord it produced 76 -> 88 -> 76 and emitted the same note four times a bar;
+ * here every candidate is generated inside the window and the previous pitch is
+ * excluded outright.
+ */
 function autoLeadBar(gen, chord, controls) {
-  if (!chord || !chord.voicing) return [];
-  const chordTones = chord.voicing.map((m) => ((m % 12) + 12) % 12);
+  const voicing = chord && chord.voicing;
+  if (!voicing || !voicing.length) return [];
+  const pcs = [...new Set(voicing.map((m) => ((m % 12) + 12) % 12))];
   const high = (controls.asymmetry || 0) >= 0;
-  const range = high ? [76, 81] : REGISTER.lead;
+  const [lo, hi] = high ? [75, 81] : REGISTER.lead;
   const notes = [];
-  let last = null;
-  for (const step of [0, 4, 8, 12]) {
-    let midi = fold(chord.root + (chordTones.includes((chord.root + 7) % 12) ? 7 : 0), range);
-    while (last !== null && midi === last) midi += 12;
-    midi = fold(midi, range);
-    notes.push({ step, midi, dur: 2, vel: 0.7 });
-    last = midi;
+  for (const [index, step] of [0, 4, 8, 12].entries()) {
+    const pc = pcs[index % pcs.length];
+    const candidates = [];
+    for (let m = lo; m <= hi; m += 1) if ((((m % 12) + 12) % 12) === pc) candidates.push(m);
+    if (!candidates.length) continue;
+    const previous = notes.length ? notes[notes.length - 1].midi : null;
+    const usable = candidates.filter((m) => m !== previous);
+    if (!usable.length) continue;      // a rest beats repeating a pitch
+    const centre = previous === null ? (lo + hi) / 2 : previous;
+    usable.sort((a, b) => Math.abs(a - centre) - Math.abs(b - centre));
+    notes.push({ step, midi: usable[0], dur: 2, vel: 0.7 });
   }
   return notes;
 }
@@ -393,7 +444,6 @@ export function nextBar(gen, controls = {}) {
   const devices = bar.ui.devices;
 
   if (!gen.current || gen.barsLeft <= 0) {
-    if (gen.current && !gen.exit.length) gen.pos += 1;
     bar.ui.reason = advanceChord(gen, C, devices);
   } else {
     bar.ui.reason = `holding ${gen.current.label}`;
@@ -410,7 +460,7 @@ export function nextBar(gen, controls = {}) {
       quality: chord.quality,
       voicing: chord.voicing,
       cliche: chord.cliche,
-      devices: chord.cliche ? ["cliche"] : [],
+      devices: chord.devices || [],
       rejected: chord.rejected,
     });
     // a sus tension, resolved two beats later: never on the last 8th of the bar
@@ -474,10 +524,10 @@ export function aggregate(sharers, now) {
   };
   const C = mix("C") ?? 0.3;
   // The vamp is what the bleed *reaches*, not how long the socket has been quiet:
-  // a calm person at C 0.2 is still a live band, a solo wizard who left is not.
-  const soloGone = live.length === 1
-    && live[0].age > DECAY_S
-    && C <= C_FLOOR + 0.05;
+  // a calm person at C 0.2 is still a live band, a wizard who left is not. With
+  // several wizards this applies when every one of them has gone.
+  const everyoneGone = live.every((s) => s.age > DECAY_S);
+  const vamp = everyoneGone && C <= C_FLOOR + 0.05;
   return {
     C,
     alphaShare: mix("alphaShare"),
@@ -485,7 +535,7 @@ export function aggregate(sharers, now) {
     arousal: mix("arousal"),
     motion: mix("motion"),
     heads: live.length,
-    mode: soloGone ? "vamp" : "live",
+    mode: vamp ? "vamp" : "live",
   };
 }
 
