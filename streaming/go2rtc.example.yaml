@@ -1,0 +1,11 @@
+# Copy to go2rtc.yaml (never commit that file: it holds your camera's password).
+api:    {listen: "127.0.0.1:1984"}   # keep on localhost: go2rtc's API can run programs
+rtsp:   {listen: ""}
+webrtc: {listen: ""}
+streams:
+  # Bambu Lab printer with "LAN Only Liveview" on:
+  # printer: rtspx://bblp:<access code>@<printer ip>:322/streaming/live/1
+  # Generic IP camera:
+  cam1: rtsp://user:password@192.168.1.20:554/stream1
+  # Meta Quest view over adb (see README):
+  # quest: exec:python -u quest_feed.py --serial <headset ip>:5555 --max-size 1080 --crop 1440:1440:150:230 --bit-rate 2M

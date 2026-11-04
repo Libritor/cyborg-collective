@@ -1,0 +1,10 @@
+{
+ "serial": "<printer serial, from the printer's Settings > Device screen>",
+ "access_code": "<LAN access code, from the printer's Network screen>",
+ "ip_hint": "<optional: the printer's IP address>",
+ "owner": "<your name>",
+ "pseudonym": "printer-cam",
+ "model": "Bambu Lab H2C",
+ "label": "What viewers see under the picture",
+ "note": "one line under the card"
+}

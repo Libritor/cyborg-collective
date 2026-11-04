@@ -1,0 +1,6 @@
+go2rtc.yaml
+settings.json
+logs/
+bin/
+STOP
+__pycache__/
