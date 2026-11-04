@@ -81,6 +81,7 @@
     p.el.scrollIntoView({ behavior: "smooth", block: "center" });
   }
   window.addEventListener("hashchange", focusSharedPerson);
+  window.addEventListener("load", focusSharedPerson);
 
   // ---------------- live: the Cyborg Collective relay ----------------
   const people = new Map();
