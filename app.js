@@ -39,6 +39,49 @@
   }
   const $ = id => document.getElementById(id);
 
+  // Social sharing v1: a link to a public, currently shared live card.
+  // The link grants no new access; the relay's existing sharing tier still applies.
+  function liveShareUrl(pseudonym) {
+    const url = new URL(window.location.href);
+    url.hash = `live-user=${encodeURIComponent(pseudonym)}`;
+    return url.href;
+  }
+  async function shareLivePerson(pseudonym, button) {
+    const url = liveShareUrl(pseudonym);
+    const title = `${pseudonym} is sharing wearable data on 6ense`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url });
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        button.textContent = "Link copied!";
+        setTimeout(() => { button.textContent = "Share live link"; }, 2200);
+      } else {
+        window.prompt("Copy this public live link:", url);
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        window.prompt("Copy this public live link:", url);
+      }
+    }
+  }
+  function focusSharedPerson() {
+    if (!window.location.hash.startsWith("#live-user=")) return;
+    let id;
+    try { id = decodeURIComponent(window.location.hash.slice(11)); } catch (_) { return; }
+    const p = people.get(id);
+    if (!p) {
+      const notice = $("shared-person-notice");
+      if (notice) notice.textContent = `Waiting for ${id} to share live. If they have stopped sharing, this link will not show their data.`;
+      return;
+    }
+    const notice = $("shared-person-notice");
+    if (notice) notice.textContent = "Viewing a public live share. Data is visible only while its owner is sharing.";
+    p.el.classList.add("shared-person-highlight");
+    p.el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  window.addEventListener("hashchange", focusSharedPerson);
+
   // ---------------- live: the Cyborg Collective relay ----------------
   const people = new Map();
   const grid = $("grid"), empty = $("empty"), linkEl = $("link");
@@ -52,6 +95,7 @@
     el.innerHTML = `
       <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier"></span><span class="badge dev"></span></h3>
       <div class="said"><span class="pseud" hidden></span><span class="chip activity" hidden></span></div>
+      <div class="social-actions"><button type="button" class="share-live-button" title="Share a link to this already-public live session">Share live link</button><small>Only while this person is sharing</small></div>
       <div class="mood" hidden><canvas class="moodgrid" width="54" height="54"></canvas><div class="moodside"><span class="moodchip"></span><span class="moodtext"></span></div></div>
       <div class="moodlog" hidden></div>
       <div class="facts"><span class="fact model"></span><span class="fact batt"></span><span class="fact since"></span><span class="fact auxq"></span></div>
@@ -83,6 +127,7 @@
     el.querySelector(".name").textContent = p.pseudonym;
     el.querySelector(".tier").textContent = tierLabel(p.tier);
     el.querySelector(".dev").textContent = p.device || "";
+    el.querySelector(".share-live-button").addEventListener("click", event => shareLivePerson(p.pseudonym, event.currentTarget));
     return el;
   }
   function ensure(msg) {
@@ -92,6 +137,7 @@
       p = { pseudonym: msg.pseudonym, tier: msg.tier, device: msg.device, raw: CH.map(() => []) };
       p.el = card(p); grid.appendChild(p.el); people.set(msg.pseudonym, p); empty.hidden = true;
       if (msg.name || msg.activity || msg.mood) setProfile(p, msg);
+      if (window.location.hash.startsWith("#live-user=")) focusSharedPerson();
     }
     return p;
   }
