@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room Mood</title>
+<meta name="description" content="How the room is feeling right now and how that is shifting: anonymous counts from the phones of people who chose to be counted, shown only once enough of them are in it.">
+<link rel="stylesheet" href="style.css">
+<style>
+  :root { --calm: #2e9e6b; --activated: #d9a400; --strained: #d9534f; --unknown: #6b7280; --goodc: #c86dd7; }
+  body.wall { min-height: 100vh; display: flex; flex-direction: column; }
+  .wall header.top { padding-bottom: 0; }
+  .wall header.top h1 { font-size: 34px; }
+  .wall main { flex: 1; display: grid; grid-template-rows: auto auto 1fr auto; gap: 18px; padding: 8px 24px 24px; }
+  .now { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  .now .word { font-size: clamp(48px, 10vw, 128px); font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .now .word.calm { color: var(--calm); } .now .word.activated { color: var(--activated); }
+  .now .word.strained { color: var(--strained); } .now .word.unknown, .now .word.hidden { color: var(--unknown); }
+  .now .shift { font-size: clamp(16px, 2.6vw, 28px); color: var(--muted); }
+  .bars3 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .bar { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .bar b { font-size: clamp(24px, 4vw, 44px); display: block; }
+  .bar span { color: var(--muted); font-size: 14px; }
+  .bar i { display: block; height: 10px; border-radius: 6px; margin-top: 8px; background: var(--soft); overflow: hidden; }
+  .bar i::after { content: ""; display: block; height: 100%; width: var(--w, 0%); background: var(--c, var(--unknown)); transition: width .6s; }
+  .bar.calm { --c: var(--calm); } .bar.activated { --c: var(--activated); } .bar.strained { --c: var(--strained); } .bar.good { --c: var(--goodc); }
+  .chart { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-height: 220px; display: flex; flex-direction: column; }
+  .chart canvas { width: 100%; flex: 1; display: block; }
+  .chart .legend { display: flex; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 6px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+  .foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 14px; }
+  .cells { display: flex; gap: 10px; flex-wrap: wrap; }
+  .cell { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+  @media (max-width: 700px) { .bars3 { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body class="wall">
+<header class="top">
+  <h1>Room mood <span class="badge" id="link">connecting…</span></h1>
+  <p class="tag">How the people here are doing, as their own wearables read it and as they rate it, counted anonymously. Nobody is shown alone: the room appears once <span id="k">a few</span> people are counted, and a person leaves the count ten minutes after their phone stops voting.</p>
+</header>
+<main>
+  <div class="now">
+    <div class="word unknown" id="word">—</div>
+    <div class="shift" id="shift">waiting for the first votes</div>
+  </div>
+  <div class="bars3">
+    <div class="bar calm"><b id="calm">0</b><span>calm</span><i id="calm-i"></i></div>
+    <div class="bar activated"><b id="activated">0</b><span>activated</span><i id="activated-i"></i></div>
+    <div class="bar strained"><b id="strained">0</b><span>strained</span><i id="strained-i"></i></div>
+    <div class="bar good"><b id="good">0</b><span>feeling good · <span id="company">0</span> open to company</span><i id="good-i"></i></div>
+  </div>
+  <div class="chart">
+    <canvas id="chart" height="240"></canvas>
+    <div class="legend"><span><i style="background:var(--calm)"></i>calm</span><span><i style="background:var(--activated)"></i>activated</span><span><i style="background:var(--strained)"></i>strained</span><span><i style="background:var(--unknown)"></i>unknown</span><span><i style="background:var(--goodc)"></i>feeling good (line)</span><span id="span">last 4 hours, by the minute</span></div>
+  </div>
+  <div class="foot">
+    <div><b id="n">0</b> counted now · <span id="located">0</span> with a place</div>
+    <div class="cells" id="cells"></div>
+    <div>Count yourself in from MuseLog → Friends → <em>Room / area mood</em>. <a href="index.html">The Collective</a></div>
+  </div>
+</main>
+<script src="mood.js"></script>
+</body>
+</html>
