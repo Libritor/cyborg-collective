@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A room, rosbagged</title>
+<style>
+  :root { color-scheme: light dark; --ink: #1a1a19; --muted: #6a6f76; --bg: #f6f3ec; --panel: rgba(255,255,255,0.86); }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f0efec; --muted: #b7b4ab; --bg: #15171a; --panel: rgba(24,26,30,0.86); } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #view { position: fixed; inset: 0; }
+  #panel { position: fixed; left: 16px; top: 16px; max-width: 420px; padding: 14px 16px; background: var(--panel); border-radius: 12px; backdrop-filter: blur(6px); }
+  #panel h1 { font-size: 18px; margin: 0 0 6px; }
+  #panel p { margin: 6px 0; }
+  #panel .muted { color: var(--muted); font-size: 13px; }
+  #panel a { color: inherit; }
+  #status { position: fixed; right: 16px; bottom: 16px; padding: 8px 12px; background: var(--panel); border-radius: 10px; font-size: 13px; color: var(--muted); }
+  label { font-size: 13px; color: var(--muted); margin-right: 10px; }
+  button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--muted); background: transparent; color: var(--ink); cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="panel">
+  <h1>A room, rosbagged</h1>
+  <p>A bedroom office in Toronto, walked for three and a half minutes on 6 November 2026 with a Meta Quest 3S on and a Muse headband under it. The headset's own camera and inertial unit went into a ROS 2 bag; this is the place the bag describes, built from the pictures with structure-from-motion and a depth model.</p>
+  <p class="muted">Drag to look around, scroll to move closer, right-drag to pan. Walls that the camera could not track are missing; the furniture, the window and the map on the wall are where they were.</p>
+  <p><label><input type="checkbox" id="points"> show the sparse points the cameras agreed on</label> <button id="reset">reset view</button></p>
+  <p class="muted">Part of <a href="../">6ense.com</a> · the wearer published this; the raw recording stays with them · <a href="../#record">the record</a></p>
+</div>
+<div id="status">loading the room…</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
+
+const status = document.getElementById("status");
+const view = document.getElementById("view");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(matchMedia("(prefers-color-scheme: dark)").matches ? 0x15171a : 0xf6f3ec);
+const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.02, 200);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
+const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(3, 5, 2); scene.add(sun);
+
+let home = null;
+function frame(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3()); const c = box.getCenter(new THREE.Vector3());
+  const r = Math.max(size.x, size.y, size.z);
+  camera.position.set(c.x + r * 0.9, c.y + r * 0.5, c.z + r * 0.9);
+  controls.target.copy(c); controls.update();
+  home = { pos: camera.position.clone(), target: c.clone() };
+}
+document.getElementById("reset").onclick = () => { if (home) { camera.position.copy(home.pos); controls.target.copy(home.target); controls.update(); } };
+
+const points = new THREE.Group(); points.visible = false; scene.add(points);
+document.getElementById("points").onchange = e => { points.visible = e.target.checked; };
+
+new GLTFLoader().load("room.glb", g => {
+  g.scene.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshStandardMaterial({ vertexColors: !!o.geometry.attributes.color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }); } });
+  scene.add(g.scene); frame(g.scene);
+  status.textContent = "the room, from the headset's own pictures";
+}, undefined, () => {
+  status.textContent = "the mesh is not here yet; showing the sparse points";
+  points.visible = true; document.getElementById("points").checked = true;
+});
+new PLYLoader().load("points.ply", geo => {
+  const mat = new THREE.PointsMaterial({ size: 0.02, vertexColors: !!geo.attributes.color });
+  const p = new THREE.Points(geo, mat); points.add(p);
+  if (!home) frame(p);
+});
+
+addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+</script>
+</body>
+</html>
