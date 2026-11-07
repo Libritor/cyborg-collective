@@ -149,3 +149,8 @@ camera-stream video { display: block; width: 100%; height: 100%; object-fit: con
 table.bags td { vertical-align: top; }
 table.bags a { white-space: nowrap; }
 @media (max-width: 600px) { table.bags th:nth-child(3), table.bags td:nth-child(3) { display: none; } }
+
+.nav-btn { font: inherit; font-size: 14px; color: var(--ink); background: transparent; border: 1px solid var(--muted); border-radius: 999px; padding: 2px 12px; cursor: pointer; line-height: 1.5; }
+.nav-btn:hover, .nav-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg, #fff); border-color: var(--ink); }
+.nav-btn[disabled] { opacity: 0.5; cursor: default; }
+.nav-note { color: var(--muted); font-size: 13px; align-self: center; }
