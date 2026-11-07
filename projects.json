@@ -14,8 +14,12 @@
     "stamps": [
      "2026-11-06"
     ],
-    "summary": "The Meta Quest 3S recorded over adb into a ROS 2 bag (headset IMU at 800 Hz, the headset view as H.264, and the Muse over OSC), while the same session played live on this page. Only the summary is here; the bag stays with its wearer.",
+    "summary": "The Meta Quest 3S recorded over adb into a ROS 2 bag (headset IMU at 800 Hz, the headset view as H.264, and the Muse over OSC), while the same session played live on this page. The room itself was rebuilt from the bag's pictures and can be walked in the viewer. Only the summary and the model are here; the bag stays with its wearer.",
     "links": [
+     [
+      "Walk the room the bag describes (3-D viewer)",
+      "https://6ense.com/space/"
+     ],
      [
       "Quest rosbag tools in the MuseLog repo (cam-gateway branch, by request)",
       "https://github.com/Libritor/MuseLog"
