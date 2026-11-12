@@ -7,16 +7,23 @@
 // it plays a piece generated from one session of the record, chosen for the day,
 // and says so. Nothing here is a recording.
 //
-// While it plays, brain waves leave the 6ense mark (waves.js), and a short note
-// says what is being heard (hearing.js).
+// While it plays, brain waves leave the 6ense mark, drawn the way a SWIM draws a
+// wave (swim.js), and a short note says what is being heard (hearing.js). The
+// waves are the samples themselves wherever there are samples to draw: a stored
+// minute of the session the day's piece is made from (music/eeg/), or the raw
+// trace of a live sharer who opened their headband to the music and sends one.
+// Where there are only band powers, the waves show those, and the note says so.
 
 import { renderKit } from "./kit.js";
 import { createGenerator, nextBar, aggregate } from "./generator.js";
 import { createLoop } from "./loop.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle } from "./idle.js";
-import { createWaves } from "./waves.js";
-import { BANDS, hearingNote, sharesFromMedians, sharesFromViews } from "./hearing.js";
+// The ?v= on these three (and inside swim.js and eegbands.js) goes up whenever one of them changes what it exports:
+// the host lets a browser keep a module for ten minutes, and a new player handed an old hearing.js does not load.
+import { createSwim } from "./swim.js?v=2";
+import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=2";
+import { BANDS, hearingNote, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=2";
 
 const STORE_KEY = "collective.music";          // "on" | "off"; absent = never chose
 
@@ -34,28 +41,70 @@ function hash(text) {
   return h >>> 0;
 }
 
-/** Today's row of the record: at least five minutes long, with a device summary to seed from. */
+/** The sessions a stored minute of EEG is published for (music/eeg/index.json): stamp -> entry. */
+async function storedMinutes() {
+  try {
+    const r = await fetch("music/eeg/index.json", { cache: "no-store" });
+    if (!r.ok) return new Map();
+    const index = await r.json();
+    return new Map((index.sessions || []).filter((e) => e && e.stamp && e.file).map((e) => [e.stamp, e]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Today's row of the record: at least five minutes long, with a device summary
+ * to seed from. When stored minutes are published, the day's piece is one of
+ * those sessions, so that what is drawn and what is played come from the same
+ * recording.
+ */
 async function pieceOfTheDay() {
   try {
-    const r = await fetch("data/index.json", { cache: "no-store" });
+    const [r, minutes] = await Promise.all([fetch("data/index.json", { cache: "no-store" }), storedMinutes()]);
     if (!r.ok) return null;
     const index = await r.json();
-    const rows = (index.sessions || []).filter((row) => row && row.stamp && (row.minutes || 0) >= 5 && Array.isArray(row.devices) && row.devices.length);
+    let rows = (index.sessions || []).filter((row) => row && row.stamp && (row.minutes || 0) >= 5 && Array.isArray(row.devices) && row.devices.length);
+    const drawn = rows.filter((row) => minutes.has(row.stamp));
+    if (drawn.length) rows = drawn;
     if (!rows.length) return null;
     const day = new Date().toISOString().slice(0, 10);
-    rows.sort((a, b) => hash(a.stamp + day) - hash(b.stamp + day));
+    const rank = (row) => hash(`${day}|${row.stamp}`);
+    rows.sort((a, b) => rank(a) - rank(b));
     const row = rows[0];
     const summary = row.devices.find((d) => d && d.bands_median) || row.devices[0];
-    return { stamp: row.stamp, date: row.date, minutes: row.minutes, summary };
+    return { stamp: row.stamp, date: row.date, minutes: row.minutes, summary, eeg: minutes.get(row.stamp) || null };
   } catch {
     return null;
   }
 }
 
+/** The stored minute of a session, split into its five bands, as a source for the waves; null when it cannot be had. */
+async function storedSource(entry) {
+  try {
+    const r = await fetch(`music/eeg/${entry.file}`);
+    if (!r.ok) return null;
+    const buffer = await r.arrayBuffer();
+    const lead = Number.isInteger(entry.lead) && entry.lead >= 0 ? entry.lead : 0;
+    const length = entry.samples - 2 * lead;
+    if (!(entry.fs > 0) || !(entry.uv_per_count > 0) || buffer.byteLength !== entry.samples * 2 || !(length > 0)) return null;
+    // the bands are filtered over the whole file; the `lead` samples at each end are where the filters settle, and are not drawn
+    const bands = splitBands(decodeCounts(buffer, entry.uv_per_count), entry.fs);
+    return {
+      kind: "record", fs: entry.fs, length, electrode: entry.electrode, seconds: Math.round(length / entry.fs),
+      read: (key, n) => (bands[key] && n >= 0 && n < length ? bands[key][lead + n] : undefined),
+    };
+  } catch {
+    return null;
+  }
+}
+
+const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its frames keep coming
+
 export async function mountPlayer({ button, status, mark = null, note = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
-  const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0 };
+  const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
   window.__player = state;
 
   let kit;
@@ -63,11 +112,39 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
   catch (err) { say("the band could not load: " + err.message); return null; }
 
   // who is sharing, and who opened their headband to the music
+  const rawHeads = new Map();      // pseudonym -> the raw trace of a head that sends one, split as it arrives
+  function onRaw(pseudonym, frame) {
+    if (!Array.isArray(frame.x)) return;
+    const fs = frame.fs > 0 ? frame.fs : 256;
+    let head = rawHeads.get(pseudonym);
+    if (!head || head.fs !== fs) {
+      head = { fs, at: 0, channel: -1, bands: createLiveBands(fs) };
+      const { bands } = head;
+      head.source = { kind: "live", fs, electrode: null, read: bands.read, received: () => bands.state.received };
+      rawHeads.set(pseudonym, head);
+    }
+    if (head.channel < 0) {
+      // one electrode per head: the best seated one when the first raw frame arrives
+      const names = Array.isArray(frame.ch) && frame.ch.length === frame.x.length ? frame.ch : ["TP9", "AF7", "AF8", "TP10"];
+      const view = liveViews().find((v) => v.pseudonym === pseudonym);
+      const seat = (name) => (view && view.hsi && Number.isInteger(view.hsi[name]) ? view.hsi[name] : 2.5);
+      const order = ["TP9", "TP10", "AF7", "AF8"].filter((name) => names.includes(name));
+      order.sort((a, b) => seat(a) - seat(b));
+      head.channel = order.length ? names.indexOf(order[0]) : 0;
+      head.source.electrode = names[head.channel] || null;
+    }
+    const samples = frame.x[head.channel];
+    if (!Array.isArray(samples)) return;
+    head.bands.push(samples);
+    head.at = performance.now();
+  }
+
   const relay = createRelay({
     url: relayUrl, allow,
     onSharers: () => describe(),
-    onLeave: () => describe(),
+    onLeave: (pseudonym) => { rawHeads.delete(pseudonym); describe(); },
     onStale: () => describe(),
+    onRaw,
   });
 
   const gen = createGenerator({ seed: 5, tonicMidi: 57, bpm: 132, cruelty: 0.15 });
@@ -96,19 +173,48 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
     return nextBar(gen, { C: 0.3, alphaShare: 0.35, arousal: 0.3, motion: 0.3, asymmetry: 0.2 });
   }
 
-  // the waves show the bands of whatever the band is playing from
+  // the waves are drawn from whatever the band is playing from: a live head's raw trace if one is coming in,
+  // the stored minute of the day's session if nobody is live, and band powers where there is no trace to draw
   const pieceShares = piece ? sharesFromMedians(piece.summary && piece.summary.bands_median) : null;
+  const recordSource = piece && piece.eeg ? await storedSource(piece.eeg) : null;
   let waves = null;
+  let powers = null;               // the stand-in for when there are only band powers, remade when they change
+  function powerSource(shares) {
+    const key = JSON.stringify(shares);
+    if (!powers || powers.key !== key) {
+      powers = powerWaves(shares, 256, waves ? waves.state.pxPerUv : 1);
+      powers.key = key;
+    }
+    return powers;
+  }
+  function waveSource() {
+    const views = liveViews();
+    if (views.length) {
+      const fresh = performance.now() - RAW_FRESH_MS;
+      const head = views.map((v) => rawHeads.get(v.pseudonym)).find((h) => h && h.at >= fresh);
+      state.shares = sharesFromViews(views);
+      return head ? head.source : powerSource(state.shares);
+    }
+    state.shares = pieceShares;
+    return recordSource || powerSource(pieceShares);
+  }
+  /** What the note says the waves are: null when they are not drawn at all. */
+  function waveInfo() {
+    if (!waves || waves.state.reduced) return null;
+    const source = waveSource();
+    return { kind: source.kind, electrode: source.electrode || null, seconds: source.seconds || null };
+  }
   function onBar(event) {
     describe();
     if (!waves) return;
-    const views = liveViews();
-    waves.setShares(views.length ? sharesFromViews(views) : pieceShares);
+    const source = waveSource();
+    state.waves = waves.state.reduced ? null : { kind: source.kind, electrode: source.electrode || null };
+    waves.setSource(source);
     waves.bar(event.time, event.tempo);
   }
 
   const loop = createLoop({ ctx, kit, pullBar, bpm: idle ? idle.bpm : 132, muted: ["lead"], onBar });
-  waves = createWaves({ audio: ctx, tap: loop.voices.master, mark });
+  waves = createSwim({ audio: ctx, tap: loop.voices.master, mark });
   window.__waves = waves;
 
   // the note that says what is being heard: shown when the music starts, gone when it stops
@@ -117,10 +223,11 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
   function showNote() {
     if (!note || noteClosed) return;
     const live = liveViews().length;
-    const key = `${live}|${state.piece}|${waves.state.reduced}`;
+    const drawn = waveInfo();
+    const key = `${live}|${state.piece}|${drawn ? `${drawn.kind}:${drawn.electrode}` : "none"}`;
     if (key !== noteKey) {
       noteKey = key;
-      const words = hearingNote({ live, piece: live ? null : (idle ? piece : null), rings: !waves.state.reduced });
+      const words = hearingNote({ live, piece: live ? null : (idle ? piece : null), waves: drawn });
       const el = (tag, text, cls) => {
         const node = document.createElement(tag);
         if (text) node.textContent = text;
@@ -135,8 +242,8 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
       const first = el("p");
       first.append(el("b", `${words.title}. `), words.what);
       const parts = [close, first, el("p", words.how)];
-      if (words.rings) {
-        const legend = el("p", `${words.rings[0]} `);
+      if (words.waves) {
+        const legend = el("p", `${words.waves[0]} `);
         BANDS.forEach((band, i) => {
           const chip = el("span", "", "band-chip");
           const dot = el("i");
@@ -144,7 +251,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
           chip.append(dot, band.key);
           legend.append(chip, i < BANDS.length - 1 ? " " : "");
         });
-        legend.append(`. ${words.rings[1]}`);
+        legend.append(`. ${words.waves[1]}`);
         parts.push(legend);
       }
       const last = el("p", "♪ stops it · ", "foot");

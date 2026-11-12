@@ -1,0 +1,21 @@
+{
+ "about": "One minute of one electrode from each recording listed here, exactly as stored: uint16 ADC counts, little-endian, `fs` samples a second, microvolts = count x `uv_per_count`. The file starts `lead` samples before the minute and ends `lead` samples after it; those are there for the band filters to settle on and are not drawn. Written by music/eeg/extract.py; drawn by music/swim.js. Every other part of every recording stays with the person who made it.",
+ "sessions": [
+  {
+   "stamp": "20251213_170944",
+   "file": "20251213_170944.bin",
+   "electrode": "TP10",
+   "site": "behind the right ear",
+   "fs": 256,
+   "samples": 16384,
+   "lead": 512,
+   "seconds": 60,
+   "first_sample": 64000,
+   "from_s": 251.1,
+   "uv_per_count": 0.08850637856314472,
+   "clean": 1.0,
+   "recorded": "2025-12-13T17:09:44",
+   "minutes": 14.3
+  }
+ ]
+}

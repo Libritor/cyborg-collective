@@ -36,7 +36,7 @@
 
 <section id="record">
   <h2>The record</h2>
-  <p class="sub">Every recording the phone's recorder has made, and every live share a person chose to keep, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner, or, for a kept share, with the relay until the person removes it.</p>
+  <p class="sub">Every recording the phone's recorder has made, and every live share a person chose to keep, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner, or, for a kept share, with the relay until the person removes it. One exception, listed in full in <a href="music/eeg/index.json"><code>music/eeg/</code></a>: the minute of one electrode that the band's waves are drawn from.</p>
   <div class="tiles" id="totals"></div>
   <div class="card">
     <div class="bars" id="months"></div>
@@ -88,12 +88,13 @@
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
+    <li>The band's waves: while the music plays, the dots leaving 6ense are samples, not decoration. With nobody live they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
   </ul>
 </footer>
 <script src="video-rtc.js?v=1794024219"></script>
 <script src="app.js?v=1794024219"></script>
 <script type="module">
-import { mountPlayer } from "./music/player.js?v=1794447292";
+import { mountPlayer } from "./music/player.js?v=1794453292";
 mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note") })
   .then((band) => { window.__band = band; })

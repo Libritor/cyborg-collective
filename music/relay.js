@@ -260,6 +260,9 @@ export function assignRoles(sharers, { now = null } = {}) {
  * numbers. `onStale(pseudonym, age)` fires once each time a sender crosses
  * STALE_S in silence; `onLeave(pseudonym, reason)` fires only for a sharer who
  * was really admitted, so an unpronounced disconnect fades nothing.
+ * `onRaw(pseudonym, frame)` hands over an admitted sharer's raw-trace frames
+ * (`eeg`), which the band does not play but the page may draw; a sharer who is
+ * not admitted to the music is not handed over either.
  */
 export function createRelay({
   url = DEFAULT_RELAY,
@@ -267,6 +270,7 @@ export function createRelay({
   onSharers = null,
   onStale = null,
   onLeave = null,
+  onRaw = null,
   onStatus = null,
   Socket = null,
   clock = null,
@@ -477,6 +481,7 @@ export function createRelay({
         r.stale = false;   // consent restored: back in the cast on its next frame
       }
     }
+    if (kind === "eeg" && onRaw && isAdmitted(r)) onRaw(pseudonym, frame);
     const projected = projectFrame(frame);
     if (projected && isAdmitted(r)) {
       push(r.sharer, projected, at);

@@ -1,9 +1,10 @@
-// Proof for the home page's note and the band shares its waves are drawn from.
+// Proof for the home page's note, the five bands, and the stand-in waves drawn
+// when only band powers are known.
 // Run: node music/test_hearing.js -> "PASS <n> assertions", exit 0.
 
 import { readFileSync } from "node:fs";
 
-import { BANDS, sharesFromMedians, sharesFromViews, rippleHeight, dayOf, hearingNote } from "./hearing.js";
+import { BANDS, SITES, sharesFromMedians, sharesFromViews, rippleHeight, powerWaves, dayOf, hearingNote } from "./hearing.js";
 import { BANDS as CONDITIONER_BANDS } from "./conditioner.js";
 
 let assertions = 0;
@@ -24,10 +25,12 @@ console.log("the five bands");
 {
   check(JSON.stringify(BANDS.map((b) => b.key)) === JSON.stringify(CONDITIONER_BANDS),
     "the same five bands, in the same order, as the conditioner reads");
-  const lambdas = BANDS.map((b) => b.wavelength);
-  check(lambdas.every((v, i) => i === 0 || v < lambdas[i - 1]), "slower bands ripple longer: wavelengths fall from delta to gamma");
+  check(BANDS.every((b) => b.lo > 0 && b.hi > b.lo) && BANDS.every((b, i) => i === 0 || (b.lo >= BANDS[i - 1].lo && b.lo <= BANDS[i - 1].hi)),
+    "each band has its edges in Hz, and the bands run on from one another, slow to fast");
+  check(BANDS[0].lo === 1 && BANDS[BANDS.length - 1].hi === 44, "together they cover 1 to 44 Hz");
   check(BANDS.every((b) => /^#[0-9a-f]{6}$/.test(b.color)) && new Set(BANDS.map((b) => b.color)).size === BANDS.length,
     "every band has its own colour");
+  check(["TP9", "AF7", "AF8", "TP10"].every((ch) => typeof SITES[ch] === "string" && SITES[ch].length > 5), "every electrode has a place in words");
 }
 
 console.log("shares from a record summary");
@@ -64,38 +67,67 @@ console.log("shares from the heads playing live");
     "nobody, a head that left, or a head with no bands -> null");
 }
 
-console.log("how tall a ripple stands");
+console.log("the stand-in waves, when only band powers are known");
 {
   const shares = { delta: 0.5, theta: 0.2, alpha: 0.2, beta: 0.09, gamma: 0.01 };
   check(rippleHeight(shares, "delta") > rippleHeight(shares, "theta") && rippleHeight(shares, "theta") > rippleHeight(shares, "beta"),
-    "more of the power, a taller ripple");
-  check(BANDS.every((b) => rippleHeight({ ...shares, [b.key]: 1 }, b.key) <= 0.34 * b.wavelength + 1e-9),
-    "never taller than the band's own wavelength can carry");
-  check(BANDS.every((b) => rippleHeight(shares, b.key) > 0), "a band with little power still shows");
+    "more of the power, a taller wave");
+  check(BANDS.every((b) => rippleHeight(shares, b.key) > 0 && rippleHeight(shares, b.key) <= 11), "a band with little power still shows, and none stands taller than 11 px");
   check(rippleHeight(null, "alpha") > 0 && rippleHeight(null, "nope") === 0, "unknown shares stand at a middling height; an unknown band at none");
+
+  const fs = 256;
+  const waves = powerWaves(shares, fs, 0.5);
+  check(waves.kind === "powers" && waves.fs === fs && waves.length === undefined, "it calls itself band powers, and has no end");
+  const peak = (key) => Math.max(...Array.from({ length: fs * 2 }, (_, n) => Math.abs(waves.read(key, n))));
+  check(BANDS.every((b) => near(peak(b.key), rippleHeight(shares, b.key) / 0.5, 0.05)),
+    "each band swings as far as its share says, in the microvolts the page will scale back to pixels");
+  const crossings = (key) => {
+    let count = 0;
+    for (let n = 1; n < fs * 4; n += 1) if (waves.read(key, n - 1) < 0 && waves.read(key, n) >= 0) count += 1;
+    return count / 4;
+  };
+  check(BANDS.every((b) => crossings(b.key) >= b.lo - 0.5 && crossings(b.key) <= b.hi + 0.5), "each band is a steady wave at a rate inside its own range");
+  check(waves.read("nope", 3) === undefined, "an unknown band has no wave");
 }
 
 console.log("the note");
 {
   check(dayOf("2025-10-18T16:23:46") === "18 Oct 2025" && dayOf("2026-01-05") === "5 Jan 2026" && dayOf("drive__x") === "" && dayOf(null) === "",
     "a record date is printed as a day; anything else as nothing");
-  const record = hearingNote({ live: 0, piece: { stamp: "s", date: "2025-10-18T16:23:46", minutes: 5.5 } });
+  const piece = { stamp: "s", date: "2025-10-18T16:23:46", minutes: 5.5 };
+  const stored = { kind: "record", electrode: "TP10", seconds: 60 };
+  const record = hearingNote({ live: 0, piece, waves: stored });
   check(record.title === "What you are hearing", "it has a title");
   check(/not a recording/.test(record.what) && /generated from the summary of one session in the record \(18 Oct 2025, 5\.5 min\)/.test(record.what),
     "nobody live: it says the piece is generated from one session's summary, and which");
-  check(!/replay/i.test(record.what.replace("not a replay", "")) && !/following/.test(record.what), "and claims neither a replay nor a live head");
+  check(!/replay/i.test(record.what) && !/following/.test(record.what), "and claims neither a replay nor a live head");
   const one = hearingNote({ live: 1, piece: { date: "2025-10-18" } });
   const three = hearingNote({ live: 3 });
   check(/following 1 person sharing/.test(one.what) && /following 3 people sharing/.test(three.what) && !/the record/.test(one.what),
     "live heads: it says how many people the band is following, and does not mention the record");
   const nothing = hearingNote({ live: 0, piece: null });
   check(/resting pattern/.test(nothing.what), "no head and no piece: it says the band is holding a resting pattern");
-  check(Array.isArray(record.rings) && record.rings.length === 2 && /6ense/.test(record.rings[0]), "it explains the rings in two halves around the band names");
-  check(hearingNote({ live: 0, piece: null, rings: false }).rings === null, "with the waves off it says nothing about rings");
   check(/hi-hat/.test(record.how) && /harmony/.test(record.how) && /drum fills/.test(record.how), "it says what the signal steers");
   check(record.more.href === "music/listen.html?relay=1", "it links to the desk, where every rule is shown");
-  const words = [record.what, record.how, ...(record.rings || [])].join(" ").split(/\s+/).length;
-  check(words <= 95, `it stays short (${words} words)`);
+
+  check(Array.isArray(record.waves) && record.waves.length === 2 && /6ense/.test(record.waves[0]), "it explains the waves in two halves around the band names");
+  check(/that session's own EEG: one minute from the electrode behind the right ear, split into its five bands/.test(record.waves[0])
+    && /Every dot is one stored sample/.test(record.waves[1]),
+    "a stored minute: it says the waves are the session's own EEG, how much of it, which electrode, and that a dot is a sample");
+  check(/45 seconds from the electrode on the left forehead/.test(hearingNote({ piece, waves: { kind: "record", electrode: "AF7", seconds: 45 } }).waves[0]),
+    "a stretch that is not a minute is given in seconds");
+  const raw = hearingNote({ live: 1, waves: { kind: "live", electrode: "TP9" } });
+  check(/one sharer's raw trace as it arrives, from the electrode behind the left ear/.test(raw.waves[0]) && !/stored/.test(raw.waves.join(" ")),
+    "a live raw trace: it says so, and does not call the samples stored");
+  const powersLive = hearingNote({ live: 2, waves: { kind: "powers" } });
+  const powersRecord = hearingNote({ live: 0, piece, waves: { kind: "powers" } });
+  check(/how strong each of the five bands is for the people sharing/.test(powersLive.waves[0]) && /in that summary/.test(powersRecord.waves[0])
+    && [powersLive, powersRecord].every((n) => /band powers, not from a raw trace/.test(n.waves[1]) && !/sample/.test(n.waves.join(" "))),
+    "band powers only: it says the waves are not a raw trace, and never speaks of samples");
+  check([record, raw, powersLive].every((n) => /Steve Mann's SWIM \(Sequential Wave Imprinting Machine\)/.test(n.waves[1])), "it names the SWIM the drawing follows");
+  check(hearingNote({ live: 0, piece: null, waves: null }).waves === null, "with the waves off it says nothing about them");
+  const words = [record.what, record.how, ...record.waves].join(" ").split(/\s+/).length;
+  check(words <= 115, `it stays short (${words} words)`);
 }
 
 console.log("purity");

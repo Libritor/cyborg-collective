@@ -3,16 +3,27 @@
 // Pure and DOM-free, like explain.js: node asserts the words, player.js prints
 // them. The wording says what the engine does and no more: a live head steers the
 // band as it goes; with nobody sharing, a piece is generated from one session's
-// summary (idle.js), which is never a replay.
+// summary (idle.js), which is never a replay. The waves are another matter: they
+// are the session's own samples when a stored minute is published for it
+// (music/eeg/), a live sharer's raw trace when they send one, and otherwise only
+// a picture of the band powers, and the note says which.
 
-/** The five bands, slow to fast, in the colours the cards draw their band bars in. */
+/**
+ * The five bands, slow to fast, in the colours the cards draw their band bars
+ * in, each with its edges in Hz (the Muse's own definitions).
+ */
 export const BANDS = Object.freeze([
-  Object.freeze({ key: "delta", color: "#f44336", wavelength: 150 }),
-  Object.freeze({ key: "theta", color: "#ff9800", wavelength: 74 }),
-  Object.freeze({ key: "alpha", color: "#4caf50", wavelength: 44 }),
-  Object.freeze({ key: "beta", color: "#2196f3", wavelength: 22 }),
-  Object.freeze({ key: "gamma", color: "#9c27b0", wavelength: 12 }),
+  Object.freeze({ key: "delta", color: "#f44336", lo: 1, hi: 4 }),
+  Object.freeze({ key: "theta", color: "#ff9800", lo: 4, hi: 8 }),
+  Object.freeze({ key: "alpha", color: "#4caf50", lo: 7.5, hi: 13 }),
+  Object.freeze({ key: "beta", color: "#2196f3", lo: 13, hi: 30 }),
+  Object.freeze({ key: "gamma", color: "#9c27b0", lo: 30, hi: 44 }),
 ]);
+
+/** Where each electrode sits, in words. */
+export const SITES = Object.freeze({
+  TP9: "behind the left ear", AF7: "on the left forehead", AF8: "on the right forehead", TP10: "behind the right ear",
+});
 
 const finite = (v) => typeof v === "number" && Number.isFinite(v);
 
@@ -70,9 +81,9 @@ export function sharesFromViews(views) {
 }
 
 /**
- * How tall a band's ripple stands, in pixels: taller the more of the power the
- * band holds, never taller than its own wavelength can carry without folding.
- * With no shares known every band stands at the same middling height.
+ * How tall a band's wave stands, in pixels, when only band powers are known
+ * (no raw trace to draw): taller the more of the power the band holds. With no
+ * shares known every band stands at the same middling height.
  */
 export function rippleHeight(shares, key) {
   const band = BANDS.find((b) => b.key === key);
@@ -82,7 +93,24 @@ export function rippleHeight(shares, key) {
     const top = Math.max(...BANDS.map((b) => shares[b.key] || 0));
     rel = top > 0 ? (shares[key] || 0) / top : 0.5;
   }
-  return Math.min(0.34 * band.wavelength, 2.5 + 8.5 * Math.sqrt(rel));
+  return 2.5 + 8.5 * Math.sqrt(rel);
+}
+
+/**
+ * A stand-in trace for when only band powers are known: each band a steady
+ * sine at the middle of its range, as tall as its share of the power. It is a
+ * picture of the powers, not anyone's samples, and the note says so.
+ * `pxPerUv` turns the pixel height back into the microvolts swim.js draws from.
+ */
+export function powerWaves(shares, fs, pxPerUv = 1) {
+  const waves = {};
+  for (const band of BANDS) {
+    waves[band.key] = { hz: Math.sqrt(band.lo * band.hi), uv: rippleHeight(shares, band.key) / pxPerUv };
+  }
+  return {
+    kind: "powers", fs,
+    read: (key, n) => (waves[key] ? waves[key].uv * Math.sin((2 * Math.PI * waves[key].hz * n) / fs) : undefined),
+  };
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -97,11 +125,13 @@ export function dayOf(stamp) {
 
 /**
  * The note shown when the music starts. `live` is how many heads are playing,
- * `piece` the record row the day's piece is generated from (or null), `rings`
- * whether the waves are being drawn (they are not when the visitor asked the
- * system for less motion).
+ * `piece` the record row the day's piece is generated from (or null), `waves`
+ * what the waves are drawn from: null when they are not drawn (the visitor
+ * asked the system for less motion), else `{ kind, electrode, seconds }` with
+ * kind "record" (a stored minute of the piece's own session), "live" (a
+ * sharer's raw trace as it arrives) or "powers" (band powers only).
  */
-export function hearingNote({ live = 0, piece = null, rings = true } = {}) {
+export function hearingNote({ live = 0, piece = null, waves = null } = {}) {
   let what;
   if (live > 0) {
     what = `Music made from brain waves as they happen: the band is following ${live} ${live === 1 ? "person" : "people"} `
@@ -115,16 +145,29 @@ export function hearingNote({ live = 0, piece = null, rings = true } = {}) {
   } else {
     what = "Nobody is sharing live right now, so the band holds a resting pattern until someone opens their headband to the music.";
   }
+
+  // the page prints the five band names, each with its colour, between the two halves
+  let drawn = null;
+  const swim = "a sweeping wand of lights, as in Steve Mann's SWIM (Sequential Wave Imprinting Machine)";
+  if (waves && (waves.kind === "record" || waves.kind === "live")) {
+    const where = SITES[waves.electrode] ? ` ${SITES[waves.electrode]}` : "";
+    const source = waves.kind === "record"
+      ? `The waves leaving 6ense are that session's own EEG: ${finite(waves.seconds) && waves.seconds !== 60 ? `${waves.seconds} seconds` : "one minute"} `
+        + `from the electrode${where}, split into its five bands:`
+      : `The waves leaving 6ense are one sharer's raw trace as it arrives, from the electrode${where}, split into its five bands:`;
+    drawn = [source, `Every dot is one ${waves.kind === "record" ? "stored " : ""}sample, laid down by ${swim}.`];
+  } else if (waves) {
+    const whose = live > 0 ? "for the people sharing" : (piece ? "in that summary" : "at rest");
+    drawn = [`The waves leaving 6ense show how strong each of the five bands is ${whose}:`,
+      `They are drawn from band powers, not from a raw trace, by ${swim}.`];
+  }
+
   return {
     title: "What you are hearing",
     what,
     how: "A higher concentration score opens up the harmony and speeds the hi-hats, more alpha opens the hi-hat, and head "
       + "movement changes the drum fills.",
-    // the page prints the five band names, each with its colour, between the two halves
-    rings: rings
-      ? ["The rings leaving 6ense are the five brain-wave bands, slow to fast:",
-        "A ripple stands taller the more of the power its band holds."]
-      : null,
+    waves: drawn,
     more: { text: "The desk shows every rule", href: "music/listen.html?relay=1" },
   };
 }
