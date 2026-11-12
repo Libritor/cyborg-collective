@@ -141,6 +141,9 @@ console.log("the line over the panel");
   check(/^brain waves · session of 13 Dec 2025 · electrode TP10, behind the right ear/.test(silent) && playing === "brain waves · session of 13 Dec 2025 · electrode TP10, behind the right ear",
     "a stored minute: whose session, which electrode and where it sits");
   check(/♪ listen sets the wand going$/.test(silent) && !/listen/.test(playing), "silent, it says how to set the wand going; playing, it does not");
+  const waiting = panelCaption({ shown: stored, piece, playing: false, silent: true });
+  check(/the sound starts with your first tap or key press$/.test(waiting) && !/listen/.test(waiting) && /session of 13 Dec 2025/.test(waiting),
+    "the wand sweeping before the browser lets the page sound: it says the sound starts with the first tap or key press");
   check(/held still, as your system asks for less motion$/.test(panelCaption({ shown: stored, piece, playing: true, still: true })), "held still for a visitor who asked for less motion, it says so");
   check(panelCaption({ shown: { kind: "live", electrode: "AF7" }, live: 1, playing: true }) === "brain waves, live · electrode AF7, on the left forehead", "a live raw trace: live, and which electrode");
   check(panelCaption({ shown: { kind: "powers" }, live: 2, playing: true }) === "band powers of the people sharing live · no raw trace to draw"

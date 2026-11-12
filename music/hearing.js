@@ -177,13 +177,18 @@ export function hearingNote({ live = 0, piece = null, waves = null } = {}) {
  * The line over the brain-wave panel: what is in it right now. `shown` is what
  * the panel is drawing, `{ kind, electrode }` as for the note, or null when it
  * has only its axes; `playing` whether the band is sounding; `still` whether the
- * picture is being held still for a visitor who asked for less motion.
+ * picture is being held still for a visitor who asked for less motion; `silent`
+ * whether the wand is already sweeping while the browser holds the sound back
+ * until the visitor's first tap or key press.
  */
-export function panelCaption({ shown = null, piece = null, live = 0, playing = false, still = false } = {}) {
+export function panelCaption({ shown = null, piece = null, live = 0, playing = false, still = false, silent = false } = {}) {
   const where = shown && SITES[shown.electrode] ? ` \u00b7 electrode ${shown.electrode}, ${SITES[shown.electrode]}` : "";
   if (shown && shown.kind === "record") {
     const day = piece ? dayOf(piece.date) : "";
-    const tail = still ? " \u00b7 held still, as your system asks for less motion" : (playing ? "" : " \u00b7 \u266a listen sets the wand going");
+    const tail = still ? " \u00b7 held still, as your system asks for less motion"
+      : playing ? ""
+        : silent ? " \u00b7 the sound starts with your first tap or key press"
+          : " \u00b7 \u266a listen sets the wand going";
     return `brain waves${day ? ` \u00b7 session of ${day}` : ""}${where}${tail}`;
   }
   if (shown && shown.kind === "live") return `brain waves, live${where}`;

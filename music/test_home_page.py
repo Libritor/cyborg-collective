@@ -10,6 +10,13 @@ The check that matters most is section 2: it recomputes, from the bytes of the p
 where every dot belongs on the panel's axes (seconds across, microvolts up), and looks for the ink there; then it
 reads the same recording half a second late and shows that the wrong stretch does not fit. Live sharers are
 imitated by handing frames to the page's own relay object; nothing is sent to any server.
+
+The band plays by default, so arrival is checked both ways: where the browser holds the sound back until the visitor
+touches the page (the wand must sweep in silence and the sound must join on the first tap or key press, anywhere),
+and where it lets a page sound at once (the band must be playing on arrival, untouched). The test browser itself
+always lets a page sound (it counts its own navigation as a gesture), so the first case is made by HOLD_SOUND
+below: an AudioContext that stays suspended, and whose resume() stays pending, until the page has had a real
+(trusted) tap or key press.
 """
 import json
 import os
@@ -17,6 +24,8 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")       # the page's words include characters a Windows console lacks
 URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8771/"
 OUT = sys.argv[2] if len(sys.argv) > 2 else None
 if OUT:
@@ -37,11 +46,29 @@ def check(ok, label, detail=""):
 
 
 READY = "() => { const b = document.getElementById('listen'); return b && !b.disabled; }"
+# What most browsers do on a first visit: a context made before any gesture is suspended, and resume() does not
+# resolve until the page has had a trusted tap or key press (the test's own clicks and key presses are trusted).
+HOLD_SOUND = """(() => {
+  const Real = window.AudioContext;
+  let touched = false;
+  for (const type of ['pointerdown', 'mousedown', 'keydown', 'touchend']) {
+    window.addEventListener(type, (event) => { if (event.isTrusted) touched = true; }, true);
+  }
+  const waiting = [];
+  window.AudioContext = class extends Real {
+    constructor(...args) { super(...args); if (!touched) super.suspend(); }
+    resume() {
+      if (!touched) return new Promise((resolve) => { waiting.push(resolve); });
+      return super.resume().then(() => { while (waiting.length) waiting.shift()(); });
+    }
+  };
+})();"""
 STATE = """() => {
   const note = document.getElementById('listen-note');
   const r = note ? note.getBoundingClientRect() : null;
   return {
-    playing: window.__player.playing, mode: window.__player.mode, piece: window.__player.piece,
+    playing: window.__player.playing, preview: window.__player.preview, mode: window.__player.mode, piece: window.__player.piece,
+    ctx: window.__band ? window.__band.ctx.state : null,
     drawn: window.__player.waves, shares: window.__player.shares,
     waves: JSON.parse(JSON.stringify(window.__waves.state)),
     caption: document.getElementById('swim-caption').textContent,
@@ -178,8 +205,10 @@ PICTURE = """() => {
 }"""
 
 
-def new_page(browser, **kw):
+def new_page(browser, hold=True, **kw):
     ctx = browser.new_context(viewport={"width": kw.pop("width", 1280), "height": kw.pop("height", 800)}, **kw)
+    if hold:
+        ctx.add_init_script(HOLD_SOUND)
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -196,7 +225,7 @@ def new_page(browser, **kw):
     page.on("console", on_console)
     page.goto(URL, wait_until="domcontentloaded")
     page.wait_for_function(READY, timeout=60000)
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(1100)          # the page tries to start on arrival; give it the moment that takes
     return page, errors
 
 
@@ -212,15 +241,17 @@ def keeps_to_itself(page, label):
 with sync_playwright() as p:
     b = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
 
-    print("1. silent, then play from the button")
+    print("1. arriving where the browser holds the sound back, then the listen button")
     page, errors = new_page(b)
     s = page.evaluate(STATE)
-    check(not s["playing"] and s["noteHidden"] and not s["sounding"], "before play: silent, no note", json.dumps(s)[:300])
-    check(s["waves"]["still"] and s["waves"]["dots"] == 0 and "session of" in s["caption"] and "listen sets the wand going" in s["caption"],
-          "the panel shows the stored minute, still, and says how to set the wand going", s["caption"] + " " + json.dumps(s["waves"]))
+    check(not s["playing"] and s["ctx"] == "suspended" and s["noteHidden"] and not s["sounding"], "on arrival, untouched: no sound (the browser has not allowed it), no note", json.dumps(s)[:300])
+    check(s["preview"] and s["waves"]["preview"] and s["waves"]["running"] and not s["waves"]["still"]
+          and "session of" in s["caption"] and "the sound starts with your first tap or key press" in s["caption"] and "tap anywhere or press a key for sound" in s["status"],
+          "the wand is already sweeping the stored minute in silence, and the page says a tap or a key brings the sound", s["caption"] + " | " + s["status"] + " " + json.dumps(s["waves"]))
+    page.wait_for_function("() => { const p = window.__waves.probe(); return p && p.sweep && p.sweep.kind === 'record' && p.sweep.painted[0] > 0.6 * p.sweep.need; }", timeout=20000)
     fit = page.evaluate(ON_THE_SAMPLES, 0)
-    check("error" not in fit and fit["still"] and fit["looked"] >= 400 and fit["own"] >= 0.99 * fit["looked"],
-          f"the still picture stands on the published samples ({fit.get('own')} of {fit.get('looked')} places)", json.dumps(fit))
+    check("error" not in fit and fit["looked"] >= 300 and fit["own"] >= 0.99 * fit["looked"],
+          f"what the silent wand draws stands on the published samples ({fit.get('own')} of {fit.get('looked')} places)", json.dumps(fit))
     check(s["chains"]["hidden"] and not s["chains"]["state"]["shown"], "no chains are drawn while there is no bar to draw", json.dumps(s["chains"])[:200])
     keeps_to_itself(page, "silent")
     shot(page, "panel_silent.png", clip={"x": 0, "y": 0, "width": 1280, "height": 560})
@@ -348,7 +379,22 @@ with sync_playwright() as p:
     check(not errors, "no script errors on the page", "; ".join(errors)[:300])
     page.context.close()
 
-    print("9. the first tap far down the page")
+    print("9. any touch brings the sound: a link, a key, a tap far down the page")
+    page, errors = new_page(b)
+    page.click("nav a[href='#record']")
+    page.wait_for_timeout(2500)
+    s = page.evaluate(STATE)
+    check(s["playing"] and s["ctx"] == "running" and not s["preview"] and page.evaluate("() => location.hash") == "#record",
+          "a tap on a menu link follows the link and brings the sound", json.dumps({k: s[k] for k in ("playing", "ctx", "preview")}))
+    check(not errors, "no script errors on the page", "; ".join(errors)[:300])
+    page.context.close()
+    page, errors = new_page(b)
+    page.keyboard.press("ArrowDown")
+    page.wait_for_timeout(2500)
+    s = page.evaluate(STATE)
+    check(s["playing"] and s["ctx"] == "running", "a key press brings the sound", json.dumps({k: s[k] for k in ("playing", "ctx", "preview")}))
+    check(not errors, "no script errors on the page", "; ".join(errors)[:300])
+    page.context.close()
     page, errors = new_page(b)
     page.evaluate("() => scrollTo(0, document.body.scrollHeight)")
     page.wait_for_timeout(500)
@@ -400,6 +446,31 @@ with sync_playwright() as p:
     check(not errors, "no script errors on the page", "; ".join(errors)[:300])
     page.context.close()
 
+    print("12. arriving where the browser lets a page sound without a gesture")
+    page, errors = new_page(b, hold=False)
+    page.wait_for_function("() => window.__player.playing", timeout=8000)
+    page.wait_for_timeout(4000)
+    s = page.evaluate(STATE)
+    check(s["playing"] and s["ctx"] == "running" and not s["preview"] and s["sounding"], "the band is playing on arrival, with nothing touched", json.dumps({k: s[k] for k in ("playing", "ctx", "preview", "sounding")}))
+    check(s["waves"]["running"] and s["waves"]["level"] > 0.2 and s["waves"]["dots"] > 1500 and not s["noteHidden"] and not s["chains"]["hidden"],
+          "with sound, the wand, the note and the chains", json.dumps(s["waves"]))
+    shot(page, "panel_arrival_playing.png", clip={"x": 0, "y": 0, "width": 1280, "height": 1000})
+    page.click("#listen")
+    page.wait_for_timeout(600)
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(READY, timeout=60000)
+    page.wait_for_timeout(2500)
+    s = page.evaluate(STATE)
+    check(not s["playing"] and not s["preview"] and s["waves"]["still"] and "off" in s["status"],
+          "a visitor who stopped it is not played at when they come back: the page stays silent and still, and says it is off", s["status"] + " " + json.dumps(s["waves"]))
+    page.click("#listen")
+    page.wait_for_timeout(2500)
+    page.reload(wait_until="domcontentloaded")
+    page.wait_for_function(READY, timeout=60000)
+    page.wait_for_function("() => window.__player.playing", timeout=8000)
+    check(True, "and once they switch it back on, it plays on arrival again")
+    check(not errors, "no script errors on the page", "; ".join(errors)[:300])
+    page.context.close()
     b.close()
 
 bad = results.count(False)

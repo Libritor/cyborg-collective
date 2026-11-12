@@ -1,8 +1,11 @@
 // The band on the home page: one button, the same engine as listen.html.
 //
-// Browsers refuse to start audio without a gesture, so the kit is prerendered at
-// load and the first tap anywhere on the page starts the music (unless the
-// visitor switched it off before, which is remembered). While people who opened
+// The band plays by default. On arrival it starts by itself wherever the browser
+// lets a page sound without a gesture. Where the browser does not (most do not,
+// for a first visit), the wand starts sweeping the stored minute in silence and
+// the sound joins on the visitor's first tap or key press, anywhere on the page.
+// A visitor who switched it off before is not played at: that is remembered.
+// The kit is prerendered at load, which needs no gesture. While people who opened
 // their headband to the music are sharing, the band follows them; when nobody is,
 // it plays a piece generated from one session of the record, chosen for the day,
 // and says so. Nothing here is a recording.
@@ -25,7 +28,7 @@ import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle } from "./idle.js";
 // The ?v= on these three (and inside swim.js and eegbands.js) goes up whenever one of them changes what it exports:
 // the host lets a browser keep a module for ten minutes, and a new player handed an old hearing.js does not load.
-import { createSwim } from "./swim.js?v=3";
+import { createSwim } from "./swim.js?v=4";
 import { createChains } from "./chains.js?v=1";
 import { concentrationParts, getConcentrationWeights } from "./conditioner.js";
 import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";
@@ -111,7 +114,7 @@ const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its f
 export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, chains = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
-  const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
+  const state = { playing: false, preview: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
   window.__player = state;
 
   let kit;
@@ -229,6 +232,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     caption.textContent = panelCaption({
       shown: moving ? about(waveSource()) : about(recordSource),
       piece, live: liveViews().length, playing: state.playing, still: state.playing && waves.state.reduced,
+      silent: state.preview,
     });
   }
   const chainView = createChains({ root: chains });
@@ -309,7 +313,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
   function describe() {
     showCaption();
     if (!state.playing) {
-      say(remembered() === "off" ? "off · tap ♪ to listen" : "tap anywhere to listen");
+      say(remembered() === "off" ? "off · tap ♪ to listen" : "tap anywhere or press a key for sound");
       return;
     }
     const views = liveViews();
@@ -319,10 +323,15 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     showNote();                                   // the note follows who is playing (a head joins, the last one leaves)
   }
 
+  let starting = false;
   async function start() {
-    if (state.playing) return;
-    try { await loop.play(); } catch (err) { say("could not start audio: " + err.message); return; }
+    if (state.playing || starting) return;
+    starting = true;
+    // where the browser has not let the page sound yet, this waits for the gesture that does
+    try { await loop.play(); } catch (err) { say("could not start audio: " + err.message); return; } finally { starting = false; }
     state.playing = true;
+    state.preview = false;
+    unlisten();
     button.setAttribute("aria-pressed", "true");
     button.textContent = "♪ stop";
     remember("on");
@@ -338,6 +347,8 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     button.setAttribute("aria-pressed", "false");
     button.textContent = "♪ listen";
     if (byVisitor) remember("off");
+    state.preview = false;
+    unlisten();
     waves.stop();
     if (note) note.hidden = true;
     if (chains) chains.hidden = true;
@@ -347,19 +358,36 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
 
   button.addEventListener("click", (event) => {
     event.stopPropagation();
-    if (state.playing) stop(); else start();
+    if (state.playing) { stop(); return; }
+    ctx.resume().catch(() => {});
+    start();
   });
 
-  // the first gesture anywhere starts the band, unless the visitor said no before
-  if (remembered() !== "off") {
-    const first = (event) => {
-      if (event.target && event.target.closest && event.target.closest("a, button, input, select, textarea, video")) return;
-      document.removeEventListener("pointerdown", first);
-      document.removeEventListener("keydown", first);
-      start();
-    };
-    document.addEventListener("pointerdown", first);
-    document.addEventListener("keydown", first);
+  // Any gesture, anywhere, brings the sound in: a tap on a link or a field counts as much as a tap on the page.
+  // The context is resumed inside every gesture, because a browser only honours the call made in one, and
+  // start() is already waiting on it if an earlier touch did not count (a scroll, a modifier key).
+  const GESTURES = ["pointerdown", "keydown", "touchend"];
+  function onGesture(event) {
+    if (state.playing || remembered() === "off") { unlisten(); return; }
+    if (event.target && event.target.closest && event.target.closest("#listen")) return;   // the button speaks for itself
+    ctx.resume().catch(() => {});
+    start();
+  }
+  function unlisten() {
+    for (const type of GESTURES) document.removeEventListener(type, onGesture, true);
+  }
+
+  /** On arrival: sound at once where the browser allows it; otherwise the silent wand, and the sound on the first gesture. */
+  async function arrive() {
+    if (remembered() === "off") return;
+    for (const type of GESTURES) document.addEventListener(type, onGesture, { capture: true, passive: true });
+    try { await Promise.race([ctx.resume(), new Promise((resolve) => setTimeout(resolve, 400))]); } catch { /* refused: wait for a gesture */ }
+    if (state.playing || starting) return;
+    if (ctx.state === "running") { await start(); return; }
+    if (waves.preview({ source: recordSource, tempo: idle ? idle.bpm : 132 })) {
+      state.preview = true;
+      describe();
+    }
   }
 
   // a hidden tab throttles timers to about 1 Hz; the loop suspends the context and reanchors
@@ -370,5 +398,6 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
 
   button.disabled = false;
   describe();
+  arrive();
   return { start, stop, loop, relay, ctx, waves };
 }

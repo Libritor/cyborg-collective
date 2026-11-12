@@ -15,7 +15,7 @@
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
 </header>
 <nav>
-  <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn" aria-pressed="false" disabled title="The band plays the brainwaves of the people sharing live; when nobody is, a piece generated from the record">♪ listen</button><span id="listen-status" class="nav-note">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a>
+  <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it, and that is remembered">♪ listen</button><span id="listen-status" class="nav-note">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a>
 </nav>
 <aside id="listen-note" class="listen-note" aria-live="polite" hidden></aside>
 <div class="band-col">
@@ -103,7 +103,7 @@
 <script src="video-rtc.js?v=1794024219"></script>
 <script src="app.js?v=1794024219"></script>
 <script type="module">
-import { mountPlayer } from "./music/player.js?v=1794516968";
+import { mountPlayer } from "./music/player.js?v=1794519009";
 mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),

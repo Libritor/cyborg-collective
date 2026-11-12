@@ -26,6 +26,11 @@
 // A sweep starts on a downbeat and lasts a whole number of bars. While the band
 // is silent the panel shows the first stretch of the stored minute, still. For a
 // visitor who asked their system for less motion it stays that way.
+//
+// A browser may refuse to let a page sound before the visitor has touched it.
+// Until then the wand can sweep the stored minute in silence (`preview`), timed
+// on a wall clock at the band's tempo; when the sound arrives, `start` moves the
+// sweeps onto the audio clock and the next one wipes what the silent wand drew.
 
 import { BANDS } from "./hearing.js?v=3";
 
@@ -48,9 +53,9 @@ const clock = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.floor(seco
 
 export function createSwim({ audio, tap = null, mark = null, panel = null } = {}) {
   const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const state = { running: false, reduced, source: null, sweeps: 0, dots: 0, level: 0, inked: false, still: false, pxPerUv: 1 };
+  const state = { running: false, preview: false, reduced, source: null, sweeps: 0, dots: 0, level: 0, inked: false, still: false, pxPerUv: 1 };
   if (!panel || typeof document === "undefined") {
-    return { state, start() {}, stop() {}, bar() {}, setSource() {}, setStill() {}, probe: () => null };
+    return { state, start() {}, stop() {}, bar() {}, setSource() {}, setStill() {}, preview: () => false, probe: () => null };
   }
 
   const canvas = document.createElement("canvas");
@@ -228,6 +233,17 @@ export function createSwim({ audio, tap = null, mark = null, panel = null } = {}
   const downbeats = [];      // { time, bar } still to come, on the audio clock
   let raf = 0;
   let stoppedAt = null;      // rAF time the band stopped at, while the picture fades
+  let nowS = () => audio.currentTime;   // the clock sweeps are timed on: the audio clock, or a wall clock while the wand previews in silence
+  let previewing = null;     // { bar, next }: downbeats made up at the band's tempo while there is no sound to follow
+
+  /** The still picture becomes the sweep before the first: the wand draws over it and wipes it as it goes. */
+  function stillBecomesOld() {
+    [cur, old] = [old, cur];
+    cur.g.clearRect(0, 0, cur.c.width, cur.c.height);
+    sweep = null;
+    state.still = false;
+    state.inked = true;
+  }
 
   function clearDots() {
     for (const s of [cur, old]) s.g.clearRect(0, 0, s.c.width, s.c.height);
@@ -352,7 +368,10 @@ export function createSwim({ audio, tap = null, mark = null, panel = null } = {}
 
   function frame(t) {
     raf = 0;
-    const now = audio.currentTime;
+    const now = nowS();
+    if (previewing) {
+      while (previewing.next <= now + 0.05) { downbeats.push({ time: previewing.next, bar: previewing.bar }); previewing.next += previewing.bar; }
+    }
     while (downbeats.length && downbeats[0].time <= now) {
       const beat = downbeats.shift();
       if (!state.running || now - beat.time > LATE_S) continue;
@@ -389,29 +408,54 @@ export function createSwim({ audio, tap = null, mark = null, panel = null } = {}
 
     /** The band started: the wand leaves the left edge on the next downbeat. */
     start() {
+      const wasPreview = state.preview;
+      if (wasPreview) {
+        // the sound has arrived: from here the sweeps follow the audio clock, and the next one wipes what the silent wand drew
+        nowS = () => audio.currentTime;
+        previewing = null;
+        state.preview = false;
+        downbeats.length = 0;
+        sweep = null;
+      }
       state.running = true;
       stoppedAt = null;
       if (mark) mark.classList.add("sounding");
       panel.classList.add("sounding");
       layout();
       if (reduced) return;               // the still picture stays
-      if (state.still) {
-        // the still picture becomes the sweep before the first: the wand draws over it and wipes it as it goes
-        [cur, old] = [old, cur];
-        cur.g.clearRect(0, 0, cur.c.width, cur.c.height);
-        sweep = null;
-        state.still = false;
-        state.inked = true;
-      } else {
-        clearDots();
-      }
+      if (state.still) stillBecomesOld();
+      else if (!wasPreview) clearDots();
       compose(0);
       wake();
+    },
+
+    /**
+     * No sound yet, because the browser wants the visitor to touch the page first: the wand sweeps `source` (a
+     * stored stretch) in silence, at the band's tempo. False when it does not (less motion asked for, already
+     * running, nothing to draw).
+     */
+    preview({ source: stored = null, tempo = 132 } = {}) {
+      if (reduced || state.running || !stored) return false;
+      const t0 = performance.now() / 1000;
+      nowS = () => performance.now() / 1000 - t0;
+      previewing = { bar: (4 * 60) / (tempo > 0 ? tempo : 132), next: 0.1 };
+      source = stored;
+      state.running = true;
+      state.preview = true;
+      stoppedAt = null;
+      layout();
+      if (state.still) stillBecomesOld(); else clearDots();
+      compose(0);
+      wake();
+      return true;
     },
 
     /** The band stopped: no more dots; the sweep fades and the still picture comes back. */
     stop() {
       state.running = false;
+      state.preview = false;
+      previewing = null;
+      nowS = () => audio.currentTime;
       downbeats.length = 0;
       if (mark) mark.classList.remove("sounding");
       panel.classList.remove("sounding");
