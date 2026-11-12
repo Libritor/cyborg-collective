@@ -111,9 +111,26 @@ export function createSwim({ audio, tap = null, mark = null, panel = null } = {}
     state.pxPerUv = pxPerUv;
     core = narrow ? 0.9 : 1.05;          // px, the radius of a dot
     halo = narrow ? 2.8 : 3.4;           // px, the radius of its glow
-    if (sweep) sweep.lost = true;        // the sheets were cleared: what was laid down is gone until the next sweep
     drawAxes();
     if (state.still) drawStill();
+    else redraw();                       // the sheets were cleared: lay the sweep in progress down again where it now belongs
+  }
+
+  /** After the panel changed size: the dots of the sweep in progress, laid down again on the new axes. */
+  function redraw() {
+    if (!sweep) return;
+    const glow = glowFor(sweep.need);
+    for (let i = 0; i < BANDS.length; i += 1) {
+      const spots = [];
+      for (let n = 0; n <= sweep.painted[i]; n += 1) {
+        const uv = sweep.src.read(BANDS[i].key, sweep.s0 + n);
+        if (uv === undefined) continue;
+        const y = yOf(i, uv);
+        spots.push([xOf(n, sweep.need), y]);
+        sweep.last[i] = y;
+      }
+      if (spots.length) leave(cur.g, i, spots, glow);
+    }
   }
 
   /** The axes: band names and microvolt ticks up the left, seconds along the bottom. */

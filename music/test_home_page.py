@@ -11,9 +11,10 @@ where every dot belongs on the panel's axes (seconds across, microvolts up), and
 reads the same recording half a second late and shows that the wrong stretch does not fit. Live sharers are
 imitated by handing frames to the page's own relay object; nothing is sent to any server.
 
-The band plays by default, so arrival is checked both ways: where the browser holds the sound back until the visitor
-touches the page (the wand must sweep in silence and the sound must join on the first tap or key press, anywhere),
-and where it lets a page sound at once (the band must be playing on arrival, untouched). The test browser itself
+The band plays by default on every visit, so arrival is checked both ways: where the browser holds the sound back
+until the visitor touches the page (the wand and the chains must run in silence, the page must ask for the tap, and
+the sound must join on the first tap or key press, anywhere), and where it lets a page sound at once (the band must
+be playing on arrival, untouched, also for a visitor who stopped it last time). The test browser itself
 always lets a page sound (it counts its own navigation as a gesture), so the first case is made by HOLD_SOUND
 below: an AudioContext that stays suspended, and whose resume() stays pending, until the page has had a real
 (trusted) tap or key press.
@@ -67,7 +68,9 @@ STATE = """() => {
   const note = document.getElementById('listen-note');
   const r = note ? note.getBoundingClientRect() : null;
   return {
-    playing: window.__player.playing, preview: window.__player.preview, mode: window.__player.mode, piece: window.__player.piece,
+    playing: window.__player.playing, preview: window.__player.preview, waiting: window.__player.waiting, stopped: window.__player.stopped,
+    ask: (() => { const a = document.getElementById('sound-ask'); return a && !a.hidden && a.getBoundingClientRect().width > 0 ? a.textContent : null; })(),
+    mode: window.__player.mode, piece: window.__player.piece,
     ctx: window.__band ? window.__band.ctx.state : null,
     drawn: window.__player.waves, shares: window.__player.shares,
     waves: JSON.parse(JSON.stringify(window.__waves.state)),
@@ -245,14 +248,22 @@ with sync_playwright() as p:
     page, errors = new_page(b)
     s = page.evaluate(STATE)
     check(not s["playing"] and s["ctx"] == "suspended" and s["noteHidden"] and not s["sounding"], "on arrival, untouched: no sound (the browser has not allowed it), no note", json.dumps(s)[:300])
-    check(s["preview"] and s["waves"]["preview"] and s["waves"]["running"] and not s["waves"]["still"]
-          and "session of" in s["caption"] and "the sound starts with your first tap or key press" in s["caption"] and "tap anywhere or press a key for sound" in s["status"],
-          "the wand is already sweeping the stored minute in silence, and the page says a tap or a key brings the sound", s["caption"] + " | " + s["status"] + " " + json.dumps(s["waves"]))
+    check(s["waiting"] and s["preview"] and s["waves"]["preview"] and s["waves"]["running"] and not s["waves"]["still"]
+          and "session of" in s["caption"] and "no sound yet" in s["caption"] and "tap anywhere or press a key for sound" in s["status"],
+          "the wand is already sweeping the stored minute in silence, and the page says there is no sound yet", s["caption"] + " | " + s["status"] + " " + json.dumps(s["waves"]))
+    check(s["ask"] and "tap anywhere for sound" in s["ask"], "a plain request sits on the panel: tap anywhere for sound", str(s["ask"]))
     page.wait_for_function("() => { const p = window.__waves.probe(); return p && p.sweep && p.sweep.kind === 'record' && p.sweep.painted[0] > 0.6 * p.sweep.need; }", timeout=20000)
     fit = page.evaluate(ON_THE_SAMPLES, 0)
     check("error" not in fit and fit["looked"] >= 300 and fit["own"] >= 0.99 * fit["looked"],
           f"what the silent wand draws stands on the published samples ({fit.get('own')} of {fit.get('looked')} places)", json.dumps(fit))
-    check(s["chains"]["hidden"] and not s["chains"]["state"]["shown"], "no chains are drawn while there is no bar to draw", json.dumps(s["chains"])[:200])
+    c = s["chains"]
+    check(not c["hidden"] and c["state"]["shown"] and "no sound yet" in c["state"]["bar"] and len(c["steps"]) >= 2 and len(c["lit"]) == 1 and c["signalBalls"] >= 18,
+          f"the chains are already stepping through the day's piece in silence ({c['state']['bar']}; {' '.join(c['steps'])}, lit {c['lit']})", json.dumps(c)[:300])
+    seen = {c["state"]["bar"]}
+    for _ in range(4):
+        page.wait_for_timeout(1000)
+        seen.add(page.evaluate("() => window.__chains.state.bar"))
+    check(len(seen) >= 2, f"and are redrawn bar by bar ({sorted(seen)})")
     keeps_to_itself(page, "silent")
     shot(page, "panel_silent.png", clip={"x": 0, "y": 0, "width": 1280, "height": 560})
     page.click("#listen")
@@ -264,7 +275,8 @@ with sync_playwright() as p:
     check(s["drawn"] and s["drawn"]["kind"] == "record" and s["drawn"]["electrode"] in ("TP9", "AF7", "AF8", "TP10"), "the page knows the waves are the record's own samples, and from which electrode", json.dumps(s["drawn"]))
     check(s["waves"]["level"] > 0.2, "the wand's lights follow the level of the sound", str(s["waves"]["level"]))
     check(s["sounding"], "the 6ense mark is lit")
-    check("session of" in s["caption"] and "electrode" in s["caption"] and "listen" not in s["caption"], "the line over the panel says whose session and which electrode", s["caption"])
+    check("session of" in s["caption"] and "electrode" in s["caption"] and "listen" not in s["caption"] and "no sound" not in s["caption"], "the line over the panel says whose session and which electrode", s["caption"])
+    check(not s["waiting"] and s["ask"] is None and "no sound" not in s["chains"]["state"]["bar"], "with the sound in, the request for a tap is gone", json.dumps({"ask": s["ask"], "bar": s["chains"]["state"]["bar"]}))
     check(not s["noteHidden"] and not s["floating"] and s["noteInView"] and s["notePos"] == "relative", "the note is shown under the menu", json.dumps({k: s[k] for k in ("noteHidden", "floating", "noteInView", "notePos")}))
     check("What you are hearing" in s["noteText"] and "not a recording" in s["noteText"] and "summary of one session" in s["noteText"], "the note says what the music is", s["noteText"][:200])
     check("that session's own EEG: one minute from the electrode" in s["noteText"] and "Every dot is one stored sample, in microvolts against seconds" in s["noteText"]
@@ -312,7 +324,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(3000)
     s = page.evaluate(STATE)
     check(s["waves"]["still"] and s["waves"]["dots"] == dots and "listen sets the wand going" in s["caption"], "the sweep faded and the still picture is back", json.dumps(s["waves"]) + " " + s["caption"])
-    check(s["chains"]["hidden"], "the chains are put away with the music")
+    check(s["chains"]["hidden"] and s["stopped"] and "stopped" in s["status"] and s["ask"] is None, "the chains are put away with the music, and the page says it is stopped", s["status"])
 
     print("5. play again, close the note")
     page.click("#listen")
@@ -417,7 +429,9 @@ with sync_playwright() as p:
     page.wait_for_timeout(2000)
     two = page.evaluate(PICTURE)
     s = page.evaluate(STATE)
-    check(s["playing"] and s["waves"]["reduced"] and s["waves"]["dots"] == 0 and s["waves"]["still"] and before == one == two, "music plays, and the picture on the panel does not move", json.dumps(s["waves"]) + f" {before} {one} {two}")
+    # `before` may differ from `one`: the request for a tap leaves the line over the panel when the sound comes in, and the
+    # still picture is laid out again in the room that frees. What must not happen is movement while the music plays.
+    check(s["playing"] and s["waves"]["reduced"] and s["waves"]["dots"] == 0 and s["waves"]["still"] and one == two, "music plays, and the picture on the panel does not move", json.dumps(s["waves"]) + f" {before} {one} {two}")
     check(not s["noteHidden"] and "waves in the panel" not in s["noteText"] and "What you are hearing" in s["noteText"] and "held still" in s["caption"],
           "the note leaves the wand out, and the line over the panel says the picture is held still", s["noteText"][-200:] + " | " + s["caption"])
     check(not errors, "no script errors on the page", "; ".join(errors)[:300])
@@ -457,18 +471,18 @@ with sync_playwright() as p:
     shot(page, "panel_arrival_playing.png", clip={"x": 0, "y": 0, "width": 1280, "height": 1000})
     page.click("#listen")
     page.wait_for_timeout(600)
-    page.reload(wait_until="domcontentloaded")
-    page.wait_for_function(READY, timeout=60000)
-    page.wait_for_timeout(2500)
     s = page.evaluate(STATE)
-    check(not s["playing"] and not s["preview"] and s["waves"]["still"] and "off" in s["status"],
-          "a visitor who stopped it is not played at when they come back: the page stays silent and still, and says it is off", s["status"] + " " + json.dumps(s["waves"]))
-    page.click("#listen")
-    page.wait_for_timeout(2500)
+    check(not s["playing"] and s["stopped"], "the button stops it")
+    page.mouse.click(700, 700)
+    page.wait_for_timeout(1500)
+    check(not page.evaluate("() => window.__player.playing"), "and once stopped, a tap on the page does not start it again behind the visitor's back")
     page.reload(wait_until="domcontentloaded")
     page.wait_for_function(READY, timeout=60000)
     page.wait_for_function("() => window.__player.playing", timeout=8000)
-    check(True, "and once they switch it back on, it plays on arrival again")
+    page.wait_for_timeout(2500)
+    s = page.evaluate(STATE)
+    check(s["playing"] and not s["stopped"] and not s["chains"]["hidden"] and s["waves"]["running"],
+          "the stop was for that visit only: on the next visit the band, the wand and the chains are playing again on arrival", json.dumps({k: s[k] for k in ("playing", "stopped")}))
     check(not errors, "no script errors on the page", "; ".join(errors)[:300])
     page.context.close()
     b.close()

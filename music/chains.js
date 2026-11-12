@@ -67,7 +67,7 @@ export function chainGraphs({ data = null, mix = null, parts = null, weights = n
 }
 
 /** The lines of text beside the drawings: where the walk is, why this bar is what it is, and the numbers that made it. */
-export function chainWords({ data = null, mix = null, bar = null, tempo = null } = {}) {
+export function chainWords({ data = null, mix = null, bar = null, tempo = null, silent = false } = {}) {
   const at = data || {};
   const ui = at.ui || {};
   const chain = ui.chain || null;
@@ -84,7 +84,7 @@ export function chainWords({ data = null, mix = null, bar = null, tempo = null }
   const bpm = finite(tempo) ? tempo : (finite(at.tempo) ? at.tempo : null);
   const m = mix || {};
   return {
-    clock: `bar ${index === null ? "—" : index + 1}${bpm === null ? "" : ` · ${Math.round(bpm)} bpm`}`,
+    clock: `bar ${index === null ? "—" : index + 1}${bpm === null ? "" : ` · ${Math.round(bpm)} bpm`}${silent ? " · no sound yet" : ""}`,
     walk,
     reason: typeof ui.reason === "string" ? ui.reason : "",
     band: `C ${fixed(m.C)} · α ${fixed(m.alphaShare)} · arousal ${fixed(m.arousal)} · motion ${fixed(m.motion)} · asym ${signed(m.asymmetry)}`,
@@ -171,8 +171,9 @@ function paint(svg, graph, summary) {
 
 /**
  * The chains panel. `root` is the <figure> it fills. `show(bar)` paints one bar:
- * { data, mix, parts, weights, bar, tempo, source } with `source` a few words on
- * where the numbers come from ("1 person sharing live", "the session's summary").
+ * { data, mix, parts, weights, bar, tempo, source, silent } with `source` a few
+ * words on where the numbers come from ("1 person sharing live", "the session's
+ * summary") and `silent` true while the browser is still holding the sound back.
  */
 export function createChains({ root } = {}) {
   const state = { bar: null, walk: "", current: null, steps: [], C: null, shown: false };
@@ -189,7 +190,7 @@ export function createChains({ root } = {}) {
   caption.append(el("b", "", "6ense™"), " the chains · how this bar of music was made", clock);
   const how = el("p", "ch-how");
   how.append("Brain signals set the concentration C. C opens the devices, and the chords walk their chain one step at a time. ",
-    el("i", "ch-gold", "Gold"), " is sounding, ", el("i", "ch-cold", "blue"), " is in force, ", el("i", "ch-warm", "dashed red"), " comes next.");
+    el("i", "ch-gold", "Gold"), " is where the band is now, ", el("i", "ch-cold", "blue"), " is in force, ", el("i", "ch-warm", "dashed red"), " comes next.");
 
   const section = (name, hint) => {
     const head = el("h4", "", name);
@@ -208,10 +209,10 @@ export function createChains({ root } = {}) {
   return {
     state,
 
-    show({ data, mix = null, parts = null, weights = null, bar = null, tempo = null, source = "" } = {}) {
+    show({ data, mix = null, parts = null, weights = null, bar = null, tempo = null, source = "", silent = false } = {}) {
       if (!data) return;
       const graphs = chainGraphs({ data, mix, parts, weights });
-      const words = chainWords({ data, mix, bar, tempo });
+      const words = chainWords({ data, mix, bar, tempo, silent });
       clock.textContent = words.clock;
       chord.where.textContent = words.walk;
       chord.line.textContent = words.reason ? `why this bar: ${words.reason}` : "";

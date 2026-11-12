@@ -94,6 +94,8 @@ console.log("the words beside them");
   const chain = walking.data.ui.chain;
   const words = chainWords({ data: walking.data, mix: walking.mix, bar: 4, tempo: 132 });
   check(words.clock === "bar 5 · 132 bpm", "the bar is counted from one, with its tempo");
+  check(chainWords({ data: walking.data, mix: walking.mix, bar: 4, tempo: 132, silent: true }).clock === "bar 5 · 132 bpm · no sound yet",
+    "while the browser holds the sound back, the bar says there is no sound yet");
   check(words.walk.startsWith(`${chain.title} · step ${Math.min(chain.position, chain.steps.length)} of ${chain.steps.length}: `) && words.walk.includes(chain.steps[Math.min(chain.position, chain.steps.length) - 1]),
     "where the walk is: the progression's name, the step, and its chord");
   check(words.reason === walking.data.ui.reason && words.reason.length > 0, "why this bar is what it is: the generator's own sentence");

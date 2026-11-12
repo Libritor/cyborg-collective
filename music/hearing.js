@@ -187,7 +187,7 @@ export function panelCaption({ shown = null, piece = null, live = 0, playing = f
     const day = piece ? dayOf(piece.date) : "";
     const tail = still ? " \u00b7 held still, as your system asks for less motion"
       : playing ? ""
-        : silent ? " \u00b7 the sound starts with your first tap or key press"
+        : silent ? " \u00b7 no sound yet"
           : " \u00b7 \u266a listen sets the wand going";
     return `brain waves${day ? ` \u00b7 session of ${day}` : ""}${where}${tail}`;
   }

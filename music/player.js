@@ -1,10 +1,11 @@
 // The band on the home page: one button, the same engine as listen.html.
 //
-// The band plays by default. On arrival it starts by itself wherever the browser
-// lets a page sound without a gesture. Where the browser does not (most do not,
-// for a first visit), the wand starts sweeping the stored minute in silence and
-// the sound joins on the visitor's first tap or key press, anywhere on the page.
-// A visitor who switched it off before is not played at: that is remembered.
+// The band plays by default, on every visit. On arrival it starts by itself
+// wherever the browser lets a page sound without a gesture. Where the browser
+// does not (most do not, for a first visit), everything but the sound starts
+// anyway: the wand sweeps the stored minute and the chains step through the
+// day's piece, in silence, and the sound joins on the visitor's first tap or
+// key press, anywhere on the page. The button stops it for this visit only.
 // The kit is prerendered at load, which needs no gesture. While people who opened
 // their headband to the music are sharing, the band follows them; when nobody is,
 // it plays a piece generated from one session of the record, chosen for the day,
@@ -33,15 +34,6 @@ import { createChains } from "./chains.js?v=1";
 import { concentrationParts, getConcentrationWeights } from "./conditioner.js";
 import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";
 import { BANDS, hearingNote, panelCaption, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=3";
-
-const STORE_KEY = "collective.music";          // "on" | "off"; absent = never chose
-
-function remembered() {
-  try { return localStorage.getItem(STORE_KEY); } catch { return null; }
-}
-function remember(value) {
-  try { localStorage.setItem(STORE_KEY, value); } catch { /* private mode: fine */ }
-}
 
 /** A stable small hash, so the day's piece is the same for every visitor that day. */
 function hash(text) {
@@ -111,10 +103,12 @@ async function storedSource(entry) {
 
 const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its frames keep coming
 
-export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, chains = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
+export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, chains = null, ask = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
-  const state = { playing: false, preview: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
+  // waiting: the band has started but the browser is holding the sound back until the visitor touches the page;
+  // preview: the wand is sweeping in that silence; stopped: the visitor pressed the button to stop it
+  const state = { playing: false, waiting: false, preview: false, stopped: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
   window.__player = state;
 
   let kit;
@@ -232,11 +226,35 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     caption.textContent = panelCaption({
       shown: moving ? about(waveSource()) : about(recordSource),
       piece, live: liveViews().length, playing: state.playing, still: state.playing && waves.state.reduced,
-      silent: state.preview,
+      silent: state.waiting,
     });
   }
   const chainView = createChains({ root: chains });
   window.__chains = chainView;
+
+  // While the sound is held back the chains step through the day's piece on a wall clock, one bar at a time, as the
+  // silent wand does: the bars are the ones the band will play (idle.js answers the same for the same index).
+  let silentTimer = null;
+  let silentBar = 0;
+  function silentStep() {
+    const i = silentBar % 16;
+    chainView.show({
+      data: idle.pullBar(i), mix: idle.controls(i), parts: null, weights: getConcentrationWeights(),
+      bar: silentBar, tempo: idle.bpm, source: "the session's summary", silent: true,
+    });
+    silentBar += 1;
+  }
+  function startSilent() {
+    if (!idle || !chains || silentTimer) return;
+    chains.hidden = false;
+    silentBar = 0;
+    silentStep();
+    silentTimer = setInterval(silentStep, (240 / idle.bpm) * 1000);
+  }
+  function stopSilent() {
+    if (silentTimer) clearInterval(silentTimer);
+    silentTimer = null;
+  }
   function onBar(event) {
     describe();
     const from = made.get(event.bar) || {};
@@ -312,8 +330,9 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
 
   function describe() {
     showCaption();
+    if (ask) ask.hidden = !state.waiting;
     if (!state.playing) {
-      say(remembered() === "off" ? "off · tap ♪ to listen" : "tap anywhere or press a key for sound");
+      say(state.stopped ? "stopped · ♪ plays it again" : state.waiting ? "tap anywhere or press a key for sound" : "starting the band");
       return;
     }
     const views = liveViews();
@@ -330,11 +349,13 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     // where the browser has not let the page sound yet, this waits for the gesture that does
     try { await loop.play(); } catch (err) { say("could not start audio: " + err.message); return; } finally { starting = false; }
     state.playing = true;
+    state.waiting = false;
     state.preview = false;
+    state.stopped = false;
+    stopSilent();
     unlisten();
     button.setAttribute("aria-pressed", "true");
     button.textContent = "♪ stop";
-    remember("on");
     waves.start();
     if (chains) chains.hidden = false;           // the chains are drawn while there is a bar to draw
     describe();
@@ -346,8 +367,10 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     state.playing = false;
     button.setAttribute("aria-pressed", "false");
     button.textContent = "♪ listen";
-    if (byVisitor) remember("off");
+    state.stopped = !!byVisitor;          // for this visit only: the next visit starts again
+    state.waiting = false;
     state.preview = false;
+    stopSilent();
     unlisten();
     waves.stop();
     if (note) note.hidden = true;
@@ -368,7 +391,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
   // start() is already waiting on it if an earlier touch did not count (a scroll, a modifier key).
   const GESTURES = ["pointerdown", "keydown", "touchend"];
   function onGesture(event) {
-    if (state.playing || remembered() === "off") { unlisten(); return; }
+    if (state.playing || state.stopped) { unlisten(); return; }
     if (event.target && event.target.closest && event.target.closest("#listen")) return;   // the button speaks for itself
     ctx.resume().catch(() => {});
     start();
@@ -377,17 +400,19 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     for (const type of GESTURES) document.removeEventListener(type, onGesture, true);
   }
 
-  /** On arrival: sound at once where the browser allows it; otherwise the silent wand, and the sound on the first gesture. */
+  /**
+   * On arrival, every visit: sound at once where the browser allows it. Where it does not, the wand and the chains
+   * start in silence and the page asks for the one tap or key press the browser wants.
+   */
   async function arrive() {
-    if (remembered() === "off") return;
     for (const type of GESTURES) document.addEventListener(type, onGesture, { capture: true, passive: true });
     try { await Promise.race([ctx.resume(), new Promise((resolve) => setTimeout(resolve, 400))]); } catch { /* refused: wait for a gesture */ }
-    if (state.playing || starting) return;
+    if (state.playing || starting || state.stopped) return;
     if (ctx.state === "running") { await start(); return; }
-    if (waves.preview({ source: recordSource, tempo: idle ? idle.bpm : 132 })) {
-      state.preview = true;
-      describe();
-    }
+    state.waiting = true;
+    state.preview = waves.preview({ source: recordSource, tempo: idle ? idle.bpm : 132 });
+    if (state.preview) startSilent();          // not for a visitor who asked for less motion: their page stays still
+    describe();
   }
 
   // a hidden tab throttles timers to about 1 Hz; the loop suspends the context and reanchors
