@@ -5,23 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794515228">
+<link rel="stylesheet" href="style.css?v=1794516968">
 </head>
 <body>
+<div class="masthead">
 <header class="top">
- <div class="top-text">
   <h1>Cyborg Collective</h1>
   <p class="tag">A window the person opens, not a feed that is taken. Live headbands when someone chooses to share; the record of every recording behind them, always.</p>
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
- </div>
- <figure class="swim-panel" id="swim">
-  <figcaption><b>6ense™</b> <span id="swim-caption">brain waves</span></figcaption>
- </figure>
 </header>
 <nav>
   <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn" aria-pressed="false" disabled title="The band plays the brainwaves of the people sharing live; when nobody is, a piece generated from the record">♪ listen</button><span id="listen-status" class="nav-note">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a>
 </nav>
 <aside id="listen-note" class="listen-note" aria-live="polite" hidden></aside>
+<div class="band-col">
+ <figure class="swim-panel" id="swim">
+  <figcaption><b>6ense™</b> <span id="swim-caption">brain waves</span></figcaption>
+ </figure>
+ <figure class="chains-panel" id="chains" hidden></figure>
+</div>
+</div>
 <main>
 
 <section id="live">
@@ -94,15 +97,17 @@
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
     <li>The band's waves: the dots in the brain-wave panel at the top of the page are samples, not decoration, drawn in microvolts against seconds. With nobody live, and while the band is silent, they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
+    <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
 <script src="video-rtc.js?v=1794024219"></script>
 <script src="app.js?v=1794024219"></script>
 <script type="module">
-import { mountPlayer } from "./music/player.js?v=1794515228";
+import { mountPlayer } from "./music/player.js?v=1794516968";
 mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
-              panel: document.getElementById("swim"), caption: document.getElementById("swim-caption") })
+              panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
+              chains: document.getElementById("chains") })
   .then((band) => { window.__band = band; })
   .catch((err) => { const s = document.getElementById("listen-status"); if (s) s.textContent = "the band could not load: " + err.message; });
 </script>

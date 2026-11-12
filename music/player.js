@@ -9,7 +9,10 @@
 //
 // While it plays, a wand of lights draws brain waves in the panel beside the title,
 // the way a SWIM draws a wave (swim.js), with microvolts up the side and seconds
-// along the bottom, and a short note says what is being heard (hearing.js). The
+// along the bottom, and a short note says what is being heard (hearing.js). Under
+// the panel the band's two chains are drawn for the bar that is sounding: the
+// chord walk and the signal chain, from the bar itself and the controls it was
+// generated from (chains.js), so a visitor can see how the music is made. The
 // waves are the samples themselves wherever there are samples to draw: a stored
 // minute of the session the day's piece is made from (music/eeg/), or the raw
 // trace of a live sharer who opened their headband to the music and sends one.
@@ -23,6 +26,8 @@ import { createIdle } from "./idle.js";
 // The ?v= on these three (and inside swim.js and eegbands.js) goes up whenever one of them changes what it exports:
 // the host lets a browser keep a module for ten minutes, and a new player handed an old hearing.js does not load.
 import { createSwim } from "./swim.js?v=3";
+import { createChains } from "./chains.js?v=1";
+import { concentrationParts, getConcentrationWeights } from "./conditioner.js";
 import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";
 import { BANDS, hearingNote, panelCaption, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=3";
 
@@ -103,7 +108,7 @@ async function storedSource(entry) {
 
 const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its frames keep coming
 
-export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
+export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, chains = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
   const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
@@ -162,17 +167,28 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     return relay.sharers(at).filter((v) => v && v.admitted !== false);
   }
 
+  // what each bar was generated from, kept until the bar is announced: the chains panel draws it
+  const made = new Map();
+  const RESTING = Object.freeze({ C: 0.3, alphaShare: 0.35, arousal: 0.3, motion: 0.3, asymmetry: 0.2 });
   function pullBar(index) {
     state.bars = index;
+    for (const key of made.keys()) if (key < index - 8) made.delete(key);
     const views = liveViews();
     if (views.length) {
       state.mode = "live"; state.heads = views.length;
-      return nextBar(gen, aggregate(views, Date.now() / 1000));
+      const mix = aggregate(views, Date.now() / 1000);
+      made.set(index, { mix, parts: concentrationParts(views[0]), source: `${views.length} ${views.length === 1 ? "person" : "people"} sharing live` });
+      return nextBar(gen, mix);
     }
     state.heads = 0;
-    if (idle) { state.mode = "record"; return idle.pullBar(index % 16); }
+    if (idle) {
+      state.mode = "record";
+      made.set(index, { mix: idle.controls(index % 16), parts: null, source: "the session's summary" });
+      return idle.pullBar(index % 16);
+    }
     state.mode = "vamp";
-    return nextBar(gen, { C: 0.3, alphaShare: 0.35, arousal: 0.3, motion: 0.3, asymmetry: 0.2 });
+    made.set(index, { mix: RESTING, parts: null, source: "a resting pattern" });
+    return nextBar(gen, { ...RESTING });
   }
 
   // the waves are drawn from whatever the band is playing from: a live head's raw trace if one is coming in,
@@ -215,8 +231,15 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
       piece, live: liveViews().length, playing: state.playing, still: state.playing && waves.state.reduced,
     });
   }
+  const chainView = createChains({ root: chains });
+  window.__chains = chainView;
   function onBar(event) {
     describe();
+    const from = made.get(event.bar) || {};
+    chainView.show({
+      data: event.data, mix: from.mix || null, parts: from.parts || null, weights: getConcentrationWeights(),
+      bar: event.bar, tempo: event.tempo, source: from.source || "",
+    });
     if (!waves) return;
     const source = waveSource();
     state.waves = waves.state.reduced ? null : { kind: source.kind, electrode: source.electrode || null };
@@ -304,6 +327,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     button.textContent = "♪ stop";
     remember("on");
     waves.start();
+    if (chains) chains.hidden = false;           // the chains are drawn while there is a bar to draw
     describe();
   }
 
@@ -316,6 +340,8 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     if (byVisitor) remember("off");
     waves.stop();
     if (note) note.hidden = true;
+    if (chains) chains.hidden = true;
+    chainView.clear();
     describe();
   }
 

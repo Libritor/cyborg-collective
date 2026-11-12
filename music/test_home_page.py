@@ -1,4 +1,4 @@
-"""Browser check of the home page's band: the brain-wave panel (SWIM) and the 'what you are hearing' note.
+"""Browser check of the home page's band: the brain-wave panel (SWIM), the chains panel and the 'what you are hearing' note.
 
     python -m http.server 8771 --bind 127.0.0.1        (in the repository root, in another terminal)
     python music/test_home_page.py [URL] [FOLDER]      -> "PASS <n> checks", exit 0
@@ -45,6 +45,22 @@ STATE = """() => {
     drawn: window.__player.waves, shares: window.__player.shares,
     waves: JSON.parse(JSON.stringify(window.__waves.state)),
     caption: document.getElementById('swim-caption').textContent,
+    chains: (() => {
+      const root = document.getElementById('chains');
+      const graph = (name) => root.querySelector(`svg[data-graph="${name}"]`);
+      const labels = (svg, pick) => (svg ? [...svg.querySelectorAll(pick)].map((n) => n.textContent) : []);
+      const chord = graph('the chord chain');
+      const signal = graph('the signal chain');
+      const ball = (svg, id, cls) => { const n = svg && svg.querySelector(`.ch-node[data-node="${id}"] .${cls}`); return n ? n.textContent : null; };
+      return {
+        hidden: root.hidden, state: JSON.parse(JSON.stringify(window.__chains.state)), text: root.innerText.replace(/\\s+/g, ' '),
+        steps: labels(chord, '.ch-node[data-node^="step:"] .ch-label'),
+        lit: labels(chord, '.ch-node[data-state="current"] .ch-label, .ch-node[data-state="armed"] .ch-label'),
+        signalBalls: signal ? signal.querySelectorAll('.ch-node').length : 0,
+        terms: signal ? signal.querySelectorAll('.ch-node[data-kind="term"]').length : 0,
+        C: ball(signal, 'C', 'ch-value'),
+      };
+    })(),
     noteHidden: note.hidden, noteText: note.innerText.replace(/\\s+/g, ' '), floating: note.classList.contains('floating'),
     noteInView: r ? (r.top >= 0 && r.bottom <= innerHeight && r.width > 0) : false,
     notePos: getComputedStyle(note).position,
@@ -95,9 +111,14 @@ LAYOUT = """() => {
   const box = (el) => { const r = el.getBoundingClientRect(); return { l: r.left, t: r.top + scrollY, r: r.right, b: r.bottom + scrollY }; };
   const overlap = (a, b) => Math.max(0, Math.min(a.r, b.r) - Math.max(a.l, b.l)) * Math.max(0, Math.min(a.b, b.b) - Math.max(a.t, b.t));
   const panel = box(document.getElementById('swim'));
-  const others = { text: document.querySelector('.top-text'), menu: document.querySelector('nav'), note: document.getElementById('listen-note'), main: document.querySelector('main') };
+  const chains = document.getElementById('chains');
+  const others = { text: document.querySelector('header.top'), menu: document.querySelector('nav'), note: document.getElementById('listen-note'), main: document.querySelector('main'), chains };
   const overlaps = {};
-  for (const [name, el] of Object.entries(others)) overlaps[name] = el && !el.hidden ? Math.round(overlap(panel, box(el))) : 0;
+  const shown = (el) => el && !el.hidden && getComputedStyle(el).position !== 'fixed';
+  for (const [name, el] of Object.entries(others)) overlaps[name] = shown(el) ? Math.round(overlap(panel, box(el))) : 0;
+  // the chains panel keeps to itself too
+  if (shown(chains)) for (const name of ['text', 'menu', 'note', 'main']) overlaps[`chains/${name}`] = shown(others[name]) ? Math.round(overlap(box(chains), box(others[name]))) : 0;
+  const chainsBox = shown(chains) ? box(chains) : null;
   const p = window.__waves.probe();
   const c = document.getElementById('waves');
   const g = c.getContext('2d');
@@ -110,6 +131,7 @@ LAYOUT = """() => {
   return {
     overlaps,
     panel: { width: Math.round(panel.r - panel.l), right: Math.round(panel.r), left: Math.round(panel.l) },
+    chains: chainsBox ? { width: Math.round(chainsBox.r - chainsBox.l), right: Math.round(chainsBox.r), left: Math.round(chainsBox.l) } : null,
     window: innerWidth,
     left: ink(2, 14, p.x0 - 12, p.H - 50),             // band names and microvolt ticks
     under: ink(p.x0 - 4, p.H - 28, p.plotW + 8, 26),   // seconds and the axis title
@@ -180,7 +202,9 @@ def new_page(browser, **kw):
 
 def keeps_to_itself(page, label):
     lay = page.evaluate(LAYOUT)
-    check(all(v == 0 for v in lay["overlaps"].values()), f"{label}: the panel covers no text, menu or note", json.dumps(lay["overlaps"]))
+    check(all(v == 0 for v in lay["overlaps"].values()), f"{label}: the panels cover no text, menu or note, nor each other", json.dumps(lay["overlaps"]))
+    if lay["chains"]:
+        check(lay["chains"]["left"] >= 0 and lay["chains"]["right"] <= lay["window"], f"{label}: the chains panel fits the window ({lay['chains']['width']} px wide)", json.dumps(lay["chains"]))
     check(lay["panel"]["left"] >= 0 and lay["panel"]["right"] <= lay["window"] and lay["plot"]["plotW"] >= 200, f"{label}: the panel fits the window ({lay['panel']['width']} px wide, plot {lay['plot']['plotW']} px)", json.dumps(lay))
     check(lay["left"] > 150 and lay["under"] > 60, f"{label}: its axes are drawn: band names and microvolt ticks up the left, seconds underneath", json.dumps({k: lay[k] for k in ("left", "under")}))
 
@@ -197,6 +221,7 @@ with sync_playwright() as p:
     fit = page.evaluate(ON_THE_SAMPLES, 0)
     check("error" not in fit and fit["still"] and fit["looked"] >= 400 and fit["own"] >= 0.99 * fit["looked"],
           f"the still picture stands on the published samples ({fit.get('own')} of {fit.get('looked')} places)", json.dumps(fit))
+    check(s["chains"]["hidden"] and not s["chains"]["state"]["shown"], "no chains are drawn while there is no bar to draw", json.dumps(s["chains"])[:200])
     keeps_to_itself(page, "silent")
     shot(page, "panel_silent.png", clip={"x": 0, "y": 0, "width": 1280, "height": 560})
     page.click("#listen")
@@ -215,9 +240,24 @@ with sync_playwright() as p:
           and "SWIM (Sequential Wave Imprinting Machine)" in s["noteText"],
           "the note says the waves are the session's own EEG, sample by sample, in microvolts against seconds, drawn as a SWIM draws", s["noteText"][-360:])
     check(all(name in s["noteText"] for name in ("delta", "theta", "alpha", "beta", "gamma")), "the note names the five bands")
-    shot(page, "panel_playing.png", clip={"x": 0, "y": 0, "width": 1280, "height": 560})
+    c = s["chains"]
+    check(not c["hidden"] and c["state"]["shown"] and "how this bar of music was made" in c["text"] and "bar " in c["state"]["bar"] and "bpm" in c["state"]["bar"],
+          "the chains panel is shown under the brain waves, and says which bar it is drawing", json.dumps(c)[:300])
+    check(len(c["steps"]) >= 2 and c["steps"] == c["state"]["steps"] and len(c["lit"]) == 1 and c["lit"][0] == c["state"]["current"] and c["state"]["current"] in c["state"]["walk"],
+          f"the chord chain: the progression's steps ({' '.join(c['steps'])}), with the one being played lit ({c['lit']})", json.dumps(c)[:400])
+    check("why this bar:" in c["text"] and "THE CHORD CHAIN" in c["text"].upper(), "with the generator's own reason for the bar beside it", c["text"][:300])
+    check(c["signalBalls"] >= 18 and c["terms"] == 0 and c["C"] == f"{c['state']['C']:.2f}" and "from the session's summary" in c["text"] and f"C {c['state']['C']:.2f}" in c["text"],
+          f"the signal chain: C {c['C']} and what it opens, from the session's summary (no headband, so no terms)", json.dumps({k: c[k] for k in ("signalBalls", "terms", "C")}))
+    shot(page, "panel_playing.png", clip={"x": 0, "y": 0, "width": 1280, "height": 1000})
+    seen = {c["state"]["bar"]}
+    for _ in range(4):
+        page.wait_for_timeout(1000)
+        seen.add(page.evaluate("() => window.__chains.state.bar"))
+    check(len(seen) >= 2, f"the chains are redrawn bar by bar ({sorted(seen)})")
 
     print("2. the dots are the published samples, on the panel's axes")
+    # wait until the sweep in progress is well under way, so there is a good stretch of it to hold against the file
+    page.wait_for_function("() => { const p = window.__waves.probe(); return p && p.sweep && p.sweep.kind === 'record' && p.sweep.painted[0] > 0.7 * p.sweep.need; }", timeout=20000)
     fit = page.evaluate(ON_THE_SAMPLES, 0)
     check("error" not in fit and not fit["still"] and fit["looked"] >= 150 and fit["own"] >= 0.99 * fit["looked"] and all(v is not None and v >= 97 for v in fit["per"].values()),
           f"a dot of the band's own colour at {fit.get('own')} of {fit.get('looked')} places computed afresh from the bytes of the published file (per band {fit.get('per')})", json.dumps(fit))
@@ -241,6 +281,7 @@ with sync_playwright() as p:
     page.wait_for_timeout(3000)
     s = page.evaluate(STATE)
     check(s["waves"]["still"] and s["waves"]["dots"] == dots and "listen sets the wand going" in s["caption"], "the sweep faded and the still picture is back", json.dumps(s["waves"]) + " " + s["caption"])
+    check(s["chains"]["hidden"], "the chains are put away with the music")
 
     print("5. play again, close the note")
     page.click("#listen")
@@ -269,6 +310,9 @@ with sync_playwright() as p:
           and "band powers, not from a raw trace" in s["noteText"] and "sample" not in s["noteText"] and "summary of one session" not in s["noteText"],
           "the note says the band is following them, and that the waves are band powers, not samples", s["noteText"])
     check(s["caption"] == "band powers of the people sharing live · no raw trace to draw", "and so does the line over the panel", s["caption"])
+    c = s["chains"]
+    check("from 1 person sharing live" in c["text"] and c["terms"] == 3 and c["C"] == f"{c['state']['C']:.2f}",
+          f"the signal chain is now drawn from the live head: three terms weighed into C {c['C']}", json.dumps({k: c[k] for k in ("terms", "C")}) + " " + c["text"][-200:])
 
     print("7. the same sharer starts sending a raw trace")
     page.evaluate(UNFEED)
@@ -342,6 +386,13 @@ with sync_playwright() as p:
     w = page.evaluate("() => { const r = document.getElementById('listen-note').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right)]; }")
     check(not s["noteHidden"] and w[0] >= 0 and w[1] <= 390, "the note fits a phone screen", str(w))
     keeps_to_itself(page, "phone, playing")
+    lit = page.evaluate("""() => {
+      const ball = document.querySelector('#chains .ch-node[data-state="current"] .ch-ball, #chains .ch-node[data-state="armed"] .ch-ball');
+      if (!ball) return null;
+      const b = ball.getBoundingClientRect(); const box = ball.closest('.ch-scroll').getBoundingClientRect();
+      return { inside: b.left >= box.left - 1 && b.right <= box.right + 1, left: Math.round(b.left), right: Math.round(b.right), box: [Math.round(box.left), Math.round(box.right)] };
+    }""")
+    check(lit is None or lit["inside"], "on a phone the chord being played is kept in sight inside the chains panel", json.dumps(lit))
     check(s["waves"]["sweeps"] >= 1 and s["waves"]["dots"] > 2500, "the dots are drawn on the phone", json.dumps(s["waves"]))
     fit = page.evaluate(ON_THE_SAMPLES, 0)
     check("error" not in fit and fit["looked"] >= 60 and fit["own"] >= 0.99 * fit["looked"], f"and stand where the published samples say ({fit.get('own')} of {fit.get('looked')})", json.dumps(fit))
