@@ -4,7 +4,7 @@
 
 import { readFileSync } from "node:fs";
 
-import { BANDS, SITES, sharesFromMedians, sharesFromViews, rippleHeight, powerWaves, dayOf, hearingNote } from "./hearing.js";
+import { BANDS, SITES, sharesFromMedians, sharesFromViews, rippleHeight, powerWaves, dayOf, hearingNote, panelCaption } from "./hearing.js";
 import { BANDS as CONDITIONER_BANDS } from "./conditioner.js";
 
 let assertions = 0;
@@ -110,7 +110,9 @@ console.log("the note");
   check(/hi-hat/.test(record.how) && /harmony/.test(record.how) && /drum fills/.test(record.how), "it says what the signal steers");
   check(record.more.href === "music/listen.html?relay=1", "it links to the desk, where every rule is shown");
 
-  check(Array.isArray(record.waves) && record.waves.length === 2 && /6ense/.test(record.waves[0]), "it explains the waves in two halves around the band names");
+  check(Array.isArray(record.waves) && record.waves.length === 2 && /in the panel/.test(record.waves[0]), "it explains the waves in two halves around the band names");
+  check(/in microvolts against seconds/.test(record.waves[1]) && /in microvolts against seconds/.test(hearingNote({ live: 1, waves: { kind: "live", electrode: "TP9" } }).waves[1]),
+    "where the dots are samples it says what the two axes are");
   check(/that session's own EEG: one minute from the electrode behind the right ear, split into its five bands/.test(record.waves[0])
     && /Every dot is one stored sample/.test(record.waves[1]),
     "a stored minute: it says the waves are the session's own EEG, how much of it, which electrode, and that a dot is a sample");
@@ -127,7 +129,24 @@ console.log("the note");
   check([record, raw, powersLive].every((n) => /Steve Mann's SWIM \(Sequential Wave Imprinting Machine\)/.test(n.waves[1])), "it names the SWIM the drawing follows");
   check(hearingNote({ live: 0, piece: null, waves: null }).waves === null, "with the waves off it says nothing about them");
   const words = [record.what, record.how, ...record.waves].join(" ").split(/\s+/).length;
-  check(words <= 115, `it stays short (${words} words)`);
+  check(words <= 120, `it stays short (${words} words)`);
+}
+
+console.log("the line over the panel");
+{
+  const piece = { stamp: "s", date: "2025-12-13T17:09:44", minutes: 14.3 };
+  const stored = { kind: "record", electrode: "TP10" };
+  const silent = panelCaption({ shown: stored, piece, playing: false });
+  const playing = panelCaption({ shown: stored, piece, playing: true });
+  check(/^brain waves · session of 13 Dec 2025 · electrode TP10, behind the right ear/.test(silent) && playing === "brain waves · session of 13 Dec 2025 · electrode TP10, behind the right ear",
+    "a stored minute: whose session, which electrode and where it sits");
+  check(/♪ listen sets the wand going$/.test(silent) && !/listen/.test(playing), "silent, it says how to set the wand going; playing, it does not");
+  check(/held still, as your system asks for less motion$/.test(panelCaption({ shown: stored, piece, playing: true, still: true })), "held still for a visitor who asked for less motion, it says so");
+  check(panelCaption({ shown: { kind: "live", electrode: "AF7" }, live: 1, playing: true }) === "brain waves, live · electrode AF7, on the left forehead", "a live raw trace: live, and which electrode");
+  check(panelCaption({ shown: { kind: "powers" }, live: 2, playing: true }) === "band powers of the people sharing live · no raw trace to draw"
+    && panelCaption({ shown: { kind: "powers" }, piece, playing: true }) === "band powers of the day's session · no raw trace to draw",
+    "band powers only: it does not call them brain waves, and says there is no raw trace");
+  check(panelCaption({ playing: true }) === "brain waves" && /listen/.test(panelCaption({})), "nothing to show: just the name, and how to start");
 }
 
 console.log("purity");

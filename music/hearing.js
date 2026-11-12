@@ -6,7 +6,8 @@
 // summary (idle.js), which is never a replay. The waves are another matter: they
 // are the session's own samples when a stored minute is published for it
 // (music/eeg/), a live sharer's raw trace when they send one, and otherwise only
-// a picture of the band powers, and the note says which.
+// a picture of the band powers, and the note says which. So does the line over
+// the brain-wave panel (panelCaption).
 
 /**
  * The five bands, slow to fast, in the colours the cards draw their band bars
@@ -152,13 +153,13 @@ export function hearingNote({ live = 0, piece = null, waves = null } = {}) {
   if (waves && (waves.kind === "record" || waves.kind === "live")) {
     const where = SITES[waves.electrode] ? ` ${SITES[waves.electrode]}` : "";
     const source = waves.kind === "record"
-      ? `The waves leaving 6ense are that session's own EEG: ${finite(waves.seconds) && waves.seconds !== 60 ? `${waves.seconds} seconds` : "one minute"} `
+      ? `The waves in the panel are that session's own EEG: ${finite(waves.seconds) && waves.seconds !== 60 ? `${waves.seconds} seconds` : "one minute"} `
         + `from the electrode${where}, split into its five bands:`
-      : `The waves leaving 6ense are one sharer's raw trace as it arrives, from the electrode${where}, split into its five bands:`;
-    drawn = [source, `Every dot is one ${waves.kind === "record" ? "stored " : ""}sample, laid down by ${swim}.`];
+      : `The waves in the panel are one sharer's raw trace as it arrives, from the electrode${where}, split into its five bands:`;
+    drawn = [source, `Every dot is one ${waves.kind === "record" ? "stored " : ""}sample, in microvolts against seconds, laid down by ${swim}.`];
   } else if (waves) {
     const whose = live > 0 ? "for the people sharing" : (piece ? "in that summary" : "at rest");
-    drawn = [`The waves leaving 6ense show how strong each of the five bands is ${whose}:`,
+    drawn = [`The waves in the panel show how strong each of the five bands is ${whose}:`,
       `They are drawn from band powers, not from a raw trace, by ${swim}.`];
   }
 
@@ -170,4 +171,25 @@ export function hearingNote({ live = 0, piece = null, waves = null } = {}) {
     waves: drawn,
     more: { text: "The desk shows every rule", href: "music/listen.html?relay=1" },
   };
+}
+
+/**
+ * The line over the brain-wave panel: what is in it right now. `shown` is what
+ * the panel is drawing, `{ kind, electrode }` as for the note, or null when it
+ * has only its axes; `playing` whether the band is sounding; `still` whether the
+ * picture is being held still for a visitor who asked for less motion.
+ */
+export function panelCaption({ shown = null, piece = null, live = 0, playing = false, still = false } = {}) {
+  const where = shown && SITES[shown.electrode] ? ` \u00b7 electrode ${shown.electrode}, ${SITES[shown.electrode]}` : "";
+  if (shown && shown.kind === "record") {
+    const day = piece ? dayOf(piece.date) : "";
+    const tail = still ? " \u00b7 held still, as your system asks for less motion" : (playing ? "" : " \u00b7 \u266a listen sets the wand going");
+    return `brain waves${day ? ` \u00b7 session of ${day}` : ""}${where}${tail}`;
+  }
+  if (shown && shown.kind === "live") return `brain waves, live${where}`;
+  if (shown && shown.kind === "powers") {
+    const whose = live > 0 ? "the people sharing live" : (piece ? "the day's session" : "a resting pattern");
+    return `band powers of ${whose} \u00b7 no raw trace to draw`;
+  }
+  return playing ? "brain waves" : "brain waves \u00b7 \u266a listen sets the wand going";
 }

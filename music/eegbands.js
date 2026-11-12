@@ -15,7 +15,7 @@
 // hum at 50 and 60 Hz. Nothing else is done to the signal: no smoothing, no
 // gain, no normalising. What comes out is in microvolts.
 
-import { BANDS } from "./hearing.js?v=2";
+import { BANDS } from "./hearing.js?v=3";
 
 export const MAINS_HZ = Object.freeze([50, 60]);
 export const ORDER = 4;

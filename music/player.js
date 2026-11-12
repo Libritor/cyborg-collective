@@ -7,8 +7,9 @@
 // it plays a piece generated from one session of the record, chosen for the day,
 // and says so. Nothing here is a recording.
 //
-// While it plays, brain waves leave the 6ense mark, drawn the way a SWIM draws a
-// wave (swim.js), and a short note says what is being heard (hearing.js). The
+// While it plays, a wand of lights draws brain waves in the panel beside the title,
+// the way a SWIM draws a wave (swim.js), with microvolts up the side and seconds
+// along the bottom, and a short note says what is being heard (hearing.js). The
 // waves are the samples themselves wherever there are samples to draw: a stored
 // minute of the session the day's piece is made from (music/eeg/), or the raw
 // trace of a live sharer who opened their headband to the music and sends one.
@@ -21,9 +22,9 @@ import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle } from "./idle.js";
 // The ?v= on these three (and inside swim.js and eegbands.js) goes up whenever one of them changes what it exports:
 // the host lets a browser keep a module for ten minutes, and a new player handed an old hearing.js does not load.
-import { createSwim } from "./swim.js?v=2";
-import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=2";
-import { BANDS, hearingNote, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=2";
+import { createSwim } from "./swim.js?v=3";
+import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";
+import { BANDS, hearingNote, panelCaption, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=3";
 
 const STORE_KEY = "collective.music";          // "on" | "off"; absent = never chose
 
@@ -92,6 +93,7 @@ async function storedSource(entry) {
     const bands = splitBands(decodeCounts(buffer, entry.uv_per_count), entry.fs);
     return {
       kind: "record", fs: entry.fs, length, electrode: entry.electrode, seconds: Math.round(length / entry.fs),
+      startS: Number.isFinite(entry.from_s) ? entry.from_s : undefined,      // where in the recording the minute starts
       read: (key, n) => (bands[key] && n >= 0 && n < length ? bands[key][lead + n] : undefined),
     };
   } catch {
@@ -101,7 +103,7 @@ async function storedSource(entry) {
 
 const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its frames keep coming
 
-export async function mountPlayer({ button, status, mark = null, note = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
+export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
   const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0, waves: null, shares: null };
@@ -198,11 +200,20 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
     state.shares = pieceShares;
     return recordSource || powerSource(pieceShares);
   }
-  /** What the note says the waves are: null when they are not drawn at all. */
+  const about = (source) => (source ? { kind: source.kind, electrode: source.electrode || null, seconds: source.seconds || null } : null);
+  /** What the note says the waves are: null when the wand is not moving (the visitor asked the system for less motion). */
   function waveInfo() {
     if (!waves || waves.state.reduced) return null;
-    const source = waveSource();
-    return { kind: source.kind, electrode: source.electrode || null, seconds: source.seconds || null };
+    return about(waveSource());
+  }
+  /** The line over the panel: what is in it now. Silent, or held still, it shows the stored minute, whoever is live. */
+  function showCaption() {
+    if (!caption || !waves) return;
+    const moving = state.playing && !waves.state.reduced;
+    caption.textContent = panelCaption({
+      shown: moving ? about(waveSource()) : about(recordSource),
+      piece, live: liveViews().length, playing: state.playing, still: state.playing && waves.state.reduced,
+    });
   }
   function onBar(event) {
     describe();
@@ -214,7 +225,8 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
   }
 
   const loop = createLoop({ ctx, kit, pullBar, bpm: idle ? idle.bpm : 132, muted: ["lead"], onBar });
-  waves = createSwim({ audio: ctx, tap: loop.voices.master, mark });
+  waves = createSwim({ audio: ctx, tap: loop.voices.master, mark, panel });
+  waves.setStill(recordSource);                    // while the band is silent the panel shows the start of the stored minute, still
   window.__waves = waves;
 
   // the note that says what is being heard: shown when the music starts, gone when it stops
@@ -272,6 +284,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, re
   }
 
   function describe() {
+    showCaption();
     if (!state.playing) {
       say(remembered() === "off" ? "off · tap ♪ to listen" : "tap anywhere to listen");
       return;
