@@ -6,12 +6,17 @@
 // their headband to the music are sharing, the band follows them; when nobody is,
 // it plays a piece generated from one session of the record, chosen for the day,
 // and says so. Nothing here is a recording.
+//
+// While it plays, brain waves leave the 6ense mark (waves.js), and a short note
+// says what is being heard (hearing.js).
 
 import { renderKit } from "./kit.js";
 import { createGenerator, nextBar, aggregate } from "./generator.js";
 import { createLoop } from "./loop.js";
 import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle } from "./idle.js";
+import { createWaves } from "./waves.js";
+import { BANDS, hearingNote, sharesFromMedians, sharesFromViews } from "./hearing.js";
 
 const STORE_KEY = "collective.music";          // "on" | "off"; absent = never chose
 
@@ -47,7 +52,7 @@ async function pieceOfTheDay() {
   }
 }
 
-export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
+export async function mountPlayer({ button, status, mark = null, note = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
   const say = (text) => { if (status) status.textContent = text; };
   const state = { playing: false, mode: "idle", heads: 0, piece: null, bars: 0 };
@@ -91,7 +96,73 @@ export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, al
     return nextBar(gen, { C: 0.3, alphaShare: 0.35, arousal: 0.3, motion: 0.3, asymmetry: 0.2 });
   }
 
-  const loop = createLoop({ ctx, kit, pullBar, bpm: idle ? idle.bpm : 132, muted: ["lead"], onBar: () => describe() });
+  // the waves show the bands of whatever the band is playing from
+  const pieceShares = piece ? sharesFromMedians(piece.summary && piece.summary.bands_median) : null;
+  let waves = null;
+  function onBar(event) {
+    describe();
+    if (!waves) return;
+    const views = liveViews();
+    waves.setShares(views.length ? sharesFromViews(views) : pieceShares);
+    waves.bar(event.time, event.tempo);
+  }
+
+  const loop = createLoop({ ctx, kit, pullBar, bpm: idle ? idle.bpm : 132, muted: ["lead"], onBar });
+  waves = createWaves({ audio: ctx, tap: loop.voices.master, mark });
+  window.__waves = waves;
+
+  // the note that says what is being heard: shown when the music starts, gone when it stops
+  let noteClosed = false;
+  let noteKey = null;
+  function showNote() {
+    if (!note || noteClosed) return;
+    const live = liveViews().length;
+    const key = `${live}|${state.piece}|${waves.state.reduced}`;
+    if (key !== noteKey) {
+      noteKey = key;
+      const words = hearingNote({ live, piece: live ? null : (idle ? piece : null), rings: !waves.state.reduced });
+      const el = (tag, text, cls) => {
+        const node = document.createElement(tag);
+        if (text) node.textContent = text;
+        if (cls) node.className = cls;
+        return node;
+      };
+      const close = el("button", "×", "x");
+      close.type = "button";
+      close.title = "Close this note";
+      close.setAttribute("aria-label", "Close this note");
+      close.addEventListener("click", (event) => { event.stopPropagation(); noteClosed = true; note.hidden = true; });
+      const first = el("p");
+      first.append(el("b", `${words.title}. `), words.what);
+      const parts = [close, first, el("p", words.how)];
+      if (words.rings) {
+        const legend = el("p", `${words.rings[0]} `);
+        BANDS.forEach((band, i) => {
+          const chip = el("span", "", "band-chip");
+          const dot = el("i");
+          dot.style.background = band.color;
+          chip.append(dot, band.key);
+          legend.append(chip, i < BANDS.length - 1 ? " " : "");
+        });
+        legend.append(`. ${words.rings[1]}`);
+        parts.push(legend);
+      }
+      const last = el("p", "♪ stops it · ", "foot");
+      const link = el("a", words.more.text);
+      link.href = words.more.href;
+      last.append(link);
+      parts.push(last);
+      note.replaceChildren(...parts);
+    }
+    if (note.hidden) {
+      // under the menu when the menu is in sight; otherwise pinned to the corner of the window, so a visitor
+      // far down the page still learns why there is music and how to stop it
+      const nav = document.querySelector("nav");
+      const box = nav ? nav.getBoundingClientRect() : null;
+      note.classList.toggle("floating", !box || box.bottom < 0 || box.top > window.innerHeight);
+    }
+    note.hidden = false;
+  }
 
   function describe() {
     if (!state.playing) {
@@ -102,6 +173,7 @@ export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, al
     if (views.length) say(`playing ${views.length} ${views.length === 1 ? "person" : "people"} sharing live · ♪ stops it`);
     else if (idle) say(`nobody is sharing: a piece generated from the record, session ${state.piece} · ♪ stops it`);
     else say("playing · ♪ stops it");
+    showNote();                                   // the note follows who is playing (a head joins, the last one leaves)
   }
 
   async function start() {
@@ -111,6 +183,7 @@ export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, al
     button.setAttribute("aria-pressed", "true");
     button.textContent = "♪ stop";
     remember("on");
+    waves.start();
     describe();
   }
 
@@ -121,6 +194,8 @@ export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, al
     button.setAttribute("aria-pressed", "false");
     button.textContent = "♪ listen";
     if (byVisitor) remember("off");
+    waves.stop();
+    if (note) note.hidden = true;
     describe();
   }
 
@@ -149,5 +224,5 @@ export async function mountPlayer({ button, status, relayUrl = DEFAULT_RELAY, al
 
   button.disabled = false;
   describe();
-  return { start, stop, loop, relay, ctx };
+  return { start, stop, loop, relay, ctx, waves };
 }

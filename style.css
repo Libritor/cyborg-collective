@@ -154,3 +154,23 @@ table.bags a { white-space: nowrap; }
 .nav-btn:hover, .nav-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg, #fff); border-color: var(--ink); }
 .nav-btn[disabled] { opacity: 0.5; cursor: default; }
 .nav-note { color: var(--muted); font-size: 13px; align-self: center; }
+
+/* the band: brain waves leaving the 6ense mark while it plays, and the note that says what is heard */
+#waves { position: absolute; top: 0; left: 0; width: 100%; z-index: -1; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 74%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0, #000 74%, transparent 100%); }
+.mark6 { font-weight: 700; transition: color 0.4s; }
+.mark6.sounding { color: var(--accent); }
+.listen-note { position: relative; margin: 12px 24px 0; max-width: 104ch; padding: 10px 38px 10px 14px; font-size: 13px; line-height: 1.5;
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.listen-note.floating { position: fixed; left: 16px; bottom: 16px; margin: 0; max-width: min(460px, calc(100vw - 32px)); z-index: 20;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.22); }
+.listen-note p { margin: 0; }
+.listen-note p + p { margin-top: 4px; }
+.listen-note .foot { color: var(--muted); }
+.listen-note .band-chip { white-space: nowrap; }
+.listen-note .band-chip + .band-chip { margin-left: 4px; }
+.listen-note .band-chip i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.listen-note .x { position: absolute; top: 4px; right: 6px; width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); font: inherit; font-size: 18px; line-height: 1; cursor: pointer; }
+.listen-note .x:hover { background: var(--soft); color: var(--ink); }
