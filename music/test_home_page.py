@@ -163,6 +163,7 @@ LAYOUT = """() => {
     panel: { width: Math.round(panel.r - panel.l), right: Math.round(panel.r), left: Math.round(panel.l) },
     chains: chainsBox ? { width: Math.round(chainsBox.r - chainsBox.l), right: Math.round(chainsBox.r), left: Math.round(chainsBox.l) } : null,
     window: innerWidth,
+    bases: p.bases.map((y) => Math.round(y)),          // each lane's zero line, in BANDS order (delta first)
     left: ink(2, 14, p.x0 - 12, p.H - 50),             // band names and microvolt ticks
     under: ink(p.x0 - 4, p.H - 28, p.plotW + 8, 26),   // seconds and the axis title
     plot: { x0: p.x0, plotW: Math.round(p.plotW), H: p.H },
@@ -239,6 +240,7 @@ def keeps_to_itself(page, label):
         check(lay["chains"]["left"] >= 0 and lay["chains"]["right"] <= lay["window"], f"{label}: the chains panel fits the window ({lay['chains']['width']} px wide)", json.dumps(lay["chains"]))
     check(lay["panel"]["left"] >= 0 and lay["panel"]["right"] <= lay["window"] and lay["plot"]["plotW"] >= 200, f"{label}: the panel fits the window ({lay['panel']['width']} px wide, plot {lay['plot']['plotW']} px)", json.dumps(lay))
     check(lay["left"] > 150 and lay["under"] > 60, f"{label}: its axes are drawn: band names and microvolt ticks up the left, seconds underneath", json.dumps({k: lay[k] for k in ("left", "under")}))
+    check(len(lay["bases"]) == 5 and all(a > b for a, b in zip(lay["bases"], lay["bases"][1:])), f"{label}: the lanes run from gamma at the top down to delta at the bottom", json.dumps(lay["bases"]))
 
 
 with sync_playwright() as p:

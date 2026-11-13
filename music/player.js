@@ -29,7 +29,7 @@ import { createRelay, DEFAULT_RELAY } from "./relay.js";
 import { createIdle } from "./idle.js";
 // The ?v= on these three (and inside swim.js and eegbands.js) goes up whenever one of them changes what it exports:
 // the host lets a browser keep a module for ten minutes, and a new player handed an old hearing.js does not load.
-import { createSwim } from "./swim.js?v=4";
+import { createSwim } from "./swim.js?v=5";
 import { createChains } from "./chains.js?v=1";
 import { concentrationParts, getConcentrationWeights } from "./conditioner.js";
 import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";

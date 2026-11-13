@@ -5,8 +5,9 @@
 // swept through space: at each instant the light at the wave's height flashes,
 // and the flashes stay where they were made, so the wave is seen sitting still
 // in the place it belongs to. Here the stick sweeps across the panel from left
-// to right over five lanes, one per band (delta, theta, alpha, beta, gamma, in
-// the colours the cards use for their band bars). Every dot it leaves is one
+// to right over five lanes, one per band, the fastest at the top (gamma, beta,
+// alpha, theta, delta, in the colours the cards use for their band bars), so
+// frequency rises up the panel as it does up a spectrum. Every dot it leaves is one
 // sample of that band. Across is time, in seconds since the wand left; up is
 // microvolts from the lane's own zero line, the same scale in all five lanes
 // (each lane is +-HALF_RANGE_UV tall; a larger swing sits at the lane's edge).
@@ -105,7 +106,7 @@ export function createSwim({ audio, tap = null, mark = null, panel = null } = {}
     top = 20;
     bottom = 34;
     laneH = (H - top - bottom) / BANDS.length;
-    bases = BANDS.map((_, i) => top + laneH * (i + 0.5));
+    bases = BANDS.map((_, i) => top + laneH * (BANDS.length - 1 - i + 0.5));   // gamma's lane at the top, delta's at the bottom
     amp = laneH / 2 - 1;
     pxPerUv = amp / HALF_RANGE_UV;
     state.pxPerUv = pxPerUv;
