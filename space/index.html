@@ -3,32 +3,60 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>A room, rosbagged</title>
+<title>Rooms, rosbagged</title>
 <style>
-  :root { color-scheme: light dark; --ink: #1a1a19; --muted: #6a6f76; --bg: #f6f3ec; --panel: rgba(255,255,255,0.86); }
-  @media (prefers-color-scheme: dark) { :root { --ink: #f0efec; --muted: #b7b4ab; --bg: #15171a; --panel: rgba(24,26,30,0.86); } }
+  :root { color-scheme: light dark; --ink: #1a1a19; --muted: #6a6f76; --bg: #f6f3ec; --panel: rgba(255,255,255,0.9); --line: rgba(0,0,0,0.14); --walk: #c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f0efec; --muted: #b7b4ab; --bg: #15171a; --panel: rgba(24,26,30,0.9); --line: rgba(255,255,255,0.16); --walk: #fb923c; } }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  #view { position: fixed; inset: 0; }
-  #panel { position: fixed; left: 16px; top: 16px; max-width: 420px; padding: 14px 16px; background: var(--panel); border-radius: 12px; backdrop-filter: blur(6px); }
-  #panel h1 { font-size: 18px; margin: 0 0 6px; }
+  #view { position: fixed; top: 0; right: 0; bottom: 0; left: 0; }
+  #side { position: fixed; left: 16px; top: 16px; bottom: 16px; width: min(420px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+  #side > * { pointer-events: auto; background: var(--panel); border-radius: 12px; backdrop-filter: blur(6px); }
+  #panel { padding: 14px 16px 10px; overflow: auto; min-height: 0; flex: 0 1 auto; }
+  #panel h1 { font-size: 18px; margin: 0 0 8px; }
   #panel p { margin: 6px 0; }
-  #panel .muted { color: var(--muted); font-size: 13px; }
+  .muted { color: var(--muted); font-size: 13px; }
   #panel a { color: inherit; }
-  #status { position: fixed; right: 16px; bottom: 16px; padding: 8px 12px; background: var(--panel); border-radius: 10px; font-size: 13px; color: var(--muted); }
-  label { font-size: 13px; color: var(--muted); margin-right: 10px; }
-  button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--muted); background: transparent; color: var(--ink); cursor: pointer; }
+  #runs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+  button { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line); background: transparent; color: var(--ink); cursor: pointer; }
+  #runs button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  details > summary { cursor: pointer; }
+  #about > summary { font-weight: 600; margin: 2px 0 4px; }
+  .toggles { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+  label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  #film { padding: 10px 12px; margin-top: auto; flex: 0 0 auto; }
+  #film .heads { display: grid; grid-template-columns: 1fr 1fr; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  #film video { display: block; width: 100%; height: auto; max-height: 180px; object-fit: contain; border-radius: 6px; background: #1a1b1e; }
+  #film .legend { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  #film .ramp { flex: 1; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #fde725, #7ad151, #22a884, #2a788e, #404688); }
+  #film details { margin-top: 4px; }
+  #film p { margin: 4px 0 0; }
+  #status { position: fixed; right: 16px; bottom: 16px; max-width: min(380px, calc(100vw - 32px)); padding: 8px 12px; background: var(--panel); border-radius: 10px; font-size: 13px; color: var(--muted); }
+  @media (min-width: 900px) { #view { left: 452px; } }
+  @media (max-width: 899px) { #status { display: none; } }
 </style>
 </head>
 <body>
 <div id="view"></div>
-<div id="panel">
-  <h1>A room, rosbagged</h1>
-  <p>A bedroom office in Toronto, walked for three and a half minutes on 6 November 2026 with a Meta Quest 3S on and a Muse headband under it. The headset's own camera and inertial unit went into a ROS 2 bag; this is the place the bag describes, built from the pictures with structure-from-motion and a depth model.</p>
-  <p class="muted">Drag to look around, scroll to move closer, right-drag to pan. Walls that the camera could not track are missing; the furniture, the window and the map on the wall are where they were.</p>
-  <p><label><input type="checkbox" id="points"> show the sparse points the cameras agreed on</label> <button id="reset">reset view</button></p>
-  <p class="muted">Part of <a href="../">6ense.com</a> · the wearer published this; the raw recording stays with them · <a href="../#record">the record</a> · <a href="rosbagged_room_stl.zip">print it</a> (two STLs for a 3-D printer, 6 MB zip)</p>
+<div id="side">
+  <div id="panel">
+    <h1>Rooms, rosbagged</h1>
+    <div id="runs" role="group" aria-label="Which walk"></div>
+    <details id="about" open>
+      <summary id="run-title"></summary>
+      <p id="run-text"></p>
+      <p class="muted" id="run-facts"></p>
+      <p class="muted">Part of <a href="../">6ense.com</a> · published by the wearer · the camera pictures and the raw recordings stay with them; what is here was computed from them · <a href="../#record">the record</a><span id="print"> · <a href="rosbagged_room_stl.zip">print it</a> (two STLs, 6 MB zip)</span></p>
+    </details>
+    <p class="toggles"><label><input type="checkbox" id="points"> sparse points</label><label><input type="checkbox" id="walk" checked> the walk</label><label><input type="checkbox" id="inside" checked> see inside</label><button id="reset">reset view</button></p>
+  </div>
+  <div id="film">
+    <div class="heads"><span>How far each surface is</span><span>Which way it faces</span></div>
+    <video id="maps" muted loop playsinline controls preload="metadata"></video>
+    <div class="legend"><span id="near">near</span><span class="ramp" role="img" aria-label="Colour scale from near (yellow) to far (blue), logarithmic"></span><span id="far">far</span></div>
+    <details id="film-about" open><summary class="muted">what the film shows</summary><p class="muted" id="film-note"></p></details>
+  </div>
 </div>
-<div id="status">loading the room…</div>
+<div id="status"><span id="status-text">loading…</span><br>Drag to look around · scroll to move closer · right-drag to pan</div>
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
 </script>
@@ -38,50 +66,155 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { PLYLoader } from "three/addons/loaders/PLYLoader.js";
 
-const status = document.getElementById("status");
-const view = document.getElementById("view");
+// The walks. Words are here; the numbers come from runs/<id>/run.json, written by maps_to_web.py from the maps themselves.
+const RUNS = [
+  { id: "room", label: "Bedroom office", title: "A bedroom office, 6 November 2026", mesh: "room.glb", points: "points.ply", print: true,
+    text: "A bedroom office in Toronto, walked for three and a half minutes with a Meta Quest 3S on and a Muse headband under it. The headset's camera and inertial unit went into a ROS 2 bag; this is the place the bag describes, built from the pictures with structure-from-motion and stereo between views. The room was dim and its walls plain, so little of each depth map survived the cross-check: walls the camera could not track are missing; the furniture, the window and the map on the wall are where they were." },
+  { id: "room-fine", label: "Same room, finer", title: "The same room, taken more finely", mesh: null, points: "runs/room-fine/points.ply",
+    text: "The same recording cut into 520 pictures instead of 415; 281 of them could be placed. Stereo made a first depth estimate for every placed view, the cross-check between views finished for 37 of them, and the maps were never fused. So there is no surface here: only the sparse points the pictures agreed on, the walk, and the film of the first estimates, noise included." },
+  { id: "first", label: "First walk", title: "A first short walk, 8 November 2026", mesh: null, points: "runs/first/points.ply",
+    text: "The first walk recorded by the Room Walk app on the headset, which notes where the headset was for every picture, so distances are in metres without guessing. 187 pictures were placed and 92 views went to stereo. It was a trial before the lab walk of the same night: first estimates only, never cross-checked, never fused." },
+  { id: "lab", label: "The lab", title: "A lab, 8 November 2026", mesh: "runs/lab/room.glb", points: "runs/lab/points.ply", inside: true,
+    text: "A lab, walked for five minutes with the Room Walk app on the Quest 3S. All 501 views were placed with the headset's own positions, so the model is in metres: about 7 m by 11 m, the ceiling at 2.5 m. Two hours of stereo on a laptop graphics card gave 499 cross-checked depth maps, fused into 1.29 million points and then this surface. Shelves and benches full of things come out well; blank walls and the dark end of the room are thin." },
+];
+const KIND = { geometric: "cross-checked between views (what went into the model)", photometric: "a first estimate, not cross-checked, so noise is left in" };
+
+const $ = id => document.getElementById(id);
+const statusText = $("status-text"), view = $("view"), video = $("maps");
+const dark = matchMedia("(prefers-color-scheme: dark)");
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
 view.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(matchMedia("(prefers-color-scheme: dark)").matches ? 0x15171a : 0xf6f3ec);
-const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.02, 200);
+const paint = () => { scene.background = new THREE.Color(dark.matches ? 0x15171a : 0xf6f3ec); };
+paint(); dark.addEventListener("change", paint);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.02, 200);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
 const sun = new THREE.DirectionalLight(0xffffff, 0.8); sun.position.set(3, 5, 2); scene.add(sun);
-
-let home = null;
-function frame(obj) {
-  const box = new THREE.Box3().setFromObject(obj);
-  const size = box.getSize(new THREE.Vector3()); const c = box.getCenter(new THREE.Vector3());
-  const r = Math.max(size.x, size.y, size.z);
-  camera.position.set(c.x + r * 0.9, c.y + r * 0.5, c.z + r * 0.9);
-  controls.target.copy(c); controls.update();
-  home = { pos: camera.position.clone(), target: c.clone() };
+function fit() {
+  const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
 }
-document.getElementById("reset").onclick = () => { if (home) { camera.position.copy(home.pos); controls.target.copy(home.target); controls.update(); } };
+fit(); new ResizeObserver(fit).observe(view);
 
-const points = new THREE.Group(); points.visible = false; scene.add(points);
-document.getElementById("points").onchange = e => { points.visible = e.target.checked; };
+const walkColour = () => new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue("--walk").trim() || "#c2410c");
+const state = {};          // per run: { group, mesh, points, walk, marker, arrow, path, info, box, loaded }
+let current = null;
 
-new GLTFLoader().load("room.glb", g => {
-  g.scene.traverse(o => { if (o.isMesh) { o.material = new THREE.MeshStandardMaterial({ vertexColors: !!o.geometry.attributes.color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }); } });
-  scene.add(g.scene); frame(g.scene);
-  status.textContent = "the room, from the headset's own pictures";
-}, undefined, () => {
-  status.textContent = "the mesh is not here yet; showing the sparse points";
-  points.visible = true; document.getElementById("points").checked = true;
-});
-new PLYLoader().load("points.ply", geo => {
-  const mat = new THREE.PointsMaterial({ size: 0.02, vertexColors: !!geo.attributes.color });
-  const p = new THREE.Points(geo, mat); points.add(p);
-  if (!home) frame(p);
-});
+// Looking in from outside: a surface seen from behind is not drawn, so the wall and the ceiling nearest the visitor
+// drop away, as in a doll's house. The surfaces face the cameras that saw them, which were inside the room. It suits
+// a room that was walked all the way round (the lab starts with it on); a room seen from one side loses too much.
+const INSIDE = THREE.FrontSide;
+function setInside(s, on) {
+  if (s && s.mesh) s.mesh.traverse(o => { if (o.isMesh) { o.material.side = on ? INSIDE : THREE.DoubleSide; o.material.needsUpdate = true; } });
+}
+function goHome(s) {
+  if (!s || !s.box) return;
+  const size = s.box.getSize(new THREE.Vector3()), c = s.box.getCenter(new THREE.Vector3());
+  const r = Math.max(size.x, size.y, size.z, 1) * Math.max(1, 0.85 / camera.aspect);      // further back in a tall window
+  camera.position.set(c.x + r * 0.55, c.y + r * 0.6, c.z + r * 0.55);
+  controls.target.copy(c); controls.update();
+}
 
-addEventListener("resize", () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
-(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+async function load(run) {
+  const s = state[run.id] = { group: new THREE.Group(), points: new THREE.Group(), walk: new THREE.Group(), loaded: false };
+  s.group.add(s.points, s.walk); scene.add(s.group);
+  const dir = "runs/" + run.id + "/";
+  const [info, path] = await Promise.all([fetch(dir + "run.json").then(r => r.json()), fetch(dir + "path.json").then(r => r.json())]);
+  s.info = info; s.path = path;
+  // the walk: a line through the views in order, and a marker with the way the camera was looking
+  const pts = path.centres.map(c => new THREE.Vector3(c[0], c[1], c[2]));
+  const col = walkColour();
+  s.walk.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: col })));
+  const box = new THREE.Box3().setFromPoints(pts);
+  const span = Math.max(...box.getSize(new THREE.Vector3()).toArray(), 1);
+  s.marker = new THREE.Mesh(new THREE.SphereGeometry(span * 0.012, 16, 12), new THREE.MeshBasicMaterial({ color: col }));
+  s.arrow = new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1), pts[0], span * 0.09, col, span * 0.03, span * 0.02);
+  s.walk.add(s.marker, s.arrow);
+  s.box = box.clone().expandByScalar(1.0);                       // until a surface arrives, look at where the walk went
+  const ready = [];
+  ready.push(new Promise(done => new PLYLoader().load(run.points, geo => {
+    s.points.add(new THREE.Points(geo, new THREE.PointsMaterial({ size: run.mesh ? 0.02 : 0.03, vertexColors: !!geo.attributes.color })));
+    done();
+  }, undefined, done)));
+  if (run.mesh) ready.push(new Promise(done => new GLTFLoader().load(run.mesh, g => {
+    g.scene.traverse(o => { if (o.isMesh) o.material = new THREE.MeshStandardMaterial({ vertexColors: !!o.geometry.attributes.color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide }); });
+    s.mesh = g.scene; s.group.add(g.scene);
+    s.box = new THREE.Box3().setFromObject(g.scene);
+    done();
+  }, undefined, done)));
+  await Promise.all(ready);
+  s.loaded = true;
+  return s;
+}
+
+function place(s) {                     // the marker at the view the film is showing
+  if (!s || !s.path) return;
+  const n = s.path.centres.length;
+  const k = Math.min(n - 1, Math.max(0, Math.floor((video.currentTime || 0) * s.info.fps)));
+  const c = s.path.centres[k], d = s.path.look[k];
+  s.marker.position.set(c[0], c[1], c[2]);
+  s.arrow.position.set(c[0], c[1], c[2]);
+  s.arrow.setDirection(new THREE.Vector3(d[0], d[1], d[2]).normalize());
+  s.view = k;
+}
+
+async function show(id, viaHash) {
+  const run = RUNS.find(r => r.id === id) || RUNS[0];
+  current = run.id;
+  for (const b of $("runs").children) b.setAttribute("aria-pressed", String(b.dataset.id === run.id));
+  $("run-title").textContent = run.title; $("run-text").textContent = run.text; $("run-facts").textContent = "";
+  $("print").hidden = !run.print;
+  if (!viaHash) history.replaceState(null, "", "#" + run.id);
+  for (const k in state) state[k].group.visible = k === run.id;
+  const dir = "runs/" + run.id + "/";
+  video.poster = dir + "poster.jpg"; video.src = dir + "maps.mp4";
+  statusText.textContent = "loading " + run.label.toLowerCase() + "…";
+  let s = state[run.id];
+  try { if (!s) s = await load(run); } catch (e) { statusText.textContent = "this walk could not be loaded"; return; }
+  if (current !== run.id) return;       // another walk was chosen while this one loaded
+  s.group.visible = true;
+  const hasMesh = !!s.mesh;
+  $("points").checked = !hasMesh; $("points").disabled = !hasMesh;
+  $("inside").disabled = !hasMesh; $("inside").checked = hasMesh && !!run.inside;
+  s.points.visible = !hasMesh; s.walk.visible = $("walk").checked;
+  setInside(s, $("inside").checked);
+  goHome(s); place(s);
+  const i = s.info, about = i.metric ? "" : "about ";
+  $("near").textContent = "near, " + about + i.near_m.toFixed(1) + " m";
+  $("far").textContent = about + i.far_m.toFixed(1) + " m, far";
+  $("run-facts").textContent = i.views + " views in the film · " + i.sparse_points.toLocaleString("en") + " sparse points" +
+    (i.metric ? " · distances measured by the headset" : " · distances by convention (the middle point of the room set 2.5 m from the camera)");
+  $("film-note").textContent = "One frame per view: " + KIND[i.kind] + ". On average " + Math.round(i.filled * 100) +
+    " % of a map has a value; the rest is dark. On the right, lilac faces the camera, green faces up, pink right, teal left. " +
+    "The marker on the orange line is where the headset was for the view on screen.";
+  statusText.textContent = hasMesh ? "the surface, from the headset's own pictures" : "sparse points only: this walk was never fused into a surface";
+  const calm = matchMedia("(prefers-reduced-motion: reduce)").matches || (navigator.connection && navigator.connection.saveData);
+  if (!calm) video.play().catch(() => {});
+}
+
+for (const r of RUNS) {
+  const b = document.createElement("button");
+  b.textContent = r.label; b.dataset.id = r.id; b.setAttribute("aria-pressed", "false");
+  b.onclick = () => show(r.id);
+  $("runs").appendChild(b);
+}
+$("points").onchange = e => { const s = state[current]; if (s) s.points.visible = e.target.checked; };
+$("walk").onchange = e => { const s = state[current]; if (s) s.walk.visible = e.target.checked; };
+$("inside").onchange = e => setInside(state[current], e.target.checked);
+$("reset").onclick = () => goHome(state[current]);
+addEventListener("hashchange", () => show(location.hash.slice(1), true));
+if (innerWidth < 900) $("about").open = false;                         // on a phone the room comes first; the words open on a tap
+if (innerWidth < 900 || innerHeight < 900) $("film-about").open = false;   // and in a short window the walk's own words come before the film's
+
+(function loop() {
+  place(state[current]);
+  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop);
+})();
+window.__space = { state, RUNS, get current() { return current; }, video };
+show(location.hash.slice(1) || RUNS[0].id, true);
 </script>
 </body>
 </html>
