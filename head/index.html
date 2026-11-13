@@ -348,7 +348,8 @@ function coverage() {                       // how much of the view the head cov
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 40) { n += 1; sum += d[i] + d[i + 1] + d[i + 2]; }
   return { covered: n / 9216, mean: n ? sum / n / 3 : 0 };
 }
-window.__head = { state, ready: false, feed: handle, setCut: (a) => { state.opened = true; cut.value = String(a * 1000); setCut(a); }, png, coverage };
+function look(x, y, z) { camera.position.set(x, y, z); controls.update(); }      // stand somewhere else, for pictures of where the dots sit
+window.__head = { state, ready: false, feed: handle, setCut: (a) => { state.opened = true; cut.value = String(a * 1000); setCut(a); }, png, coverage, look };
 if (innerWidth < 900) $("about").open = false;
 load().then(() => requestAnimationFrame(frame)).catch((e) => { who.textContent = "The head could not be loaded (" + e.message + ")."; });
 </script>

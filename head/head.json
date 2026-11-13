@@ -39,56 +39,56 @@
   {
    "name": "AF7",
    "pos": [
-    43.7,
-    118.0,
-    75.8
+    42.0,
+    109.0,
+    81.1
    ],
    "out": [
-    0.5,
+    0.383,
     0.0,
-    0.866
+    0.924
    ]
   },
   {
    "name": "AF8",
    "pos": [
-    -39.0,
-    118.0,
-    67.5
+    -22.5,
+    109.0,
+    84.6
    ],
    "out": [
-    -0.5,
+    -0.267,
     0.0,
-    0.866
+    0.964
    ]
   },
   {
    "name": "TP9",
    "pos": [
-    77.9,
+    76.5,
     72.0,
-    -31.5
+    -45.5
    ],
    "out": [
-    0.927,
+    0.902,
     0.0,
-    -0.375
+    -0.431
    ]
   },
   {
    "name": "TP10",
    "pos": [
-    -74.6,
+    -74.4,
     72.0,
-    -30.2
+    -36.9
    ],
    "out": [
-    -0.927,
+    -0.948,
     0.0,
-    -0.375
+    -0.317
    ]
   }
  ],
  "nasion_y_mm": 84.0,
- "electrodes_note": "about where a Muse headband's four electrodes rest: the forehead pair on the forehead above the eyebrows, the ear pair behind the ears; placed by angle round the head and height above the bridge of the nose as found on the scan"
+ "electrodes_note": "about where a Muse headband's four electrodes rest: the forehead pair just above the eyebrows, the ear pair behind the ears; placed by angle from the face's own midline and height above the bridge of the nose, both found on the scan"
 }

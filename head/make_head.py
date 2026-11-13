@@ -35,9 +35,12 @@ GRID_MM = 1.875                 # the surface's grid in the slice plane (4 scann
 Z_UP = 1.5                      # surface rows per slice spacing (the scan has a slice every 3 mm): a row every 2 mm
 # Where a Muse rests, as an angle round the head from the front (towards the wearer's left) and millimetres above the
 # bridge of the nose (the nasion, found on the scan as the deepest point of the midline between nose and forehead).
-# The forehead pair sits on the forehead, clear above the eyebrows (the brow ridge of this head is about 10 mm above
-# the nasion); the ear pair rests behind the ears, a little below it. Approximate: a script cannot feel for landmarks.
-SITES = (("AF7", 30.0, 34.0), ("AF8", -30.0, 34.0), ("TP9", 112.0, -12.0), ("TP10", -112.0, -12.0))
+# "The front" is the face's own: the line from the back of the head through the nasion. A head rarely lies square in
+# a scanner (this one is turned a few degrees), and measured from the middle of its outline one forehead electrode
+# lands nearer the nose than the other. The forehead pair sits just above the eyebrows, over the middle of each (the
+# brow of this head is 12 to 16 mm above the nasion); the ear pair rests behind the ears, a little below the nasion.
+# Approximate: a script cannot feel for landmarks.
+SITES = (("AF7", 19.0, 25.0), ("AF8", -19.0, 25.0), ("TP9", 112.0, -12.0), ("TP10", -112.0, -12.0))
 
 
 def load_axial(src):
@@ -194,20 +197,40 @@ def main():
     nasion_k = tip + 3 + int(np.argmin(front[tip + 3:tip + 3 + reach_k]))
     print("nose tip at slice %d, nasion at slice %d (%.0f mm below the top)" % (tip, nasion_k, (top - nasion_k) * dz))
 
+    # ---- the face's own midline, at the height of the nasion: from the back-most point of the head to the front-most
+    sl = body[nasion_k]
+    rows_in = np.nonzero(sl.any(1))[0]
+    depth = max(1, int(round(3.0 / dy)))
+
+    def middle_of(rows_):                                                      # the middle column of the head within these rows
+        cols_in = np.nonzero(sl[rows_].any(0))[0]
+        return (cols_in.min() + cols_in.max()) / 2.0
+
+    front_r, back_r = rows_in.min(), rows_in.max()
+    front_c, back_c = middle_of(slice(front_r, front_r + depth)), middle_of(slice(back_r - depth + 1, back_r + 1))
+    fwd = np.array([(front_c - back_c) * dx, (back_r - front_r) * dy])         # (to the left, to the front), millimetres
+    fwd /= np.linalg.norm(fwd)
+    left = np.array([fwd[1], -fwd[0]])                                         # a quarter turn towards the wearer's left
+    mid_r, mid_c = (front_r + back_r) / 2.0, (front_c + back_c) / 2.0          # the point the angles are measured round
+    yaw = float(np.degrees(np.arctan2(fwd[0], fwd[1])))
+    print("the face points %.1f degrees to the wearer's left of the scanner's front; nasion %.1f mm left of the outline's middle"
+          % (yaw, (front_c - axis_c) * dx))
+
     # ---- where a Muse's electrodes rest: out from the axis at an angle and a height, to the last point inside the skin
     def skin_point(angle_deg, above_nasion_mm):
         ks = nasion_k + above_nasion_mm / dz
         k0 = int(np.clip(round(ks), 0, n - 1))
         a = np.radians(angle_deg)
-        d = np.array([np.sin(a), np.cos(a)])                                 # (to the left, to the front) in millimetres
+        d = np.cos(a) * fwd + np.sin(a) * left                               # (to the left, to the front) in millimetres
         reach = 0.0
         for mm in np.arange(20.0, 140.0, 0.5):                               # out to where the ray first leaves the head:
-            rr_ = axis_r - d[1] * mm / dy                                    # the scalp behind the ear, not the ear beyond it
-            cc_ = axis_c + d[0] * mm / dx
+            rr_ = mid_r - d[1] * mm / dy                                     # the scalp behind the ear, not the ear beyond it
+            cc_ = mid_c + d[0] * mm / dx
             if not (0 <= rr_ < rows - 1 and 0 <= cc_ < cols - 1 and body[k0, int(round(rr_)), int(round(cc_))]):
                 break
             reach = mm
-        return [round(float(d[0] * reach), 1), round(float(Y(ks)), 1), round(float(d[1] * reach), 1)], [round(float(d[0]), 3), 0.0, round(float(d[1]), 3)]
+        at = [X(mid_c) + d[0] * reach, Y(ks), Z(mid_r) + d[1] * reach]
+        return [round(float(v), 1) for v in at], [round(float(d[0]), 3), 0.0, round(float(d[1]), 3)]
 
     sites = []
     for name, angle, above in SITES:
@@ -225,7 +248,7 @@ def main():
         "top_y_mm": round(float(Y(top)), 1),
         "electrodes": sites,
         "nasion_y_mm": round(float(Y(nasion_k)), 1),
-        "electrodes_note": "about where a Muse headband's four electrodes rest: the forehead pair on the forehead above the eyebrows, the ear pair behind the ears; placed by angle round the head and height above the bridge of the nose as found on the scan",
+        "electrodes_note": "about where a Muse headband's four electrodes rest: the forehead pair just above the eyebrows, the ear pair behind the ears; placed by angle from the face's own midline and height above the bridge of the nose, both found on the scan",
     }
     with open(os.path.join(HERE, "head.json.tmp"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(info, f, indent=1)
