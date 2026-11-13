@@ -107,9 +107,12 @@ console.log("the stored minutes published here");
       `${entry.stamp}: ${entry.seconds} s at ${entry.fs} Hz with ${entry.lead / entry.fs} s at each end for the filters, two bytes a sample`);
     if (!bytes) continue;
     const uv = decodeCounts(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), entry.uv_per_count);
-    check(uv.length === entry.samples && uv.every((v) => v > 0 && v < 1450), `${entry.stamp}: every sample is a count of the 14-bit converter, off the rails`);
-    check(Math.abs(entry.uv_per_count - 1450 / 16383) < 1e-12 && uv.every((v) => Math.abs(v / entry.uv_per_count - Math.round(v / entry.uv_per_count)) < 1e-6),
-      `${entry.stamp}: microvolts = count x 1450/16383, as the recording's CSV prints them`);
+    // the two converters the headbands have (music/eeg/extract.py CONVERTERS): 14 bits over 1450 uV, 12 bits over 1650 uV
+    const converter = [[1450, 16383], [1650, 4095]].find(([span, top]) => Math.abs(entry.uv_per_count - span / top) < 1e-12);
+    check(!!converter && uv.length === entry.samples && uv.every((v) => v > 0 && v < converter[0]),
+      `${entry.stamp}: every sample is a count of its headband's converter, off the rails`);
+    check(!!converter && uv.every((v) => Math.abs(v / entry.uv_per_count - Math.round(v / entry.uv_per_count)) < 1e-6),
+      `${entry.stamp}: microvolts = count x ${converter ? converter.join("/") : "?"}, as the recording's CSV prints them`);
     check(["TP9", "AF7", "AF8", "TP10"].includes(entry.electrode) && entry.first_sample >= 0, `${entry.stamp}: says which electrode and where in the recording it starts`);
     const bands = splitBands(uv, entry.fs);
     const rms = (x) => Math.sqrt(x.reduce((s, v) => s + v * v, 0) / x.length);

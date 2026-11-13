@@ -110,7 +110,15 @@ ON_THE_SAMPLES = """async (shift) => {
   const entry = index.sessions.find((e) => e.stamp === window.__player.piece);
   if (!entry) return { error: 'the piece has no stored minute' };
   const bands = splitBands(decodeCounts(await (await fetch('music/eeg/' + entry.file)).arrayBuffer(), entry.uv_per_count), entry.fs);
-  const p = window.__waves.probe();
+  // Fetching and splitting the minute takes a moment, and the wand does not wait for it: a sweep that was nearly
+  // done when this began may have given way to a new, empty one. Hold on until the sweep on the panel has laid most
+  // of its dots, then read it at once.
+  const began = performance.now();
+  let p = window.__waves.probe();
+  while ((!p || !p.sweep || p.sweep.kind !== 'record' || !(p.sweep.painted[0] > 0.7 * p.sweep.need)) && performance.now() - began < 15000) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    p = window.__waves.probe();
+  }
   if (!p || !p.sweep || p.sweep.kind !== 'record') return { error: 'no record picture on the panel' };
   const c = document.getElementById('waves');
   const g = c.getContext('2d');
@@ -306,9 +314,15 @@ with sync_playwright() as p:
     fit = page.evaluate(ON_THE_SAMPLES, 0)
     check("error" not in fit and not fit["still"] and fit["looked"] >= 150 and fit["own"] >= 0.99 * fit["looked"] and all(v is not None and v >= 97 for v in fit["per"].values()),
           f"a dot of the band's own colour at {fit.get('own')} of {fit.get('looked')} places computed afresh from the bytes of the published file (per band {fit.get('per')})", json.dumps(fit))
+    # the wand may have begun a new sweep since: wait until there is a stretch painted to hold the late read against
+    page.wait_for_function("() => { const p = window.__waves.probe(); return p && p.sweep && p.sweep.kind === 'record' && p.sweep.painted[0] > 0.7 * p.sweep.need; }", timeout=20000)
     wrong = page.evaluate(ON_THE_SAMPLES, 128)
-    check("error" not in wrong and wrong["own"] <= 0.6 * wrong["looked"],
-          f"the same recording read half a second late does not fit the picture ({wrong.get('own')} of {wrong.get('looked')})", json.dumps(wrong))
+    # How badly the wrong stretch fits depends on how far the waves swing: on a quiet forehead electrode the fast
+    # bands barely leave their line, so a late read still lands on their ink. The slow bands swing widest in any
+    # recording; they are the ones that must stop fitting, and the whole must fit clearly worse than the true read.
+    slow = [wrong.get("per", {}).get(band) for band in ("delta", "theta")]
+    check("error" not in wrong and wrong["looked"] >= 150 and wrong["own"] <= 0.88 * wrong["looked"] and all(v is not None and v <= 75 for v in slow),
+          f"the same recording read half a second late does not fit the picture ({wrong.get('own')} of {wrong.get('looked')}; delta and theta at {slow[0]} % and {slow[1]} %)", json.dumps(wrong))
 
     print("3. the panel keeps to itself")
     keeps_to_itself(page, "playing")

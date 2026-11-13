@@ -18,9 +18,11 @@ The file holds two seconds more at each end than the minute that is drawn
 recording's own samples there instead of on an invented edge.
 
 Nothing is filtered, resampled or rounded on the way: the CSV prints each
-sample as count x (1450 / 16383) microvolts, and the count is what is kept, so
-the file gives back the CSV's numbers digit for digit (--check proves it, and
-every run checks what it has just written). The page does the band filtering in
+sample as count x a fixed number of microvolts (1450 / 16383 for the 14-bit
+headbands, 1650 / 4095 for the 12-bit ones; CONVERTERS below), and the count is
+what is kept, so the file gives back the CSV's numbers digit for digit (--check
+proves it, and every run checks what it has just written). Which converter a
+recording used is read off its own numbers and written into its index entry. The page does the band filtering in
 the browser, where anyone can read it (music/swim.js).
 
 Only one electrode and one minute leave the laptop; the rest of the recording
@@ -48,7 +50,11 @@ ELECTRODES = ("TP9", "AF7", "AF8", "TP10")
 SITES = {"TP9": "behind the left ear", "AF7": "left forehead", "AF8": "right forehead", "TP10": "behind the right ear"}
 PREFER = ("TP9", "TP10", "AF7", "AF8")       # on a tie the ear electrodes, where alpha is strongest
 FS = 256                                     # Hz, the headband's EEG rate
-UV_PER_COUNT = 1450.0 / 16383.0              # a 14-bit converter over 1450 microvolts
+# (microvolts per count, highest count): what a headband's converter prints a sample as
+CONVERTERS = (
+    (1450.0 / 16383.0, 16383),               # 14 bits over 1450 microvolts (Muse S)
+    (1650.0 / 4095.0, 4095),                 # 12 bits over 1650 microvolts (Muse 2 and the 2016 Muse)
+)
 EPOCH_S = 2
 LEAD_S = 2                                   # kept at each end of the drawn stretch for the page's filters to settle on
 CLEAN_PP_UV = 100.0                          # a 2 s epoch is steady when its 1-45 Hz swing stays under this
@@ -86,36 +92,39 @@ def read_eeg(path):
 
 
 def to_counts(texts):
-    """Printed microvolts -> ADC counts, or None when the numbers are not whole counts (another converter)."""
+    """Printed microvolts -> (ADC counts, microvolts per count, highest count), or None when the numbers are
+    not whole counts of a converter listed in CONVERTERS."""
     uv = np.array([float(t) if t else np.nan for t in texts])
     if not np.isfinite(uv).all():
         return None
-    counts = np.round(uv / UV_PER_COUNT)
-    if counts.min() < 0 or counts.max() > 16383 or np.abs(uv - counts * UV_PER_COUNT).max() > 1e-6:
-        return None
-    return counts.astype(np.uint16)
+    for per, top in CONVERTERS:
+        counts = np.round(uv / per)
+        if counts.min() >= 0 and counts.max() <= top and np.abs(uv - counts * per).max() <= 1e-6:
+            return counts.astype(np.uint16), per, top
+    return None
 
 
-def printed(count):
-    return f"{count * UV_PER_COUNT:.6f}"
+def printed(count, per):
+    return f"{count * per:.6f}"
 
 
 def steadiest(counts, hsi, ms, seconds):
-    """(clean fraction, electrode, first sample) of the steadiest stretch of `seconds`, or None."""
+    """(clean fraction, electrode, first sample) of the steadiest stretch of `seconds`, or None.
+    `counts` maps an electrode to what to_counts gave for it."""
     n_epoch = EPOCH_S * FS
     want = seconds // EPOCH_S
     sos = butter(4, [1.0, 45.0], btype="bandpass", fs=FS, output="sos")
     best = None
     for ch in PREFER:
-        c = counts.get(ch)
-        if c is None or len(c) < seconds * FS:
+        if counts.get(ch) is None or len(counts[ch][0]) < seconds * FS:
             continue
-        x = sosfiltfilt(sos, c.astype(float) * UV_PER_COUNT)
+        c, per, top = counts[ch]
+        x = sosfiltfilt(sos, c.astype(float) * per)
         epochs = len(c) // n_epoch
         e = x[:epochs * n_epoch].reshape(epochs, n_epoch)
         raw = c[:epochs * n_epoch].reshape(epochs, n_epoch)
         clean = (np.ptp(e, axis=1) < CLEAN_PP_UV) & (e.std(axis=1) > FLAT_RMS_UV)
-        clean &= (raw.min(axis=1) > 0) & (raw.max(axis=1) < 16383)                       # never on the rails
+        clean &= (raw.min(axis=1) > 0) & (raw.max(axis=1) < top)                         # never on the rails
         contact = np.array([code in ("", "1", "1.0") for code in hsi[ch][:epochs * n_epoch]]).reshape(epochs, n_epoch)
         clean &= contact.all(axis=1)                                                     # good contact where it was logged
         run = np.convolve(clean.astype(float), np.ones(want), mode="valid") / want
@@ -154,7 +163,7 @@ def check(path, entry, text=None):
     stored = text[entry["electrode"]][a:a + entry["samples"]]
     if len(counts) != entry["samples"] or len(stored) != entry["samples"]:
         return False
-    return all(printed(int(c)) == t for c, t in zip(counts, stored))
+    return all(printed(int(c), entry["uv_per_count"]) == t for c, t in zip(counts, stored))
 
 
 def main():
@@ -193,14 +202,14 @@ def main():
             print(f"SKIP {stamp}: {rate:.1f} samples a second, not {FS}"); failed += 1; continue
         counts = {ch: to_counts(text[ch]) for ch in ELECTRODES}
         if all(c is None for c in counts.values()):
-            print(f"SKIP {stamp}: the samples are not whole counts of a 14-bit, 1450 uV converter"); failed += 1; continue
+            print(f"SKIP {stamp}: the samples are not whole counts of a converter this tool knows (CONVERTERS)"); failed += 1; continue
         whole = a.seconds + 2 * LEAD_S                 # the minute and the two ends the filters settle on
         found = steadiest(counts, hsi, ms, whole)
         if not found or found[0] < a.min_clean:
             print(f"SKIP {stamp}: no steady stretch of {whole} s"
                   + (f" (best {found[0]:.2f} clean on {found[1]})" if found else "")); failed += 1; continue
         clean, ch, first = found
-        chunk = counts[ch][first:first + whole * FS]
+        chunk = counts[ch][0][first:first + whole * FS]
         lead = LEAD_S * FS
         name = f"{stamp}.bin"
         with open(os.path.join(HERE, name), "wb") as f:
@@ -209,7 +218,7 @@ def main():
             "stamp": stamp, "file": name, "electrode": ch, "site": SITES[ch],
             "fs": FS, "samples": int(len(chunk)), "lead": lead, "seconds": a.seconds,
             "first_sample": first, "from_s": round((ms[first + lead] - ms[0]) / 1000.0, 1),
-            "uv_per_count": UV_PER_COUNT, "clean": round(clean, 3),
+            "uv_per_count": counts[ch][1], "clean": round(clean, 3),
             "recorded": row.get("date"), "minutes": row.get("minutes"),
         }
         if not check(path, entry, text):

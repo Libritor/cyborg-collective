@@ -192,7 +192,7 @@ check(retried.ui.reason.includes("held:"),
   "the held step is retried on the next bar, not skipped");
 const accepted = nextBar(retryGen, { C: 0.5 });
 check(accepted.ui.reason.includes("ran out") && accepted.chords.length > 0
-  && accepted.chords[0].degree === "i(maj7)",
+  && accepted.chords[0].degree === "i7",
   "after two attempts the held step plays anyway, so a hold can never stall or skip");
 
 // every advertised device must be playable, or the chart is lying
@@ -261,12 +261,20 @@ const firstRoot = clicheChords.length ? clicheChords[0].root : null;
 check(clicheChords.every((ch) => ch.root === firstRoot),
   "the cliché keeps one root while the quality moves");
 const qualities = clicheChords.map((ch) => ch.quality);
-check(qualities[0] === "minmaj7" && qualities[1] === "min7",
-  `the cliché descends the 7th: ${qualities.join(" -> ")}`);
+check(qualities.length > 0 && qualities.every((q) => q === "min7"),
+  `the cliché steps down to the flat 7th, never through the major 7th: ${[...new Set(qualities)].join(" -> ")}`);
 check(clicheChords.every((ch) => (ch.voicing || []).every((m) => m <= REGISTER.padYielding[1])),
   "during a cliché the pad yields an octave, so the machine dodges the human");
-const afterCliche = clicheBars.flatMap((bar) => bar.chords).filter((ch) => !ch.cliche && ch.degree === "IVmaj7");
-check(afterCliche.length > 0, "the cliché still breaks open into IVmaj7");
+const afterCliche = clicheBars.flatMap((bar) => bar.chords).filter((ch) => !ch.cliche && (ch.degree === "IV" || ch.degree === "iv"));
+check(afterCliche.length > 0, "the cliché still breaks open, into IV");
+// what the family sounds as, against the pedal and the bass: no note a semitone (in any octave) from either
+const sour = [];
+for (const bar of clicheBars) {
+  const low = [...new Set((bar.bass || []).map((n) => n.midi))].concat(bar.drone == null ? [] : [typeof bar.drone === "number" ? bar.drone : bar.drone.midi]);
+  const high = bar.chords.flatMap((ch) => ch.voicing || []).concat((bar.lead || []).map((n) => n.midi));
+  for (const a of low) for (const b of high) { const d = Math.abs(a - b) % 12; if (d === 1 || d === 11) sour.push(`${a}/${b}`); }
+}
+check(sour.length === 0, `no bar of the line cliché puts a semitone against the pedal or the bass (${sour.length} found)`);
 
 // ------------------------------------------------------------ vamp + heads
 console.log("vamp and wizards");

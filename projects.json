@@ -22,6 +22,22 @@
    ]
   },
   {
+   "id": "xphone",
+   "name": "The ear as an XPhone",
+   "from": "2026-11-04",
+   "to": "2026-11-04",
+   "stamps": [
+    "2026-11-04"
+   ],
+   "summary": "What a headband records while its wearer makes sound in a solid: four minutes at a table, the head not touching it, tapping it with the fingernails, scratching it, tapping it with the fingers. The solid part of the Ear as an XPhone study, which asks the same of hearing through air and through water.",
+   "links": [
+    [
+     "Ear as an XPhone (submitted to IEEE ICCE 2027)",
+     "https://www.mersivity.com/research/ear-as-an-xphone.htm"
+    ]
+   ]
+  },
+  {
    "id": "muselog",
    "name": "MuseLog: building the recorder",
    "from": "2025-12-01",

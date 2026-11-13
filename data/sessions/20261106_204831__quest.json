@@ -103,5 +103,6 @@
   "imu_hz": 803
  },
  "date": "2026-11-06T20:48:31",
- "date_source": "bag start"
+ "date_source": "bag start",
+ "source": "quest_bag"
 }

@@ -248,17 +248,17 @@ export const DEVICE_DOCS = Object.freeze([
   {
     id: "sus",
     gate: DEVICE_GATES.sus,
-    does: "A sus4 chord on step 8 that resolves back on step 12, one bar in four, never on the last 8th.",
+    does: "A sus4 chord on step 8 that resolves back on step 12, one bar in four, never on the last 8th, and never where its 4th would sit a semitone from the pedal.",
   },
   {
     id: "cliche",
     gate: DEVICE_GATES.cliche,
-    does: "The 7th descends a semitone inside the held root, and the pad yields an octave.",
+    does: "One voice steps down from the root to the flat 7th inside the held root, and the pad yields an octave.",
   },
   {
     id: "drone",
     gate: DEVICE_GATES.drone,
-    does: "A tonic pedal in the tenor register, held clear of the bass.",
+    does: "A tonic pedal in the tenor register, held clear of the bass. It rests in any bar whose chord has a note a semitone from it.",
   },
   {
     id: "mixture",

@@ -403,13 +403,23 @@ function bassBar(chord, cliche) {
   return notes;
 }
 
-/** The pedal: the tonic, a register clear of the bass, never muddy. */
-function droneBar(gen, devices) {
+/**
+ * The pedal: the tonic, a register clear of the bass, never muddy. It rests for
+ * a bar whose chords carry a note a semitone from it: under the phrygian bII, or
+ * under a borrowed chord of the major lift, a held tonic stops being a pedal and
+ * becomes a second wrong note (A against Bb, A against Ab). The chord keeps its
+ * colour; only the grind against the pedal goes.
+ */
+function droneBar(gen, devices, chords) {
   if (!devices.includes("drone")) return null;
   let drone = fold(gen.tonicMidi + DRONE_INTERVAL, REGISTER.drone);
   while (drone - REGISTER.bass[1] < DRONE_MIN_GAP) drone += 12;
   if (drone > REGISTER.drone[1] + 12) return null;   // cannot get clear of the bass
-  return drone;
+  const rubs = (chords || []).some((chord) => (chord.voicing || []).some((midi) => {
+    const apart = (((midi - drone) % 12) + 12) % 12;
+    return apart === 1 || apart === 11;
+  }));
+  return rubs ? null : drone;
 }
 
 // ---------------------------------------------------------------- lead
@@ -440,8 +450,10 @@ function autoLeadBar(gen, chord, controls) {
     for (let m = lo; m <= hi; m += 1) if ((((m % 12) + 12) % 12) === pc) candidates.push(m);
     if (!candidates.length) continue;
     const previous = notes.length ? notes[notes.length - 1].midi : null;
-    const usable = candidates.filter((m) => m !== previous);
-    if (!usable.length) continue;      // a rest beats repeating a pitch
+    // never the pitch just played, and never a pitch right beside a pad voice: over a major 7th chord
+    // the root would otherwise land a semitone above the pad's 7th
+    const usable = candidates.filter((m) => m !== previous && !voicing.some((v) => Math.abs(v - m) === 1));
+    if (!usable.length) continue;      // a rest beats repeating a pitch, or rubbing one
     const centre = previous === null ? (lo + hi) / 2 : previous;
     usable.sort((a, b) => Math.abs(a - centre) - Math.abs(b - centre));
     notes.push({ step, midi: usable[0], dur: 2, vel: 0.7 });
@@ -532,8 +544,14 @@ export function nextBar(gen, controls = {}) {
       devices: chord.devices || [],
       rejected: chord.rejected,
     });
-    // a sus tension, resolved two beats later: never on the last 8th of the bar
-    if (devices.includes("sus") && !chord.cliche && gen.rng() < GRAMMAR.susP) {
+    // a sus tension, resolved two beats later: never on the last 8th of the bar, and never where its
+    // 4th would sit a semitone from the pedal. (The 4th of bVI is the flat 2nd of the key: with the
+    // tonic droning under it that is a minor 9th held for a beat, which is heard as a wrong note, not
+    // as a suspension.) The roll is made either way, so the bars that follow are the same bars.
+    const susRolled = devices.includes("sus") && !chord.cliche && gen.rng() < GRAMMAR.susP;
+    const fourth = (((chord.root + 5 - gen.tonicMidi) % 12) + 12) % 12;
+    const rubsPedal = devices.includes("drone") && (fourth === 1 || fourth === 11);
+    if (susRolled && !rubsPedal) {
       const sus = buildChord(gen, { deg: chord.root - gen.tonicMidi, q: "sus4", label: chord.degree }, "minor", false);
       bar.chords.push({
         step: 8, label: sus.label, degree: chord.degree, root: chord.root,
@@ -547,7 +565,7 @@ export function nextBar(gen, controls = {}) {
       });
     }
     bar.bass = bassBar(chord, chord.cliche);
-    bar.drone = droneBar(gen, devices);
+    bar.drone = droneBar(gen, devices, bar.chords);
     bar.lead = autoLeadBar(gen, chord, controls);
   }
 

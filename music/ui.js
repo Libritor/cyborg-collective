@@ -331,12 +331,12 @@ const signed = (v) => (typeof v === "number" && Number.isFinite(v)
   ? `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}`
   : DASH);
 
-/** The cliché's moving voice: the 7th descends a semitone inside the held root. */
+/** The cliché's moving voice: one voice steps down from the root to the flat 7th inside the held root. */
 function clicheLine(chord) {
   const intervals = QUALITY[chord.quality] || [];
   const pc = ((chord.root % 12) + 12) % 12;
-  if (intervals.includes(11)) return `7th ${NOTE_NAMES[(pc + 11) % 12]} → ${NOTE_NAMES[(pc + 10) % 12]}`;
-  if (intervals.includes(10)) return `7th ${NOTE_NAMES[(pc + 10) % 12]} held`;
+  if (intervals.includes(11)) return `line ${NOTE_NAMES[pc]} → ${NOTE_NAMES[(pc + 11) % 12]}`;
+  if (intervals.includes(10)) return `line ${NOTE_NAMES[pc]} → ${NOTE_NAMES[(pc + 10) % 12]}`;
   return "cliché";
 }
 

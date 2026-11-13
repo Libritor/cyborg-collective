@@ -35,15 +35,22 @@ export const FAMILIES = [
     id: "milky",
     mode: "minor",
     title: "line cliché",
-    // i - i(maj7) - i7 : one note descends inside a held root, then it breaks open
+    // i - i7 - IV - bVI : one note walks down (8, b7, 6, b6) while the tonic is held in every
+    // chord, then bVII turns it round. Each chord sits well on the tonic pedal.
+    //
+    // It used to run i - i(maj7) - i7 and open into IVmaj7. Heard with the rest of the band
+    // that was sour twice over: in the i(maj7) bar the lead and the pad sounded the major 7th
+    // a semitone from the pedal and the bass (G# on A, in A minor), and IVmaj7 brought the
+    // major third of the key (C#) straight after a bar that had just played the minor one.
+    // `node music/probe_family.mjs milky` lists what each bar sounds and any such clash.
     steps: [
       step(0, "min", 2, "i"),
-      step(0, "minmaj7", 1, "i(maj7)", { cliche: true }),
       step(0, "min7", 1, "i7", { cliche: true }),
-      step(5, "maj7", 2, "IVmaj7"),
+      step(5, "maj", 1, "IV"),
+      step(8, "maj", 2, "bVI"),
       step(10, "maj", 2, "bVII"),
     ],
-    open: step(5, "maj7", 2, "IVmaj7"),
+    open: step(8, "maj", 2, "bVI"),
     devices: ["cliche", "drone"],
   },
   {

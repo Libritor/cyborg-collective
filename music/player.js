@@ -55,24 +55,28 @@ async function storedMinutes() {
 }
 
 /**
- * Today's row of the record: at least five minutes long, with a device summary
- * to seed from. When stored minutes are published, the day's piece is one of
- * those sessions, so that what is drawn and what is played come from the same
- * recording.
+ * The row of the record the piece is made from. When a stored minute is
+ * published, it is that session, so that what is drawn and what is played come
+ * from the same recording; with several, the most recent, so the page plays
+ * what was recorded last. Only when none is published does the day choose, among
+ * sessions at least five minutes long with a device summary to seed from.
  */
 async function pieceOfTheDay() {
   try {
     const [r, minutes] = await Promise.all([fetch("data/index.json", { cache: "no-store" }), storedMinutes()]);
     if (!r.ok) return null;
     const index = await r.json();
-    let rows = (index.sessions || []).filter((row) => row && row.stamp && (row.minutes || 0) >= 5 && Array.isArray(row.devices) && row.devices.length);
-    const drawn = rows.filter((row) => minutes.has(row.stamp));
-    if (drawn.length) rows = drawn;
-    if (!rows.length) return null;
-    const day = new Date().toISOString().slice(0, 10);
-    const rank = (row) => hash(`${day}|${row.stamp}`);
-    rows.sort((a, b) => rank(a) - rank(b));
-    const row = rows[0];
+    const seeded = (index.sessions || []).filter((row) => row && row.stamp && Array.isArray(row.devices) && row.devices.length);
+    const drawn = seeded.filter((row) => minutes.has(row.stamp)).sort((a, b) => String(b.date || b.stamp).localeCompare(String(a.date || a.stamp)));
+    let row = drawn[0];                     // a session whose minute is published needs no minimum length: the minute is there
+    if (!row) {
+      const rows = seeded.filter((r) => (r.minutes || 0) >= 5);
+      if (!rows.length) return null;
+      const day = new Date().toISOString().slice(0, 10);
+      const rank = (r) => hash(`${day}|${r.stamp}`);
+      rows.sort((a, b) => rank(a) - rank(b));
+      row = rows[0];
+    }
     const summary = row.devices.find((d) => d && d.bands_median) || row.devices[0];
     return { stamp: row.stamp, date: row.date, minutes: row.minutes, summary, eeg: minutes.get(row.stamp) || null };
   } catch {
