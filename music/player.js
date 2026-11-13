@@ -34,6 +34,7 @@ import { createChains } from "./chains.js?v=1";
 import { concentrationParts, getConcentrationWeights } from "./conditioner.js";
 import { decodeCounts, splitBands, createLiveBands } from "./eegbands.js?v=3";
 import { BANDS, hearingNote, panelCaption, powerWaves, sharesFromMedians, sharesFromViews } from "./hearing.js?v=3";
+import { createAudible } from "./audible.js";
 
 /** A stable small hash, so the day's piece is the same for every visitor that day. */
 function hash(text) {
@@ -109,6 +110,9 @@ const RAW_FRESH_MS = 2500;       // a live head's raw trace is drawn while its f
 
 export async function mountPlayer({ button, status, mark = null, note = null, panel = null, caption = null, chains = null, ask = null, relayUrl = DEFAULT_RELAY, allow = [] } = {}) {
   const ctx = new AudioContext();
+  // an iPhone's silent switch silences a page's sound unless the page says it is playback (audible.js)
+  const audible = createAudible({ ctx });
+  window.__audible = audible;
   const say = (text) => { if (status) status.textContent = text; };
   // waiting: the band has started but the browser is holding the sound back until the visitor touches the page;
   // preview: the wand is sweeping in that silence; stopped: the visitor pressed the button to stop it
@@ -339,6 +343,11 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
       say(state.stopped ? "stopped · ♪ plays it again" : state.waiting ? "tap anywhere or press a key for sound" : "starting the band");
       return;
     }
+    if (ctx.state !== "running" && !document.hidden) {
+      // a phone call, another app's sound, a return from the background: the phone has taken the sound away
+      say("the sound was interrupted: tap anywhere to bring it back");
+      return;
+    }
     const views = liveViews();
     if (views.length) say(`playing ${views.length} ${views.length === 1 ? "person" : "people"} sharing live · ♪ stops it`);
     else if (idle) say(`nobody is sharing: a piece generated from the record, session ${state.piece} · ♪ stops it`);
@@ -357,7 +366,6 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     state.preview = false;
     state.stopped = false;
     stopSilent();
-    unlisten();
     button.setAttribute("aria-pressed", "true");
     button.textContent = "♪ stop";
     waves.start();
@@ -375,7 +383,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     state.waiting = false;
     state.preview = false;
     stopSilent();
-    unlisten();
+    audible.rest();
     waves.stop();
     if (note) note.hidden = true;
     if (chains) chains.hidden = true;
@@ -386,22 +394,30 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
   button.addEventListener("click", (event) => {
     event.stopPropagation();
     if (state.playing) { stop(); return; }
+    audible.open();
     ctx.resume().catch(() => {});
     start();
   });
 
   // Any gesture, anywhere, brings the sound in: a tap on a link or a field counts as much as a tap on the page.
   // The context is resumed inside every gesture, because a browser only honours the call made in one, and
-  // start() is already waiting on it if an earlier touch did not count (a scroll, a modifier key).
-  const GESTURES = ["pointerdown", "keydown", "touchend"];
+  // start() is already waiting on it if an earlier touch did not count (a scroll, a modifier key). On a phone the
+  // touch that counts is the lifting of the finger (touchend) or the click a screen reader sends in its place.
+  // The page goes on listening while the band plays: a phone can take the sound away again (a call, another app,
+  // a return from the background), and the next touch brings it back.
+  const GESTURES = ["pointerdown", "keydown", "touchend", "click"];
   function onGesture(event) {
-    if (state.playing || state.stopped) { unlisten(); return; }
+    if (state.stopped) return;
     if (event.target && event.target.closest && event.target.closest("#listen")) return;   // the button speaks for itself
+    if (state.playing) {
+      if (document.hidden) return;
+      if (audible.wants()) audible.open();
+      if (ctx.state !== "running") loop.resume().then(describe, () => {});
+      return;
+    }
+    audible.open();
     ctx.resume().catch(() => {});
     start();
-  }
-  function unlisten() {
-    for (const type of GESTURES) document.removeEventListener(type, onGesture, true);
   }
 
   /**
@@ -422,8 +438,11 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
   // a hidden tab throttles timers to about 1 Hz; the loop suspends the context and reanchors
   document.addEventListener("visibilitychange", () => {
     if (!state.playing) return;
-    if (document.hidden) loop.suspend(); else loop.resume();
+    if (document.hidden) { audible.rest(); loop.suspend(); }
+    else { if (audible.state.loop !== "none") audible.open(); loop.resume().then(describe, () => {}); }
   });
+  // the line under the menu says so when the phone has taken the sound away, and stops saying so when it is back
+  ctx.addEventListener("statechange", () => { if (state.playing) describe(); });
 
   button.disabled = false;
   describe();

@@ -18,6 +18,11 @@ be playing on arrival, untouched, also for a visitor who stopped it last time). 
 always lets a page sound (it counts its own navigation as a gesture), so the first case is made by HOLD_SOUND
 below: an AudioContext that stays suspended, and whose resume() stays pending, until the page has had a real
 (trusted) tap or key press.
+
+Section 13 is an iPhone, as far as a desk can make one: a phone's address line, a touch screen, and a stand-in for
+the audio session a phone's browser has. It shows that the page asks for what an iPhone's silent switch respects
+(the session set to playback, a silent loop playing beside the band, both from the tap itself) and that a touch
+brings the sound back after the phone takes it away. What the switch then does can only be heard on an iPhone.
 """
 import json
 import os
@@ -64,6 +69,26 @@ HOLD_SOUND = """(() => {
     }
   };
 })();"""
+IPHONE = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+          "Version/18.1 Mobile/15E148 Safari/604.1")
+# the audio session an iPhone's browser has and this one does not, and a list of every media element the page plays
+PHONE = """(() => {
+  if (!navigator.audioSession) Object.defineProperty(navigator, 'audioSession', { value: { type: 'auto' }, configurable: true });
+  window.__media = [];
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function (...args) { if (!window.__media.includes(this)) window.__media.push(this); return play.apply(this, args); };
+})();"""
+PHONE_STATE = """() => {
+  const a = window.__audible ? window.__audible.state : {}, m = window.__media || [], el = m[0];
+  let rate = null;
+  if (el && el.src.startsWith('data:audio/wav;base64,')) {
+    const bytes = Uint8Array.from(atob(el.src.split(',')[1]), (c) => c.charCodeAt(0));
+    rate = new DataView(bytes.buffer).getUint32(24, true);
+  }
+  return { playing: window.__player.playing, stopped: window.__player.stopped, ctx: window.__band.ctx.state, ctxRate: window.__band.ctx.sampleRate,
+    session: navigator.audioSession ? navigator.audioSession.type : null, apple: a.apple, loop: a.loop, media: m.length,
+    looping: el ? el.loop : null, paused: el ? el.paused : null, inPage: el ? document.contains(el) : null, rate,
+    status: document.getElementById('listen-status').textContent }; }"""
 STATE = """() => {
   const note = document.getElementById('listen-note');
   const r = note ? note.getBoundingClientRect() : null;
@@ -220,9 +245,12 @@ PICTURE = """() => {
 
 
 def new_page(browser, hold=True, **kw):
+    init = kw.pop("init", None)
     ctx = browser.new_context(viewport={"width": kw.pop("width", 1280), "height": kw.pop("height", 800)}, **kw)
     if hold:
         ctx.add_init_script(HOLD_SOUND)
+    if init:
+        ctx.add_init_script(init)
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -505,6 +533,55 @@ with sync_playwright() as p:
     s = page.evaluate(STATE)
     check(s["playing"] and not s["stopped"] and not s["chains"]["hidden"] and s["waves"]["running"],
           "the stop was for that visit only: on the next visit the band, the wand and the chains are playing again on arrival", json.dumps({k: s[k] for k in ("playing", "stopped")}))
+    check(not errors, "no script errors on the page", "; ".join(errors)[:300])
+    page.context.close()
+
+    print("13. an iPhone: the page says its sound is playback, which the phone's silent switch leaves alone")
+    page, errors = new_page(b, width=390, height=780, has_touch=True, is_mobile=True, user_agent=IPHONE, init=PHONE)
+    s = page.evaluate(PHONE_STATE)
+    check(s["apple"] and not s["playing"] and s["session"] == "auto" and s["media"] == 0 and s["loop"] == "none",
+          "on arrival, untouched: nothing is set and nothing is made", json.dumps(s))
+    box = page.locator("#swim").bounding_box()
+    page.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_function("() => window.__player.playing", timeout=8000)
+    page.wait_for_timeout(1200)
+    s = page.evaluate(PHONE_STATE)
+    check(s["playing"] and s["ctx"] == "running", "one tap of a finger on the panel brings the band", json.dumps(s))
+    check(s["session"] == "playback", "the tap set the audio session to playback", json.dumps(s))
+    check(s["media"] == 1 and s["loop"] == "playing" and s["looping"] and not s["paused"] and not s["inPage"],
+          "and started one silent loop beside the band, which is not put on the page", json.dumps(s))
+    check(s["rate"] == s["ctxRate"], f"the silence is at the band's own sample rate ({s['rate']} Hz)", json.dumps(s))
+    page.evaluate("() => window.__band.ctx.suspend()")          # the phone takes the sound away: a call, another app
+    page.wait_for_timeout(500)
+    s = page.evaluate(PHONE_STATE)
+    check(s["playing"] and s["ctx"] == "suspended" and "interrupted" in s["status"] and "tap" in s["status"],
+          "when the phone takes the sound away, the line under the menu says so and asks for a tap", s["status"])
+    page.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(1200)
+    s = page.evaluate(PHONE_STATE)
+    check(s["playing"] and s["ctx"] == "running" and "interrupted" not in s["status"] and "stops it" in s["status"],
+          "and the next tap brings it back", json.dumps(s))
+    page.locator("#listen").tap()
+    page.wait_for_timeout(600)
+    s = page.evaluate(PHONE_STATE)
+    check(not s["playing"] and s["stopped"] and s["paused"] and s["loop"] == "resting", "the button stops the band, and the silent loop with it", json.dumps(s))
+    page.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    page.wait_for_timeout(1000)
+    s = page.evaluate(PHONE_STATE)
+    check(not s["playing"] and s["paused"], "once stopped, a tap on the page starts neither again", json.dumps(s))
+    page.locator("#listen").tap()
+    page.wait_for_function("() => window.__player.playing", timeout=8000)
+    page.wait_for_timeout(800)
+    s = page.evaluate(PHONE_STATE)
+    check(s["playing"] and s["media"] == 1 and not s["paused"] and s["loop"] == "playing", "the button starts both again, with the same loop", json.dumps(s))
+    check(not errors, "no script errors on the page", "; ".join(errors)[:300])
+    page.context.close()
+    page, errors = new_page(b, init=PHONE)
+    page.mouse.click(700, 300)
+    page.wait_for_function("() => window.__player.playing", timeout=8000)
+    page.wait_for_timeout(800)
+    s = page.evaluate(PHONE_STATE)
+    check(s["playing"] and not s["apple"] and s["media"] == 0 and s["loop"] == "none", "on a computer the band plays and no silent loop is made", json.dumps(s))
     check(not errors, "no script errors on the page", "; ".join(errors)[:300])
     page.context.close()
     b.close()

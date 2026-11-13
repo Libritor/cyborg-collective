@@ -32,6 +32,7 @@ import {
   concentrationParts, concentrationFromParts, partsFromConcentration,
   getConcentrationWeights, setConcentrationWeights, WEIGHT_DEFAULTS,
 } from "./conditioner.js";
+import { createAudible } from "./audible.js";
 
 const el = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -73,6 +74,8 @@ function persistWeights(next) {
 setConcentrationWeights(storedWeights() || WEIGHT_DEFAULTS);
 
 const ctx = new AudioContext();
+// an iPhone's silent switch silences a page's sound unless the page says it is playback (audible.js)
+const audible = createAudible({ ctx });
 const ui = createUI({ root: el("mount"), onGrab: () => grab(), onWeights: (next) => applyWeights(next) });
 
 let kit = null;
@@ -731,6 +734,7 @@ async function toggle() {
   const button = el("play");
   if (loop.playing) {
     loop.stop();
+    audible.rest();
     button.textContent = "▶ listen";
     button.setAttribute("aria-pressed", "false");
     window.__audio.playing = false;
@@ -738,6 +742,7 @@ async function toggle() {
     say("stopped");
     return;
   }
+  audible.open();                 // before the first await: it only counts inside the press itself
   try {
     await loop.play();
   } catch (err) {
