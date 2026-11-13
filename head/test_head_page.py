@@ -2,8 +2,9 @@
 live sharer, and with scripts off the still picture stands in.
 
     python head/test_head_page.py [URL of the head page] [folder for pictures]
-    python head/test_head_page.py --still          # also rewrite head/still.png from the page as it draws now
-                                                   # (it is the home page's picture too: run this after make_head.py)
+    python head/test_head_page.py --still          # also rewrite, from the page as it draws now, head/still.png and
+                                                   # head/open.webp (the home page's picture and the sheet of pictures
+                                                   # its slider steps through): run this after make_head.py
 
 Without a URL it serves this repository on a free local port. Live sharers are imitated by handing messages to the
 page's own handler; nothing is sent to any server.
@@ -23,6 +24,8 @@ sys.dont_write_bytecode = True
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+# the home page's slider: this many pictures of the head, closed to fully open, on one sheet (head/open.webp)
+FRAMES, SHEET_COLS, FRAME_PX, STILL_FRAME = 21, 7, 480, 6
 passed, failed = 0, []
 
 
@@ -132,24 +135,37 @@ def main():
         check(r.status == 200 and len(r.body()) > 20000, "the still picture is there (%d KB)" % (len(r.body()) // 1024 if r.status == 200 else 0))
         pg.context.close()
 
-        if still:                                       # the page's own drawing, as a picture with nothing behind it
+        if still:                                       # the page's own drawing, as pictures with nothing behind them
             from PIL import Image
             pg = b.new_context(viewport={"width": 640, "height": 640}, device_scale_factor=2).new_page()
             pg.goto(url + "?still=1", wait_until="load")
             pg.wait_for_function("() => window.__head && window.__head.ready", timeout=60000)
             pg.wait_for_timeout(1500)
-            data = pg.evaluate("() => window.__head.png()")
-            im = Image.open(io.BytesIO(base64.b64decode(data.split(",", 1)[1]))).convert("RGBA")
-            box = im.getbbox()
+            # one picture for every position of the home page's slider, closed to fully open, all cut from the same square
+            shots_ = []
+            for k in range(FRAMES):
+                data = pg.evaluate("a => { window.__head.setCut(a); return window.__head.png(); }", k / (FRAMES - 1))
+                shots_.append(Image.open(io.BytesIO(base64.b64decode(data.split(",", 1)[1]))).convert("RGBA"))
+            boxes = [im.getbbox() for im in shots_]
             pad = 24
-            im = im.crop((max(0, box[0] - pad), max(0, box[1] - pad), min(im.width, box[2] + pad), min(im.height, box[3] + pad)))
-            side = max(im.size)
-            sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
-            sq.paste(im, ((side - im.width) // 2, (side - im.height) // 2))
-            # a couple of hundred colours: the page's own picture for scripts-off, and the picture the home page links with
-            for name, px in (("still.png", 640),):
-                out = sq.resize((px, px), Image.LANCZOS).quantize(colors=200, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
-                out.save(os.path.join(HERE, name), optimize=True)
+            x0, y0 = max(0, min(bx[0] for bx in boxes) - pad), max(0, min(bx[1] for bx in boxes) - pad)
+            x1, y1 = min(shots_[0].width, max(bx[2] for bx in boxes) + pad), min(shots_[0].height, max(bx[3] for bx in boxes) + pad)
+            side = max(x1 - x0, y1 - y0)
+
+            def square(im):
+                sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+                sq.paste(im.crop((x0, y0, x1, y1)), ((side - (x1 - x0)) // 2, (side - (y1 - y0)) // 2))
+                return sq
+
+            rows_ = (FRAMES + SHEET_COLS - 1) // SHEET_COLS
+            sheet = Image.new("RGBA", (SHEET_COLS * FRAME_PX, rows_ * FRAME_PX), (0, 0, 0, 0))
+            for k, im in enumerate(shots_):
+                sheet.paste(square(im).resize((FRAME_PX, FRAME_PX), Image.LANCZOS), ((k % SHEET_COLS) * FRAME_PX, (k // SHEET_COLS) * FRAME_PX))
+            sheet.save(os.path.join(HERE, "open.webp"), quality=80, method=6)
+            # the picture that stands before the sheet is here, and with scripts off: the same square, at the slider's starting position
+            out = square(shots_[STILL_FRAME]).resize((640, 640), Image.LANCZOS).quantize(colors=200, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
+            out.save(os.path.join(HERE, "still.png"), optimize=True)
+            for name in ("still.png", "open.webp"):
                 print("%s rewritten: %d KB" % (name, os.path.getsize(os.path.join(HERE, name)) // 1024))
             pg.context.close()
         b.close()

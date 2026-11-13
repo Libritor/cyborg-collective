@@ -93,6 +93,8 @@ STATE = """() => {
     })(),
     noteHidden: note.hidden, noteText: note.innerText.replace(/\\s+/g, ' '), floating: note.classList.contains('floating'),
     noteInView: r ? (r.top >= 0 && r.bottom <= innerHeight && r.width > 0) : false,
+    noteBegins: r ? (r.top >= 0 && r.top <= innerHeight - 60 && r.width > 0) : false,
+    statusInView: (() => { const q = document.getElementById('listen-status').getBoundingClientRect(); return q.top >= 0 && q.bottom <= innerHeight && q.width > 0; })(),
     notePos: getComputedStyle(note).position,
     sounding: document.getElementById('mark-6ense').classList.contains('sounding'),
     status: document.getElementById('listen-status').textContent,
@@ -287,7 +289,11 @@ with sync_playwright() as p:
     check(s["sounding"], "the 6ense mark is lit")
     check("session of" in s["caption"] and "electrode" in s["caption"] and "listen" not in s["caption"] and "no sound" not in s["caption"], "the line over the panel says whose session and which electrode", s["caption"])
     check(not s["waiting"] and s["ask"] is None and "no sound" not in s["chains"]["state"]["bar"], "with the sound in, the request for a tap is gone", json.dumps({"ask": s["ask"], "bar": s["chains"]["state"]["bar"]}))
-    check(not s["noteHidden"] and not s["floating"] and s["noteInView"] and s["notePos"] == "relative", "the note is shown under the menu", json.dumps({k: s[k] for k in ("noteHidden", "floating", "noteInView", "notePos")}))
+    # The head with its slider now stands between the words and the menu, so in a window this tall the note no
+    # longer fits whole under the menu: it begins in sight and runs on below. What a visitor must not have to scroll
+    # for is why there is music and how to stop it, and that is the line in the menu itself.
+    check(not s["noteHidden"] and not s["floating"] and s["noteBegins"] and s["notePos"] == "relative", "the note is shown under the menu, beginning in sight", json.dumps({k: s[k] for k in ("noteHidden", "floating", "noteBegins", "notePos")}))
+    check(s["statusInView"] and "stops it" in s["status"], "the menu's own line, in sight whole, says why there is music and how to stop it", s["status"])
     check("What you are hearing" in s["noteText"] and "not a recording" in s["noteText"] and "summary of one session" in s["noteText"], "the note says what the music is", s["noteText"][:200])
     check("that session's own EEG: one minute from the electrode" in s["noteText"] and "Every dot is one stored sample, in microvolts against seconds" in s["noteText"]
           and "SWIM (Sequential Wave Imprinting Machine)" in s["noteText"],

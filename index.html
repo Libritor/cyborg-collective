@@ -5,19 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794601507">
+<link rel="stylesheet" href="style.css?v=1794602515">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
 <div class="masthead">
 <header class="top">
   <h1>Cyborg Collective</h1>
-  <div class="head-link">
-    <a class="head-pic" href="head/" title="A head from a real CT scan: turn it, open it from the top, and see the scan itself on the cut"><img src="head/still.png" width="200" height="200" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"></a>
-    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement: turn it and open it. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
-  </div>
   <p class="tag">A window the person opens, not a feed that is taken. Live headbands when someone chooses to share; the record of every recording behind them, always.</p>
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
+  <div class="head-link">
+    <div class="head-stage">
+      <a class="head-pic" href="head/" title="A head from a real CT scan: on its own page it turns, and the brain takes the colours of whoever is sharing"><img src="head/still.png" width="300" height="300" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"><span class="head-frames" data-sheet="head/open.webp" data-frames="21" data-cols="7" hidden></span></a>
+      <label class="head-slider needs-js">closed <input type="range" id="head-cut" min="0" max="20" value="6" aria-label="How far the head is opened from the top"> open</label>
+    </div>
+    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement. Pull the slider to open it from the top: the cut shows the scan itself at that height. On <a href="head/">its own page</a> it turns, and the brain takes the colours of whoever is sharing. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
+  </div>
 </header>
 <nav>
   <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn needs-js" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it for this visit">♪ listen</button><span id="listen-status" class="nav-note needs-js">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a><a href="space/" title="Rooms rebuilt from a headset's pictures, to walk through in 3-D, each with the film of its depth maps">Rooms in 3-D</a>
@@ -118,6 +121,35 @@
 <script src="video-rtc.js?v=1794024219"></script>
 <script src="splat-view.js?v=1794537684"></script>
 <script src="app.js?v=1794537684"></script>
+<script>
+// The head's slider. The head was drawn ahead of time at every position of the slider, by the head page itself, and
+// the pictures sit on one sheet (head/open.webp); the slider only chooses which one shows. The sheet is asked for once
+// the page has settled, or as soon as the slider is touched; until it is here, and if it never comes, the still stands.
+(function () {
+  var box = document.querySelector(".head-link"), slider = document.getElementById("head-cut"), frames = box && box.querySelector(".head-frames");
+  if (!box || !slider || !frames) return;
+  var n = Number(frames.dataset.frames), cols = Number(frames.dataset.cols), rows = Math.ceil(n / cols), here = false, asked = false;
+  function show() {
+    var f = Math.max(0, Math.min(n - 1, Math.round(Number(slider.value))));
+    frames.style.backgroundPosition = ((f % cols) / (cols - 1) * 100) + "% " + (Math.floor(f / cols) / Math.max(1, rows - 1) * 100) + "%";
+  }
+  function ask() {
+    if (asked) return;
+    asked = true;
+    var sheet = new Image();
+    sheet.onload = function () {
+      frames.style.backgroundImage = "url(" + sheet.src + ")";
+      frames.style.backgroundSize = (cols * 100) + "% " + (rows * 100) + "%";
+      show(); frames.hidden = false; box.classList.add("sliding"); here = true;
+    };
+    sheet.src = frames.dataset.sheet;
+  }
+  slider.addEventListener("input", function () { ask(); if (here) show(); });
+  ["pointerdown", "focus", "touchstart"].forEach(function (e) { slider.addEventListener(e, ask, { passive: true }); });
+  box.addEventListener("pointerenter", ask);
+  if (document.readyState === "complete") setTimeout(ask, 1500); else addEventListener("load", function () { setTimeout(ask, 1500); });
+})();
+</script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
 import("./music/player.js?v=1794596409")

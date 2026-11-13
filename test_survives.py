@@ -115,6 +115,17 @@ def file_checks():
                 leaked.append(name)
     check(not leaked, "head/ holds no scanner file and no patient field", leaked)
 
+    # the home page's slider steps through a sheet of pictures: the sheet must hold as many as the page says
+    m = re.search(r'data-sheet="([^"]+)" data-frames="(\d+)" data-cols="(\d+)"', read("index.html"))
+    sheet_ok = False
+    if m and os.path.exists(os.path.join(ROOT, m.group(1))):
+        from PIL import Image
+        w, h = Image.open(os.path.join(ROOT, m.group(1))).size
+        frames, cols = int(m.group(2)), int(m.group(3))
+        cell = w // cols
+        sheet_ok = w % cols == 0 and h % cell == 0 and (h // cell) * cols >= frames > (h // cell - 1) * cols
+    check(sheet_ok, "the head's sheet of pictures holds the number of pictures the home page's slider steps through", m.groups() if m else "no sheet named")
+
     vend = os.path.join(ROOT, "space", "vendor", "three")
     check(os.path.exists(os.path.join(vend, "LICENSE")) and os.path.getsize(os.path.join(vend, "three.module.min.js")) > 500000,
           "the 3-D library the rooms page uses is kept beside it, with its licence")
@@ -173,6 +184,7 @@ def browser_checks(url, serve):
         pg.goto(url, wait_until="load")
         check(pg.locator('.head-link a[href="head/"] img').count() == 1 and pg.locator(".head-link").is_visible(), "home, scripts off: the picture of the head is there and links to it")
         check(pg.locator('.head-link a[href*="fletcher"]').count() == 1 and "Mann" not in pg.inner_text(".head-link"), "home: the head is offered as a head, with Rich Fletcher named as the inspiration")
+        check(pg.locator(".head-slider:visible").count() == 0 and pg.locator(".head-link img:visible").count() == 1, "home, scripts off: no slider that could not move anything; the still picture stands")
         pg.context.close()
 
         print("2. the relay gone: the record and the band carry on")
@@ -212,7 +224,30 @@ def browser_checks(url, serve):
         check("A window the person opens" in pg.inner_text("body") and not errors, "catalogue gone: the words are there, the table says it is not loaded, no script error", errors[:2])
         pg.context.close()
 
-        print("6. a phone: nothing slides sideways")
+        print("6. the head's slider on the home page")
+        pg, errors = page()
+        pg.goto(url, wait_until="load")
+        pg.locator("#head-cut").focus()                                     # touching the slider asks for the sheet at once
+        pg.wait_for_function("() => document.querySelector('.head-link').classList.contains('sliding')", timeout=30000)
+        at = lambda: pg.evaluate("() => document.querySelector('.head-frames').style.backgroundPosition")   # noqa: E731
+        seen = []
+        for value in ("0", "6", "13", "20"):
+            pg.locator("#head-cut").fill(value)
+            seen.append(at())
+        check(len(set(seen)) == 4 and seen[0] == "0% 0%" and seen[3] == "100% 100%", "the slider steps through the pictures, closed first and fully open last", seen)
+        check(pg.evaluate("() => getComputedStyle(document.querySelector('.head-link img')).visibility") == "hidden" and pg.locator(".head-frames").is_visible(),
+              "while it slides, the sheet's picture stands where the still was")
+        check(not errors, "the slider: no script error", errors[:2])
+        pg.context.close()
+        pg, errors = page(block=("head/open.webp",))
+        pg.goto(url, wait_until="load")
+        pg.locator("#head-cut").fill("15")
+        pg.wait_for_timeout(1200)
+        check(pg.locator(".head-link img").is_visible() and not pg.evaluate("() => document.querySelector('.head-link').classList.contains('sliding')") and not errors,
+              "the sheet gone: the still picture stands, and nothing breaks", errors[:2])
+        pg.context.close()
+
+        print("7. a phone: nothing slides sideways")
         for path in ("", "record.html", "space/", "head/"):
             pg, _ = page(width=390, height=844)
             pg.goto(url + path, wait_until="load")
