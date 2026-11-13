@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794537684">
+<link rel="stylesheet" href="style.css?v=1794592088">
+<noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
 <div class="masthead">
@@ -15,10 +16,10 @@
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
 </header>
 <nav>
-  <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it for this visit">♪ listen</button><span id="listen-status" class="nav-note">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a>
+  <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn needs-js" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it for this visit">♪ listen</button><span id="listen-status" class="nav-note needs-js">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a><a href="space/" title="Rooms rebuilt from a headset's pictures, to walk through in 3-D, each with the film of its depth maps">Rooms in 3-D</a>
 </nav>
 <aside id="listen-note" class="listen-note" aria-live="polite" hidden></aside>
-<div class="band-col">
+<div class="band-col needs-js">
  <figure class="swim-panel" id="swim">
   <figcaption><b>6ense™</b> <span id="swim-caption">brain waves</span> <span class="sound-ask" id="sound-ask" hidden>tap anywhere for sound ♪</span></figcaption>
  </figure>
@@ -26,65 +27,74 @@
 </div>
 </div>
 <main>
+<noscript><p class="noscript-note">JavaScript is off in this browser, so the parts of this page that are live are left out: who is sharing now, the band, and the record's filters. What lasts is here without it: what this page is, above; how it is honest, at the foot; <a href="record.html">the record as a plain page</a>; and <a href="space/">the rooms</a>, whose films play without scripts too.</p></noscript>
 
 <section id="live">
   <h2>Live now</h2>
-  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. Cameras appear here too, when the computer they hang off opens its gateway: the picture comes from that computer to this browser, not through the relay. A headset can appear here as well, as a cloud of splats from its depth sensing, drawn in 3-D. <span id="link" class="status">connecting…</span></p>
-  <div class="tiles">
+  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. Cameras appear here too, when the computer they hang off opens its gateway: the picture comes from that computer to this browser, not through the relay. A headset can appear here as well, as a cloud of splats from its depth sensing, drawn in 3-D. <span id="link" class="status needs-js">connecting…</span></p>
+  <div class="tiles needs-js">
     <div class="tile"><b id="n">0</b><span>people sharing now</span></div>
     <div class="tile"><b id="usable">—</b><span>with usable contact</span></div>
     <div class="tile"><b id="alpha">—</b><span>pooled relative alpha</span></div>
     <div class="tile"><b id="arousal">—</b><span>pooled activation estimate (usable only)</span></div>
     <div class="tile"><b id="cams">0</b><span>cameras live</span></div>
   </div>
-  <div class="grid" id="grid"></div>
-  <div class="empty" id="empty">Nobody is sharing right now. The record below is always here.</div>
+  <div class="grid needs-js" id="grid"></div>
+  <div class="empty needs-js" id="empty">Nobody is sharing right now. The record below is always here.</div>
   <p class="status more">The relay keeps nothing of the signal unless the person left “keep this share” on in the app; then what they streamed, at the tier they chose, is kept and listed under The record below with its summary (when, how long, activity, moods stated, contact, bands, pulse), and they can remove it from their phone. A name, an activity and a mood on a card are what that person typed; the mood is their own rating on the affect grid, never read from the signal. This page listens to the Collective's relay (<code>cyborg-collective-relay.onrender.com</code>); to point it at another, add <code>?relay=wss://host/live</code> to the address once; it is remembered in this browser only.</p>
 </section>
 
 <section id="record">
   <h2>The record</h2>
-  <p class="sub">Every recording the phone's recorder has made, and every live share a person chose to keep, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner, or, for a kept share, with the relay until the person removes it. One exception, listed in full in <a href="music/eeg/index.json"><code>music/eeg/</code></a>: the minute of one electrode that the band's waves are drawn from.</p>
-  <div class="tiles" id="totals"></div>
-  <div class="card">
+  <p class="sub">Every recording the phone's recorder has made, and every live share a person chose to keep, summarised: when, how long, which headband, how well the electrodes held, what the bands and the pulse did. Numbers and previews only; the raw samples stay with their owner, or, for a kept share, with the relay until the person removes it. One exception, listed in full in <a href="music/eeg/index.json"><code>music/eeg/</code></a>: the minute of one electrode that the band's waves are drawn from. The whole list is also on <a href="record.html">a plain page</a> that needs no script.</p>
+  <div class="tiles needs-js" id="totals"></div>
+  <div class="card needs-js">
     <div class="bars" id="months"></div>
     <div class="bars-x" id="months-x"></div>
   </div>
-  <div class="filters">
+  <div class="filters needs-js">
     <label>Project <select id="f-project"><option value="">all</option></select></label>
     <label>Month <select id="f-month"><option value="">all</option></select></label>
     <label><input type="checkbox" id="f-usable" checked> usable only</label>
     <span class="status" id="count"></span>
   </div>
+  <div class="table-scroll needs-js">
   <table class="sessions">
     <thead><tr><th>when</th><th>project</th><th>min</th><th>headbands</th><th>clean EEG</th><th>pulse</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
-  <p class="status more" id="built"></p>
+  </div>
+  <p class="status more needs-js" id="built"></p>
 
-  <h3>Check-ins</h3>
-  <p class="sub">Daily check-ins people chose to publish: three minutes of eyes-open rest, then how they rated themselves, how they slept, what they drank. Their rating sits beside the resting estimate so the two can be compared, never merged. Each person can remove theirs from their phone.</p>
+  <h3 class="needs-js">Check-ins</h3>
+  <p class="sub needs-js">Daily check-ins people chose to publish: three minutes of eyes-open rest, then how they rated themselves, how they slept, what they drank. Their rating sits beside the resting estimate so the two can be compared, never merged. Each person can remove theirs from their phone.</p>
+  <div class="table-scroll needs-js">
   <table class="sessions checkins">
     <thead><tr><th>when</th><th>who</th><th>doing</th><th>self-rated</th><th>sleep</th><th>caffeine</th><th>resting estimate</th><th>usable</th><th>pulse</th></tr></thead>
     <tbody id="checkin-rows"></tbody>
   </table>
-  <p class="status more" id="checkin-note">loading…</p>
+  </div>
+  <p class="status more needs-js" id="checkin-note">loading…</p>
 
-  <h3>Shared live sessions</h3>
-  <p class="sub">Every live share the person allowed to be logged: when, how long, at which tier, what they were doing, every mood they stated while the window was open, and the summary numbers the page showed. Never the signal. Each person can remove theirs from their phone.</p>
+  <h3 class="needs-js">Shared live sessions</h3>
+  <p class="sub needs-js">Every live share the person allowed to be logged: when, how long, at which tier, what they were doing, every mood they stated while the window was open, and the summary numbers the page showed. Never the signal. Each person can remove theirs from their phone.</p>
+  <div class="table-scroll needs-js">
   <table class="sessions shares">
     <thead><tr><th>when</th><th>who</th><th>doing</th><th>length</th><th>tier</th><th>moods stated</th><th>estimate (usable)</th><th>pulse</th><th>ended</th></tr></thead>
     <tbody id="share-rows"></tbody>
   </table>
-  <p class="status more" id="share-note">loading…</p>
+  </div>
+  <p class="status more needs-js" id="share-note">loading…</p>
 
-  <h3>Camera recordings</h3>
-  <p class="sub">What the cameras recorded, as ROS 2 bags (MCAP): one bag per hour per camera, JPEG frames on a <code>sensor_msgs/msg/CompressedImage</code> topic stamped in wall-clock time, with rosbag2's <code>metadata.yaml</code> beside each. The files stay on the computer the cameras hang off; they are listed and download from there while its gateway is on.</p>
+  <h3 class="needs-js">Camera recordings</h3>
+  <p class="sub needs-js">What the cameras recorded, as ROS 2 bags (MCAP): one bag per hour per camera, JPEG frames on a <code>sensor_msgs/msg/CompressedImage</code> topic stamped in wall-clock time, with rosbag2's <code>metadata.yaml</code> beside each. The files stay on the computer the cameras hang off; they are listed and download from there while its gateway is on.</p>
+  <div class="table-scroll needs-js">
   <table class="sessions bags">
     <thead><tr><th>started</th><th>camera</th><th>topic</th><th>length</th><th>frames</th><th>size</th><th>download</th></tr></thead>
     <tbody id="bag-rows"></tbody>
   </table>
-  <p class="status more" id="bag-note">loading…</p>
+  </div>
+  <p class="status more needs-js" id="bag-note">loading…</p>
 </section>
 
 
@@ -105,11 +115,12 @@
 <script src="splat-view.js?v=1794537684"></script>
 <script src="app.js?v=1794537684"></script>
 <script type="module">
-import { mountPlayer } from "./music/player.js?v=1794589867";
-mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
+// Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
+import("./music/player.js?v=1794589867")
+  .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
-              chains: document.getElementById("chains"), ask: document.getElementById("sound-ask") })
+              chains: document.getElementById("chains"), ask: document.getElementById("sound-ask") }))
   .then((band) => { window.__band = band; })
   .catch((err) => { const s = document.getElementById("listen-status"); if (s) s.textContent = "the band could not load: " + err.message; });
 </script>

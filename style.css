@@ -73,6 +73,11 @@ canvas.bands, canvas.raw { width: 100%; display: block; margin-top: 8px; }
 .bars-x { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
 .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0; font-size: 13px; }
 .filters select, .filters input { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--ink); }
+/* a table wider than the window scrolls inside its own box; the page itself never slides sideways */
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* shown only where scripts are off: where the lasting parts of the page are */
+main > header.top { padding-top: 28px; }      /* a page whose title sits in its one column (record.html) */
+.noscript-note { max-width: 70ch; margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 table.sessions { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.sessions th, table.sessions td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 table.sessions th { color: var(--muted); font-weight: 600; font-size: 12px; }

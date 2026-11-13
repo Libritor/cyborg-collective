@@ -34,8 +34,21 @@
   @media (min-width: 900px) { #view { left: 452px; } }
   @media (max-width: 899px) { #status { display: none; } }
 </style>
+<noscript><style>#view, #side, #status { display: none; } #plain { max-width: 62ch; margin: 28px auto; padding: 0 16px; } #plain a { color: inherit; }</style></noscript>
 </head>
 <body>
+<noscript><div id="plain">
+  <h1>Rooms, rosbagged</h1>
+  <p>Four rooms rebuilt from the pictures a headset took while it was walked through them. Drawing them in 3-D needs JavaScript, which is off in this browser. The film of each walk's depth maps is an ordinary video file and plays without it:</p>
+  <ul>
+    <li><a href="runs/room/maps.mp4">A bedroom office, 6 November 2026</a></li>
+    <li><a href="runs/room-fine/maps.mp4">The same room, taken more finely</a></li>
+    <li><a href="runs/first/maps.mp4">A first short walk, 8 November 2026</a></li>
+    <li><a href="runs/lab/maps.mp4">A lab, 8 November 2026</a></li>
+  </ul>
+  <p>In each film the left half is how far each surface is (yellow near, blue far) and the right half is which way it faces. The surfaces are files as well, for any 3-D viewer: <a href="room.glb">the bedroom office</a> and <a href="runs/lab/room.glb">the lab</a>.</p>
+  <p>Part of <a href="../">6ense.com</a> · <a href="../record.html">the record as a plain page</a></p>
+</div></noscript>
 <div id="view"></div>
 <div id="side">
   <div id="panel">
@@ -58,9 +71,11 @@
 </div>
 <div id="status"><span id="status-text">loading…</span><br>Drag to look around · scroll to move closer · right-drag to pan</div>
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }
 </script>
 <script type="module">
+// three.js 0.170.0 and the three add-ons used here are kept in vendor/three/ beside this page (MIT licence, in that folder),
+// so the page asks no other site for anything.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
