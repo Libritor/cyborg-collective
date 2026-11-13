@@ -3,6 +3,7 @@ live sharer, and with scripts off the still picture stands in.
 
     python head/test_head_page.py [URL of the head page] [folder for pictures]
     python head/test_head_page.py --still          # also rewrite head/still.png from the page as it draws now
+                                                   # (it is the home page's picture too: run this after make_head.py)
 
 Without a URL it serves this repository on a free local port. Live sharers are imitated by handing messages to the
 page's own handler; nothing is sent to any server.
@@ -145,8 +146,8 @@ def main():
             side = max(im.size)
             sq = Image.new("RGBA", (side, side), (0, 0, 0, 0))
             sq.paste(im, ((side - im.width) // 2, (side - im.height) // 2))
-            # two sizes, a few hundred colours each: the page's own picture for scripts-off, and the small one the home page links with
-            for name, px in (("still.png", 640), ("still_small.png", 264)):
+            # a couple of hundred colours: the page's own picture for scripts-off, and the picture the home page links with
+            for name, px in (("still.png", 640),):
                 out = sq.resize((px, px), Image.LANCZOS).quantize(colors=200, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
                 out.save(os.path.join(HERE, name), optimize=True)
                 print("%s rewritten: %d KB" % (name, os.path.getsize(os.path.join(HERE, name)) // 1024))

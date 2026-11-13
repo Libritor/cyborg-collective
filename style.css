@@ -78,10 +78,23 @@ canvas.bands, canvas.raw { width: 100%; display: block; margin-top: 8px; }
 /* shown only where scripts are off: where the lasting parts of the page are */
 main > header.top { padding-top: 28px; }      /* a page whose title sits in its one column (record.html) */
 /* the head that opens: a picture that is a link, as on Rich Fletcher's page */
-.head-link { display: flex; align-items: center; gap: 14px; margin: 12px 0 2px; max-width: 520px; text-decoration: none; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.head-link img { flex: none; width: 132px; height: 132px; }
-.head-link b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
-.head-link:hover b, .head-link:focus-visible b { text-decoration: underline; }
+/* It sits at the top right of the words, which run round it, so that it can be large without pushing the menu and
+   the note down the page; on a narrow screen it comes after the words, picture and caption side by side. */
+.head-link { float: right; width: 200px; margin: 4px 0 6px 18px; color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.head-link .head-pic { display: block; line-height: 0; }
+.head-link img { width: 200px; height: 200px; display: block; }
+.head-link p { margin: 2px 0 0; }
+.head-link .head-open { display: block; color: var(--ink); font-size: 15px; font-weight: 700; text-decoration: none; margin-bottom: 1px; }
+.head-link .head-open:hover, .head-link .head-pic:hover + p .head-open { text-decoration: underline; }
+.head-link p a:not(.head-open) { color: inherit; }
+header.top::after { content: ""; display: block; clear: both; }
+@media (max-width: 600px) {
+  header.top { display: flex; flex-direction: column; }
+  .head-link { order: 9; float: none; width: auto; margin: 6px 0 2px; display: flex; align-items: center; gap: 14px; }
+  .head-link .head-pic { flex: none; }
+  .head-link img { width: 150px; height: 150px; }
+  header.top::after { display: none; }
+}
 .noscript-note { max-width: 70ch; margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 table.sessions { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.sessions th, table.sessions td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }

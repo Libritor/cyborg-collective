@@ -171,7 +171,8 @@ def browser_checks(url, serve):
               "the head, scripts off: its still picture and its words stand in")
         check(pg.context.request.get(url + "head/still.png").status == 200, "the head: the still picture answers")
         pg.goto(url, wait_until="load")
-        check(pg.locator('a.head-link[href="head/"] img').count() == 1 and pg.locator("a.head-link").is_visible(), "home, scripts off: the picture of the head is there and links to it")
+        check(pg.locator('.head-link a[href="head/"] img').count() == 1 and pg.locator(".head-link").is_visible(), "home, scripts off: the picture of the head is there and links to it")
+        check(pg.locator('.head-link a[href*="fletcher"]').count() == 1 and "Mann" not in pg.inner_text(".head-link"), "home: the head is offered as a head, with Rich Fletcher named as the inspiration")
         pg.context.close()
 
         print("2. the relay gone: the record and the band carry on")

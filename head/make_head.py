@@ -33,9 +33,11 @@ SKIN_HU = -350.0                # between air and skin
 BONE_HU = 250.0
 GRID_MM = 1.875                 # the surface's grid in the slice plane (4 scanner pixels)
 Z_UP = 1.5                      # surface rows per slice spacing (the scan has a slice every 3 mm): a row every 2 mm
-# Where a Muse rests, as angles round the head from the front (towards the wearer's left) and millimetres below the top.
-# Approximate by construction: the 10-20 names are read off a head's own landmarks, which a script cannot feel for.
-SITES = (("AF7", 34.0, 82.0), ("AF8", -34.0, 82.0), ("TP9", 112.0, 104.0), ("TP10", -112.0, 104.0))
+# Where a Muse rests, as an angle round the head from the front (towards the wearer's left) and millimetres above the
+# bridge of the nose (the nasion, found on the scan as the deepest point of the midline between nose and forehead).
+# The forehead pair sits on the forehead, clear above the eyebrows (the brow ridge of this head is about 10 mm above
+# the nasion); the ear pair rests behind the ears, a little below it. Approximate: a script cannot feel for landmarks.
+SITES = (("AF7", 30.0, 34.0), ("AF8", -30.0, 34.0), ("TP9", 112.0, -12.0), ("TP10", -112.0, -12.0))
 
 
 def load_axial(src):
@@ -179,23 +181,37 @@ def main():
     Image.fromarray(grey).save(os.path.join(HERE, "slices.jpg"), quality=86, optimize=True)
     Image.fromarray(masks).save(os.path.join(HERE, "masks.png"), optimize=True)
 
+    # ---- the bridge of the nose: on the midline, the front of the face slice by slice; the nose tip is furthest
+    # forward, and the nasion is the deepest point in the 50 mm above it
+    cmid = int(round(axis_c))
+    front = np.full(n, -1e9)
+    for k_ in range(n):
+        rows_in = np.nonzero(body[k_, :, cmid - 6:cmid + 7].any(1))[0]
+        if len(rows_in):
+            front[k_] = (axis_r - rows_in.min()) * dy
+    tip = int(np.argmax(front[:n * 2 // 3]))
+    reach_k = int(round(50.0 / dz))
+    nasion_k = tip + 3 + int(np.argmin(front[tip + 3:tip + 3 + reach_k]))
+    print("nose tip at slice %d, nasion at slice %d (%.0f mm below the top)" % (tip, nasion_k, (top - nasion_k) * dz))
+
     # ---- where a Muse's electrodes rest: out from the axis at an angle and a height, to the last point inside the skin
-    def skin_point(angle_deg, below_top_mm):
-        ks = top - below_top_mm / dz
+    def skin_point(angle_deg, above_nasion_mm):
+        ks = nasion_k + above_nasion_mm / dz
         k0 = int(np.clip(round(ks), 0, n - 1))
         a = np.radians(angle_deg)
         d = np.array([np.sin(a), np.cos(a)])                                 # (to the left, to the front) in millimetres
         reach = 0.0
-        for mm in np.arange(20.0, 140.0, 0.5):
-            rr_ = axis_r - d[1] * mm / dy
+        for mm in np.arange(20.0, 140.0, 0.5):                               # out to where the ray first leaves the head:
+            rr_ = axis_r - d[1] * mm / dy                                    # the scalp behind the ear, not the ear beyond it
             cc_ = axis_c + d[0] * mm / dx
-            if 0 <= rr_ < rows - 1 and 0 <= cc_ < cols - 1 and body[k0, int(round(rr_)), int(round(cc_))]:
-                reach = mm
+            if not (0 <= rr_ < rows - 1 and 0 <= cc_ < cols - 1 and body[k0, int(round(rr_)), int(round(cc_))]):
+                break
+            reach = mm
         return [round(float(d[0] * reach), 1), round(float(Y(ks)), 1), round(float(d[1] * reach), 1)], [round(float(d[0]), 3), 0.0, round(float(d[1]), 3)]
 
     sites = []
-    for name, angle, below in SITES:
-        pos, normal = skin_point(angle, below)
+    for name, angle, above in SITES:
+        pos, normal = skin_point(angle, above)
         sites.append({"name": name, "pos": pos, "out": normal})
 
     info = {
@@ -208,7 +224,8 @@ def main():
                    "side_mm": side_mm, "first_y_mm": 0.0, "step_mm": round(dz, 3)},
         "top_y_mm": round(float(Y(top)), 1),
         "electrodes": sites,
-        "electrodes_note": "about where a Muse headband's four electrodes rest, placed by angle round the head and distance below the top, not by feeling for landmarks",
+        "nasion_y_mm": round(float(Y(nasion_k)), 1),
+        "electrodes_note": "about where a Muse headband's four electrodes rest: the forehead pair on the forehead above the eyebrows, the ear pair behind the ears; placed by angle round the head and height above the bridge of the nose as found on the scan",
     }
     with open(os.path.join(HERE, "head.json.tmp"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(info, f, indent=1)
