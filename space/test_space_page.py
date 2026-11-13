@@ -90,7 +90,8 @@ def main():
         url = "http://127.0.0.1:%d/space/" % server.server_address[1]
     with sync_playwright() as p:
         b = p.chromium.launch(channel="chrome", args=["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader",
-                                                      "--autoplay-policy=no-user-gesture-required"])
+                                                      "--autoplay-policy=no-user-gesture-required",
+                                                      "--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable"])   # the site is served over plain http
         for name, size in (("desktop", (1280, 800)), ("phone", (390, 844))):
             pg = b.new_context(viewport={"width": size[0], "height": size[1]}).new_page()
             errors = []
