@@ -170,6 +170,7 @@
     const p = people.get(pseudonym);
     if (!p) return;
     if (p.players) for (const id of [...p.players.keys()]) stopPlayer(p, id);
+    if (p.splat) p.splat.destroy();
     if (gateways.delete(pseudonym)) scheduleBags();
     p.el.remove(); people.delete(pseudonym);
     if (people.size === 0) empty.hidden = false;
@@ -483,6 +484,8 @@
     p.base = m.base;
     if (m.owner) p.name = m.owner;
     p.el.querySelector(".name").textContent = "Cameras";
+    p.el.querySelector(".badge.tier").textContent = "cameras";
+    p.el.querySelector(".camnote").hidden = false;
     let host = m.base; try { host = new URL(m.base).host; } catch {}
     p.el.querySelector(".fact.where").textContent = `served from ${host}`;
     if (p.since) p.el.querySelector(".fact.since").textContent = `gateway on for ${fmtSince(p.since * 1000)}`;
@@ -541,6 +544,33 @@
     p.players.set(id, { el, url });
   }
 
+  // A headset's gateway can also send what the headset's depth sensing sees, as splats: coloured blobs laid down
+  // from depth and the camera's colour (splat-view.js draws them). Unlike a camera's picture these do pass through
+  // the relay, which keeps none of them, and the card says so.
+  function setSplat(p, m) {
+    if (!window.SplatView) return;
+    if (!p.splat) {
+      const blk = document.createElement("div"); blk.className = "splat";
+      blk.innerHTML = `<div class="cam-head"><b>Splat sensor</b><span class="splat-facts"></span></div>
+        <div class="splat-view"></div>
+        <p class="status splat-note">What the headset's depth sensing sees, as coloured blobs laid down from depth and the camera's colour: one for each 2 cm of surface, filling in as the wearer looks around. They are not a trained Gaussian-splat scene. Drag to turn it; click it, then scroll, to zoom. These blobs do pass through the relay, which keeps none of them.</p>`;
+      p.el.querySelector(".camnote").before(blk);
+      p.splat = window.SplatView.create(blk.querySelector(".splat-view"));
+      window.__splat = p.splat;
+      if (!p.cams.size) {
+        // a gateway that sends splats and no pictures: the card is the headset's, and the note about pictures does not apply
+        p.el.querySelector(".name").textContent = p.name || "Headset";
+        p.el.querySelector(".badge.tier").textContent = "splats";
+        p.el.querySelector(".camnote").hidden = true;
+      }
+    }
+    if (m) p.splat.add(m);
+    const n = p.splat.count();
+    p.el.querySelector(".splat-facts").textContent = n
+      ? `${n.toLocaleString()} splats here${m && m.total ? ` · ${m.total.toLocaleString()} held by the headset's computer` : ""}`
+      : "waiting for the first splats";
+  }
+
   function aggregate(a) {
     // the relay served this page with a stamp of its script and stylesheet;
     // when the relay reports a different one, the page has changed: reload
@@ -555,7 +585,7 @@
     switch (msg.t) {
       case "snapshot":
         for (const p of msg.people) {
-          if (p.kind === "camera") { const q = ensureCamera(p); if (p.last?.camera) setCamera(q, p.last.camera); continue; }
+          if (p.kind === "camera") { const q = ensureCamera(p); if (p.last?.camera) setCamera(q, p.last.camera); if (p.last?.splat) setSplat(q, null); continue; }
           const q = ensure(p);
           setProfile(q, p);
           if (p.last?.device) setDevice(q, p.last.device);
@@ -571,6 +601,7 @@
         break;
       case "wearable": setWearable(ensure(msg), msg); break;
       case "camera": setCamera(ensureCamera(msg), msg); break;
+      case "splat": setSplat(ensureCamera(msg), msg); break;
       case "join": case "presence": ensure(msg); break;
       case "profile": setProfile(ensure(msg), msg); break;
       case "device": setDevice(ensure(msg), msg); break;

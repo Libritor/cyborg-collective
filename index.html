@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794522562">
+<link rel="stylesheet" href="style.css?v=1794537684">
 </head>
 <body>
 <div class="masthead">
@@ -29,7 +29,7 @@
 
 <section id="live">
   <h2>Live now</h2>
-  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. Cameras appear here too, when the computer they hang off opens its gateway: the picture comes from that computer to this browser, not through the relay. <span id="link" class="status">connecting…</span></p>
+  <p class="sub">People sharing their headband at this moment, each under a fresh pseudonym and only at the tier they chose: a name, activity and mood if they typed them; the headband model and battery; contact per electrode; band powers per channel; head motion; the gated activation estimate; heart rate and HRV; the optical channels; the raw trace. Cameras appear here too, when the computer they hang off opens its gateway: the picture comes from that computer to this browser, not through the relay. A headset can appear here as well, as a cloud of splats from its depth sensing, drawn in 3-D. <span id="link" class="status">connecting…</span></p>
   <div class="tiles">
     <div class="tile"><b id="n">0</b><span>people sharing now</span></div>
     <div class="tile"><b id="usable">—</b><span>with usable contact</span></div>
@@ -95,13 +95,15 @@
     <li>Live: when fewer than 3 of 4 electrodes are in contact the app sends <i>no claim</i>, and that is what is shown.</li>
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
+    <li>Splats: a headset's card can show what its depth sensing sees as coloured blobs in 3-D. They are laid down straight from depth and the camera's colour, one for each 2 cm of surface; nothing is trained, so this is not an optimised Gaussian-splat scene. Unlike a camera's picture they do pass through the relay on their way to you. The relay keeps none of them; the recording (a ROS 2 bag and a splat file) stays on the computer the headset hangs off.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
     <li>The band's waves: the dots in the brain-wave panel at the top of the page are samples, not decoration, drawn in microvolts against seconds. With nobody live, and while the band is silent, they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
 <script src="video-rtc.js?v=1794024219"></script>
-<script src="app.js?v=1794024219"></script>
+<script src="splat-view.js?v=1794537684"></script>
+<script src="app.js?v=1794537684"></script>
 <script type="module">
 import { mountPlayer } from "./music/player.js?v=1794522562";
 mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
