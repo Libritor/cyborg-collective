@@ -105,6 +105,16 @@ def file_checks():
     mixed = {t: sorted(str(v) for v in vs) for t, vs in tags.items() if len(vs) > 1 and not t.endswith("player.js")}
     check(not mixed, "each module is asked for under one version tag everywhere", mixed)
 
+    # the head is shown as shape and grey: no scanner file and no patient field may ever sit beside it
+    leaked = []
+    for name in sorted(os.listdir(os.path.join(ROOT, "head"))):
+        full = os.path.join(ROOT, "head", name)
+        if os.path.isfile(full) and not name.endswith(".py"):
+            blob = open(full, "rb").read()
+            if b"DICM" in blob[:256] or b"PatientName" in blob or b"PatientBirth" in blob or b"PatientID" in blob:
+                leaked.append(name)
+    check(not leaked, "head/ holds no scanner file and no patient field", leaked)
+
     vend = os.path.join(ROOT, "space", "vendor", "three")
     check(os.path.exists(os.path.join(vend, "LICENSE")) and os.path.getsize(os.path.join(vend, "three.module.min.js")) > 500000,
           "the 3-D library the rooms page uses is kept beside it, with its licence")
@@ -156,6 +166,12 @@ def browser_checks(url, serve):
         for i in range(films.count()):
             r = pg.context.request.get(url + "space/" + films.nth(i).get_attribute("href"), headers={"Range": "bytes=0-1023"})
             check(r.status in (200, 206) and "video/mp4" in r.headers.get("content-type", ""), "rooms: %s is a video file that answers" % films.nth(i).get_attribute("href"), r.status)
+        pg.goto(url + "head/", wait_until="load")
+        check(pg.locator("#plain").is_visible() and pg.locator("#plain img[src='still.png']").count() == 1 and "CT scan" in pg.inner_text("#plain"),
+              "the head, scripts off: its still picture and its words stand in")
+        check(pg.context.request.get(url + "head/still.png").status == 200, "the head: the still picture answers")
+        pg.goto(url, wait_until="load")
+        check(pg.locator('a.head-link[href="head/"] img').count() == 1 and pg.locator("a.head-link").is_visible(), "home, scripts off: the picture of the head is there and links to it")
         pg.context.close()
 
         print("2. the relay gone: the record and the band carry on")
@@ -196,7 +212,7 @@ def browser_checks(url, serve):
         pg.context.close()
 
         print("6. a phone: nothing slides sideways")
-        for path in ("", "record.html", "space/"):
+        for path in ("", "record.html", "space/", "head/"):
             pg, _ = page(width=390, height=844)
             pg.goto(url + path, wait_until="load")
             if path == "":

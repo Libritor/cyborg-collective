@@ -16,7 +16,7 @@ It is made of layers. Each needs only the ones above it in this table, and each 
 | The record | `app.js`, `data/*.json`, `projects.json` | scripts on | the table says it is not loaded; `record.html` still lists every session |
 | Live | the relay (`cyborg-collective-relay.onrender.com`) | the relay being up | the page says it is not connected; the record and the band carry on |
 | The band | `music/` | Web Audio | the menu says the band could not load; everything else carries on |
-| Extras | `splat-view.js`, `video-rtc.js`, the 3-D view in `space/` | WebGL, WebRTC | cards show without a picture; `space/` offers its films as plain links |
+| Extras | `splat-view.js`, `video-rtc.js`, the 3-D views in `space/` and `head/` | WebGL, WebRTC | cards show without a picture; `space/` offers its films as plain links; `head/` shows its still picture |
 
 `test_survives.py` takes the layers away one at a time and checks what is left. It also checks the rules that keep this true: nothing loaded from another site, every file a page asks for present, each module asked for under one version tag, `record.html` in step with the data, `projects.json` in the shape the page reads.
 
@@ -28,13 +28,15 @@ Run these before a push; all of them should pass:
     python test_survives.py               the layers and the rules above
     python music/test_home_page.py        the home page in a browser (serve the folder on 8771 first; the file says how)
     python space/test_space_page.py       the rooms page (needs Chrome, for the films)
+    python head/test_head_page.py         the head page
 
 Give any of the three Python tests `http://6ense.com/` (or `.../space/`) to check what is published.
 
 Where things come from:
 
 - `index.html`, `app.js`, `style.css`, `splat-view.js`, `video-rtc.js`, `mood.*`, `projects.json` and `data/` are published from the MuseLog repository (`collective/site/`) by its `deploy.py`, which also writes `record.html` from the data it has just copied. Change them there, or change both.
-- `music/` and `space/` live only here. `space/runs/<walk>/` is written by `maps_to_web.py` from a reconstruction's depth maps.
+- `music/`, `space/` and `head/` live only here. `space/runs/<walk>/` is written by `maps_to_web.py` from a reconstruction's depth maps.
+- `head/` is Steve Mann's head from his own CT scan, shown with his agreement: a skin surface and a small grey copy of the slices, written by `head/make_head.py` from the scan, which stays on the computer that has it. Nothing from the scan's headers is published; `python head/test_head_page.py --still` re-renders the still pictures from the page.
 - A browser keeps a file for ten minutes. `deploy.py` stamps the addresses in `index.html`; inside `music/`, a module that changes is asked for under the next `?v=` number by every file that imports it.
 
 What the site cannot promise by itself: the relay is one small server, so the live part is only as lasting as that server; and the band and the 3-D view rest on Web Audio and WebGL staying in browsers.

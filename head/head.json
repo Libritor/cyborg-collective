@@ -1,0 +1,93 @@
+{
+ "what": "Steve Mann's head from his own CT scan, shown with his agreement. Shape and grey only: nothing from the scan's headers.",
+ "scan": {
+  "kind": "CT",
+  "slices": 63,
+  "slice_mm": 3.0,
+  "pixel_mm": 0.4688
+ },
+ "frame": "millimetres; x to the wearer's left, y up, z to the front; origin on the head's axis at the lowest slice",
+ "skin": {
+  "file": "skin.bin",
+  "vertices": 51012,
+  "triangles": 102032,
+  "index_bytes": 2,
+  "box_min": [
+   -95.263,
+   -1.0,
+   -112.634
+  ],
+  "box_size": [
+   190.068,
+   182.5,
+   225.231
+  ]
+ },
+ "slices": {
+  "file": "slices.jpg",
+  "masks": "masks.png",
+  "count": 63,
+  "cols": 8,
+  "rows": 8,
+  "cell": 256,
+  "side_mm": 240.0,
+  "first_y_mm": 0.0,
+  "step_mm": 3.0
+ },
+ "top_y_mm": 180.0,
+ "electrodes": [
+  {
+   "name": "AF7",
+   "pos": [
+    52.0,
+    98.0,
+    77.1
+   ],
+   "out": [
+    0.559,
+    0.0,
+    0.829
+   ]
+  },
+  {
+   "name": "AF8",
+   "pos": [
+    -45.6,
+    98.0,
+    67.6
+   ],
+   "out": [
+    -0.559,
+    0.0,
+    0.829
+   ]
+  },
+  {
+   "name": "TP9",
+   "pos": [
+    78.8,
+    76.0,
+    -31.8
+   ],
+   "out": [
+    0.927,
+    0.0,
+    -0.375
+   ]
+  },
+  {
+   "name": "TP10",
+   "pos": [
+    -75.1,
+    76.0,
+    -30.3
+   ],
+   "out": [
+    -0.927,
+    0.0,
+    -0.375
+   ]
+  }
+ ],
+ "electrodes_note": "about where a Muse headband's four electrodes rest, placed by angle round the head and distance below the top, not by feeling for landmarks"
+}

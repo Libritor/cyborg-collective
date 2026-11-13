@@ -77,6 +77,11 @@ canvas.bands, canvas.raw { width: 100%; display: block; margin-top: 8px; }
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 /* shown only where scripts are off: where the lasting parts of the page are */
 main > header.top { padding-top: 28px; }      /* a page whose title sits in its one column (record.html) */
+/* the head that opens: a picture that is a link, as on Rich Fletcher's page */
+.head-link { display: flex; align-items: center; gap: 14px; margin: 12px 0 2px; max-width: 520px; text-decoration: none; color: var(--muted); font-size: 13px; line-height: 1.45; }
+.head-link img { flex: none; width: 132px; height: 132px; }
+.head-link b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 2px; }
+.head-link:hover b, .head-link:focus-visible b { text-decoration: underline; }
 .noscript-note { max-width: 70ch; margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 table.sessions { width: 100%; border-collapse: collapse; font-size: 13px; }
 table.sessions th, table.sessions td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }

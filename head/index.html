@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A window the person opens · Steve Mann's head</title>
+<meta name="description" content="Steve Mann's head from his own CT scan, shown with his agreement: turn it, open it from the top, and see the scan itself on the cut. When someone shares their headband live, the brain in the opening ripples in the colours of their five bands.">
+<style>
+  :root { color-scheme: light dark; --ink: #1a1a19; --muted: #6a6f76; --bg: #f6f3ec; --panel: rgba(255,255,255,0.9); --line: rgba(0,0,0,0.14); }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f0efec; --muted: #b7b4ab; --bg: #15171a; --panel: rgba(24,26,30,0.9); --line: rgba(255,255,255,0.16); } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  #view { position: fixed; top: 0; right: 0; bottom: 0; left: 0; touch-action: none; }
+  #side { position: fixed; left: 16px; top: 16px; bottom: 16px; width: min(400px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 12px; pointer-events: none; }
+  #side > * { pointer-events: auto; background: var(--panel); border-radius: 12px; backdrop-filter: blur(6px); }
+  #panel { padding: 14px 16px 10px; overflow: auto; min-height: 0; flex: 0 1 auto; }
+  #panel h1 { font-size: 18px; margin: 0 0 6px; }
+  #panel p { margin: 6px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  a { color: inherit; }
+  details > summary { cursor: pointer; font-weight: 600; margin: 2px 0 4px; }
+  #open { padding: 10px 14px 12px; margin-top: auto; flex: 0 0 auto; }
+  #open label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); }
+  #open input[type=range] { flex: 1; min-width: 0; accent-color: var(--ink); }
+  #who { margin: 8px 0 0; font-size: 13px; }
+  #who b { font-weight: 600; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .site { position: fixed; left: 0; top: 0; font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--ink); background: var(--panel); padding: 2px 5px; border-radius: 6px;
+          transform: translate(-50%, -160%); pointer-events: none; white-space: nowrap; }
+  #plain { max-width: 62ch; margin: 28px auto; padding: 0 16px; }
+  #plain img { max-width: min(100%, 420px); height: auto; display: block; }
+  @media (min-width: 900px) { #view { left: 432px; } }
+  body.still #side, body.still .site { display: none; }
+  body.still, body.still html { background: transparent; }
+  body.still #view { left: 0; }
+</style>
+<noscript><style>#view, #side, .site { display: none; }</style></noscript>
+</head>
+<body>
+<noscript><div id="plain">
+  <h1>A window the person opens</h1>
+  <img src="still.png" width="640" height="640" alt="Steve Mann's head rendered from his CT scan, the top cut away to show the scan's own slice of the brain inside the skull">
+  <p>This is Steve Mann's head, from his own CT scan, shown with his agreement. With JavaScript on it turns under the cursor and opens from the top, and the cut shows the scan itself at that height. With it off, this picture is the page.</p>
+  <p>What is here of the scan: the skin as one surface, and a small grey copy of its 63 slices. No scanner file, and nothing from the scan's headers (no name, no dates).</p>
+  <p>Part of <a href="../">6ense.com</a> · <a href="../record.html">the record as a plain page</a></p>
+</div></noscript>
+<div id="view"></div>
+<div id="side">
+  <div id="panel">
+    <h1>A window the person opens</h1>
+    <details id="about" open>
+      <summary>Steve Mann's head, from his own CT scan</summary>
+      <p>The skin is as the scanner found it; each fine line round it is one of the scan's 63 slices, three millimetres apart. Drag to turn the head. Pull the slider to open it: what shows on the cut is the scan itself at that height, bone white, the brain's folds and fluid inside.</p>
+      <p>The four dots are about where a Muse headband's electrodes rest. When someone shares their headband live, the dots take the colour of each contact and the brain in the opening ripples in the colours of that person's five bands. When nobody is, the one electrode the band's recorded minute came from keeps time with that minute.</p>
+      <p class="muted">Shown with Prof. Mann's agreement. Here of the scan: the skin as one surface and a small grey copy of the slices; no scanner file, and nothing from the scan's headers (no name, no dates). The idea of a head you can open is Rich Fletcher's, who put his own MRI on <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">his page at MIT</a>.</p>
+      <p class="muted">Part of <a href="../">6ense.com</a> · <a href="../#live">who is sharing now</a> · <a href="../#record">the record</a></p>
+    </details>
+  </div>
+  <div id="open">
+    <label>closed <input type="range" id="cut" min="0" max="1000" value="0" aria-label="How far the head is opened from the top"> open</label>
+    <p id="who" aria-live="polite">loading the head…</p>
+    <div class="legend" id="legend"></div>
+  </div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "../space/vendor/three/three.module.min.js", "three/addons/": "../space/vendor/three/addons/" } }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { BANDS } from "../music/hearing.js?v=3";
+import { decodeCounts, splitBands } from "../music/eegbands.js?v=3";
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+const STILL = params.has("still");              // one fixed picture with nothing round it: how still.png is made
+if (STILL) document.body.classList.add("still");
+const calm = STILL || matchMedia("(prefers-reduced-motion: reduce)").matches;
+const CH = ["TP9", "AF7", "AF8", "TP10"];       // the order the relay sends per-electrode numbers in
+const CONTACT = (v) => (v === 1 ? 0x16a34a : v === 2 ? 0xd97706 : v == null ? 0x9ca3af : 0xdc2626);
+const view = $("view"), who = $("who"), cut = $("cut");
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: STILL });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+renderer.setClearColor(0x000000, 0);
+view.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 10, 4000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false; controls.minDistance = 300; controls.maxDistance = 1100;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x555560, 1.15));
+const key = new THREE.DirectionalLight(0xffffff, 1.5); key.position.set(300, 420, 260); scene.add(key);
+const rim = new THREE.DirectionalLight(0xbcd0ff, 0.5); rim.position.set(-300, 120, -260); scene.add(rim);
+function fit() {
+  const w = Math.max(1, view.clientWidth), h = Math.max(1, view.clientHeight);
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+fit(); new ResizeObserver(fit).observe(view);
+
+// what is kept of the head is everything below this plane (y up, millimetres)
+const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1000);
+const state = { info: null, cutY: 1000, top: 180, low: 36, sites: [], live: null, people: new Map(), record: null, opened: false };
+
+/** The skin: grey, and a fine dark line round it at every slice of the scan. */
+function skinMaterial(side, colour) {
+  const m = new THREE.MeshStandardMaterial({ color: colour, roughness: 0.82, metalness: 0.02, side, clippingPlanes: [plane] });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uSlice = { value: state.info.scan.slice_mm };
+    shader.vertexShader = shader.vertexShader.replace("#include <common>", "#include <common>\nvarying float vUp;").replace("#include <begin_vertex>", "#include <begin_vertex>\nvUp = position.y;");
+    shader.fragmentShader = shader.fragmentShader.replace("#include <common>", "#include <common>\nvarying float vUp;\nuniform float uSlice;")
+      .replace("#include <dithering_fragment>", "float seam = smoothstep(0.40, 0.5, abs(fract(vUp / uSlice) - 0.5));\n gl_FragColor.rgb *= 1.0 - 0.17 * seam;\n#include <dithering_fragment>");
+  };
+  return m;
+}
+
+/** The cut: the scan's own slice at that height, and over the brain's room the ripples of the five bands. */
+const capUniforms = {
+  uSlices: { value: null }, uMasks: { value: null }, uCut: { value: 0 }, uStep: { value: 3 }, uCount: { value: 63 }, uCols: { value: 8 }, uRows: { value: 8 },
+  uSide: { value: 240 }, uTime: { value: 0 }, uLive: { value: 0 }, uBands: { value: [0, 0, 0, 0, 0] },
+  uColours: { value: BANDS.map((b) => new THREE.Color(b.color)) },
+};
+const capMaterial = new THREE.ShaderMaterial({
+  uniforms: capUniforms, side: THREE.DoubleSide,
+  // vAt: where this point of the cut is in the head's own millimetres (x to the left, z to the front)
+  vertexShader: "varying vec2 vAt; void main() { vec4 w = modelMatrix * vec4(position, 1.0); vAt = w.xz; gl_Position = projectionMatrix * viewMatrix * w; }",
+  fragmentShader: `
+    precision highp float;
+    varying vec2 vAt;
+    uniform sampler2D uSlices, uMasks; uniform float uCut, uStep, uCount, uCols, uRows, uSide, uTime, uLive; uniform float uBands[5]; uniform vec3 uColours[5];
+    vec2 cell(float s, vec2 at) {                       // where slice s keeps the point at (x to the left, z to the front), in the sheet
+      float col = mod(s, uCols), row = floor(s / uCols);
+      vec2 inCell = vec2(at.x / uSide + 0.5, 0.5 - at.y / uSide);            // left of a cell = the wearer's right; top = the front
+      inCell = clamp(inCell, 0.002, 0.998);
+      return vec2((col + inCell.x) / uCols, 1.0 - (row + inCell.y) / uRows);
+    }
+    void main() {
+      float f = clamp(uCut / uStep, 0.0, uCount - 1.0), s0 = floor(f), s1 = min(s0 + 1.0, uCount - 1.0), t = f - s0;
+      vec2 a = cell(s0, vAt), b = cell(s1, vAt);
+      float grey = mix(texture2D(uSlices, a).r, texture2D(uSlices, b).r, t);
+      vec2 m = mix(texture2D(uMasks, a).rg, texture2D(uMasks, b).rg, t);
+      if (m.r < 0.5) discard;                                                // outside the head
+      vec3 colour = vec3(grey) * vec3(1.0, 0.985, 0.955);
+      float brain = smoothstep(0.45, 0.6, m.g);
+      float r = length(vAt / vec2(70.0, 86.0));                              // 0 at the head's axis, about 1 at the skull
+      vec3 glow = vec3(0.0);
+      for (int i = 0; i < 5; i++) {                                          // slow wide ripples for delta ... fast fine ones for gamma
+        float fi = float(i);
+        float wave = 0.5 + 0.5 * sin(6.2832 * (r * (2.0 + 2.6 * fi) - uTime * (0.22 + 0.34 * fi)) + fi * 1.7);
+        glow += uColours[i] * uBands[i] * wave * wave;
+      }
+      colour = mix(colour, colour * 0.55 + glow * 1.55, brain * uLive);      // the folds stay visible under the ripples
+      gl_FragColor = vec4(colour, 1.0);
+    }`,
+});
+const cap = new THREE.Mesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), capMaterial);
+cap.visible = false; scene.add(cap);
+
+const head = new THREE.Group(); scene.add(head);
+const dots = new THREE.Group(); scene.add(dots);
+
+async function load() {
+  const info = state.info = await (await fetch("head.json")).json();
+  const raw = await (await fetch(info.skin.file)).arrayBuffer();
+  const [nv, nt] = new Uint32Array(raw, 0, 2);
+  const q = new Uint16Array(raw, 8, nv * 3);
+  const pos = new Float32Array(nv * 3);
+  for (let i = 0; i < nv * 3; i += 1) pos[i] = info.skin.box_min[i % 3] + (q[i] / 65535) * info.skin.box_size[i % 3];
+  const at = 8 + nv * 6;
+  const index = info.skin.index_bytes === 2 ? new Uint16Array(raw, at, nt * 3) : new Uint32Array(raw.slice(at), 0, nt * 3);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(index, 1));
+  geo.computeVertexNormals();
+  head.add(new THREE.Mesh(geo, skinMaterial(THREE.FrontSide, 0xd6d1c8)));
+  head.add(new THREE.Mesh(geo, skinMaterial(THREE.BackSide, 0x4a4541)));       // the inside of the skin, seen through the scan's air spaces
+  state.top = info.top_y_mm + 4; state.low = 36;
+
+  const tex = (url) => new Promise((done, fail) => new THREE.TextureLoader().load(url, (t) => { t.minFilter = t.magFilter = THREE.LinearFilter; t.generateMipmaps = false; done(t); }, undefined, fail));
+  const [slices, masks] = await Promise.all([tex(info.slices.file), tex(info.slices.masks)]);
+  capUniforms.uSlices.value = slices; capUniforms.uMasks.value = masks;
+  capUniforms.uStep.value = info.slices.step_mm; capUniforms.uCount.value = info.slices.count; capUniforms.uCols.value = info.slices.cols;
+  capUniforms.uRows.value = info.slices.rows; capUniforms.uSide.value = info.slices.side_mm;
+  cap.scale.set(info.slices.side_mm, 1, info.slices.side_mm); cap.visible = true;
+
+  for (const e of info.electrodes) {
+    const out = new THREE.Vector3(...e.out), p = new THREE.Vector3(...e.pos).addScaledVector(out, 2.5);
+    const dot = new THREE.Mesh(new THREE.SphereGeometry(4.2, 20, 14), new THREE.MeshBasicMaterial({ color: CONTACT(null) }));
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(4.2, 20, 14), new THREE.MeshBasicMaterial({ color: CONTACT(null), transparent: true, opacity: 0.25, depthWrite: false }));
+    dot.position.copy(p); halo.position.copy(p);
+    dots.add(dot, halo);
+    const label = document.createElement("span"); label.className = "site"; label.textContent = e.name; document.body.appendChild(label);
+    state.sites.push({ name: e.name, pos: p, out, dot, halo, label, pulse: 0 });
+  }
+  $("legend").innerHTML = BANDS.map((b) => `<span><i style="background:${b.color}"></i>${b.key}</span>`).join("");
+
+  // looked at as Fletcher's is: from the front and a little above, the face turned to the left of the picture
+  const back = Math.max(1, 0.92 / camera.aspect);              // further off in a tall, narrow window, so the whole head is in it
+  controls.target.set(0, info.top_y_mm * 0.5, 0);
+  camera.position.set(430 * back, info.top_y_mm * 0.5 + 215 * back, 345 * back);
+  controls.maxDistance = 1100 * back;
+  controls.update();
+  cut.oninput = () => { state.opened = true; setCut(Number(cut.value) / 1000); };
+  const start = STILL ? 0.3 : 0.27;
+  if (calm) { cut.value = String(start * 1000); setCut(start); state.opened = true; } else openTo(start);
+  listen(); loadRecord();
+  window.__head.ready = true;
+}
+
+/** 0 = closed (the cut above the head), 1 = opened as far as it goes. */
+function setCut(amount) {
+  state.cutY = state.top - amount * (state.top - state.low);
+  plane.constant = state.cutY;
+  cap.position.y = state.cutY;
+  capUniforms.uCut.value = state.cutY;
+}
+function openTo(amount) {                         // the head opens by itself once, as the page arrives
+  const t0 = performance.now();
+  (function step() {
+    if (state.opened) return;
+    const k = Math.min(1, (performance.now() - t0 - 500) / 1600);
+    if (k > 0) { const a = amount * (1 - Math.pow(1 - k, 3)); cut.value = String(a * 1000); setCut(a); }
+    if (k < 1) requestAnimationFrame(step); else state.opened = true;
+  })();
+}
+
+// ---------------------------------------------------------------- who is sharing: the relay, as the home page hears it
+function shownPerson() {
+  let best = null;
+  for (const p of state.people.values()) if (p.bands && (!best || p.at > best.at)) best = p;
+  return best;
+}
+function handle(msg) {
+  const person = (m) => { let p = state.people.get(m.pseudonym); if (!p) { p = { pseudonym: m.pseudonym, name: "", at: 0 }; state.people.set(m.pseudonym, p); } if (m.name) p.name = m.name; return p; };
+  switch (msg.t) {
+    case "snapshot":
+      for (const q of msg.people || []) {
+        if (q.kind === "camera") continue;
+        const p = person(q);
+        if (q.last && q.last.bands) { p.bands = q.last.bands; p.at = Date.now(); }
+        if (q.last && q.last.quality) p.hsi = q.last.quality.hsi || null;
+      }
+      break;
+    case "join": case "presence": case "profile": if (msg.pseudonym && msg.kind !== "camera") person(msg); break;
+    case "bands": { const p = person(msg); p.bands = msg; p.at = Date.now(); break; }
+    case "quality": person(msg).hsi = msg.hsi || null; break;
+    case "leave": state.people.delete(msg.pseudonym); break;
+    default: return;
+  }
+  describe();
+}
+function listen() {
+  if (STILL) return;
+  let url = "wss://cyborg-collective-relay.onrender.com/live";
+  const asked = params.get("relay");
+  if (asked && /^wss?:\/\//.test(asked)) url = asked;
+  let ws;
+  const connect = () => {
+    try { ws = new WebSocket(url); } catch { return; }
+    ws.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch { /* a message this page does not read */ } };
+    ws.onclose = () => { state.people.clear(); describe(); setTimeout(connect, 4000); };
+    ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
+  };
+  connect();
+}
+
+// ---------------------------------------------------------------- nobody sharing: the minute the band's piece is drawn from
+async function loadRecord() {
+  if (STILL) return;
+  try {
+    const index = await (await fetch("../music/eeg/index.json", { cache: "no-store" })).json();
+    const entry = (index.sessions || []).slice().sort((a, b) => String(b.recorded).localeCompare(String(a.recorded)))[0];
+    if (!entry) return;
+    const buffer = await (await fetch("../music/eeg/" + entry.file)).arrayBuffer();
+    const bands = splitBands(decodeCounts(buffer, entry.uv_per_count), entry.fs);
+    const hop = Math.round(entry.fs / 4), n = Math.floor((entry.samples - 2 * entry.lead) / hop);
+    const rms = BANDS.map((b) => { const x = bands[b.key], out = new Float32Array(n);
+      for (let k = 0; k < n; k += 1) { let s = 0; for (let i = 0; i < hop; i += 1) { const v = x[entry.lead + k * hop + i]; s += v * v; } out[k] = Math.sqrt(s / hop); } return out; });
+    state.record = { entry, rms, n, hopS: hop / entry.fs };
+    describe();
+  } catch { /* no stored minute: the head simply rests */ }
+}
+function recordShares(t) {
+  const r = state.record, k = Math.floor((t / r.hopS) % r.n);
+  const v = r.rms.map((x) => x[k]), sum = v.reduce((a, c) => a + c, 0) || 1;
+  return v.map((x) => x / sum);
+}
+
+function describe() {
+  const p = shownPerson();
+  who.textContent = "";
+  if (p) {
+    const b = document.createElement("b"); b.textContent = p.name || "someone";
+    who.append(b, " is sharing live: the dots are their headband's contacts and the ripples their five bands, drawn on this head.");
+  } else if (state.record) {
+    const d = new Date(state.record.entry.recorded);
+    who.append("Nobody is sharing right now. The ripples are the band's recorded minute (" + (isNaN(d) ? "" : d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) + ", ")
+      + "another head's " + state.record.entry.electrode + "), lent to this one.");
+  } else {
+    who.append("Nobody is sharing right now.");
+  }
+}
+
+const mean = (a) => { const v = (a || []).filter((x) => typeof x === "number" && Number.isFinite(x)); return v.length ? v.reduce((s, x) => s + x, 0) / v.length : 0; };
+const tmp = new THREE.Vector3();
+function frame(ms) {
+  const t = ms / 1000;
+  const p = shownPerson();
+  let shares = [0, 0, 0, 0, 0], live = 0;
+  if (p) {
+    shares = BANDS.map((b) => mean(p.bands.rel && p.bands.rel[b.key]));
+    const sum = shares.reduce((a, c) => a + c, 0) || 1; shares = shares.map((x) => x / sum); live = 1;
+  } else if (state.record) { shares = recordShares(t); live = 0.8; }
+  capUniforms.uBands.value = shares; capUniforms.uLive.value = live; capUniforms.uTime.value = calm ? 0 : t;
+  for (const [i, s] of state.sites.entries()) {
+    const ch = CH.indexOf(s.name);
+    let colour = CONTACT(null), pulse = 0;
+    if (p) {
+      colour = CONTACT(p.hsi ? p.hsi[s.name] : undefined);
+      const alpha = p.bands.rel && p.bands.rel.alpha ? p.bands.rel.alpha[ch] : null;
+      pulse = typeof alpha === "number" ? Math.min(1, alpha * 2.2) : 0;
+    } else if (state.record && state.record.entry.electrode === s.name) { colour = 0x16a34a; pulse = Math.min(1, shares[2] * 2.2); }
+    s.pulse += (pulse - s.pulse) * 0.15;
+    s.dot.material.color.setHex(colour); s.halo.material.color.setHex(colour);
+    const beat = calm ? 1 : 1 + 0.25 * Math.sin(t * 6.0 + i);
+    s.halo.scale.setScalar(1.25 + 2.4 * s.pulse * beat);
+    const shown = s.pos.y < state.cutY - 2;
+    s.dot.visible = s.halo.visible = shown;
+    tmp.copy(s.pos).project(camera);
+    const facing = tmp.copy(camera.position).sub(s.pos).normalize().dot(s.out) > -0.05;
+    tmp.copy(s.pos).project(camera);
+    const r = renderer.domElement.getBoundingClientRect();
+    s.label.style.display = shown && facing && !STILL ? "" : "none";
+    s.label.style.transform = `translate(${r.left + (tmp.x * 0.5 + 0.5) * r.width}px, ${r.top + (-tmp.y * 0.5 + 0.5) * r.height}px) translate(-50%, -160%)`;
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+
+// for the page's test and for making still.png: feed a relay message by hand, set the cut, read the drawing back
+function png() { renderer.render(scene, camera); return renderer.domElement.toDataURL("image/png"); }
+function coverage() {                       // how much of the view the head covers, and how light it is, read straight after a render
+  renderer.render(scene, camera);
+  const small = document.createElement("canvas"); small.width = small.height = 96;
+  const g = small.getContext("2d"); g.drawImage(renderer.domElement, 0, 0, 96, 96);
+  const d = g.getImageData(0, 0, 96, 96).data; let n = 0, sum = 0;
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 40) { n += 1; sum += d[i] + d[i + 1] + d[i + 2]; }
+  return { covered: n / 9216, mean: n ? sum / n / 3 : 0 };
+}
+window.__head = { state, ready: false, feed: handle, setCut: (a) => { state.opened = true; cut.value = String(a * 1000); setCut(a); }, png, coverage };
+if (innerWidth < 900) $("about").open = false;
+load().then(() => requestAnimationFrame(frame)).catch((e) => { who.textContent = "The head could not be loaded (" + e.message + ")."; });
+</script>
+</body>
+</html>
