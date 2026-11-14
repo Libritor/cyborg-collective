@@ -30,7 +30,7 @@
   #plain { max-width: 62ch; margin: 28px auto; padding: 0 16px; }
   #plain img { max-width: min(100%, 420px); height: auto; display: block; }
   @media (min-width: 900px) { #view { left: 432px; } }
-  body.still #side, body.still .site { display: none; }
+  body.still #side, body.still:not(.embed) .site { display: none; }      /* a frame keeps the electrodes' names; the pictures made from ?still do not carry them (they are drawn, not written) */
   body.still, body.still html { background: transparent; }
   body.still #view { left: 0; }
   /* ?embed=1, in a frame on the home page: only the head, nothing behind it, grabbed to turn; a finger moving up or
@@ -411,7 +411,7 @@ function frame(ms) {
     const facing = tmp.copy(camera.position).sub(s.pos).normalize().dot(s.out) > -0.05;
     tmp.copy(s.pos).project(camera);
     const r = renderer.domElement.getBoundingClientRect();
-    s.label.style.display = shown && facing && !BARE ? "" : "none";
+    s.label.style.display = shown && facing && !STILL ? "" : "none";
     s.label.style.transform = `translate(${r.left + (tmp.x * 0.5 + 0.5) * r.width}px, ${r.top + (-tmp.y * 0.5 + 0.5) * r.height}px) translate(-50%, -160%)`;
   }
   controls.update();
@@ -431,7 +431,18 @@ function coverage() {                       // how much of the view the head cov
 }
 function look(x, y, z) { camera.position.set(x, y, z); controls.update(); }      // stand somewhere else, for pictures of where the dots sit
 const where = () => ({ azimuth: controls.getAzimuthalAngle(), polar: controls.getPolarAngle(), distance: controls.getDistance(), cut: state.cutY });   // which way it is turned
-window.__head = { state, ready: false, embed: EMBED, drawn: 0, feed: handle, setCut: (a) => { state.opened = true; cut.value = String(a * 1000); setCut(a); }, png, coverage, look, where };
+// Where each electrode's name stands in the view (0 to 1 from the left and from the top), whether its dot faces the
+// camera, and how far the head can be opened before the cut takes the dot away: for the home page, which writes
+// the same names over the still picture.
+function sites() {
+  renderer.render(scene, camera);
+  return state.sites.map((s) => {
+    const at = s.pos.clone().project(camera);
+    return { name: s.name, x: at.x * 0.5 + 0.5, y: -at.y * 0.5 + 0.5, facing: camera.position.clone().sub(s.pos).normalize().dot(s.out) > -0.05,
+      hideAt: (state.top - s.pos.y - 2) / (state.top - state.low), labelled: s.label.style.display !== "none" };
+  });
+}
+window.__head = { state, ready: false, embed: EMBED, drawn: 0, sites, feed: handle, setCut: (a) => { state.opened = true; cut.value = String(a * 1000); setCut(a); }, png, coverage, look, where };
 if (innerWidth < 900) $("about").open = false;
 load().then(() => { requestAnimationFrame(frame); toParent("ready"); })
   .catch((e) => { who.textContent = "The head could not be loaded (" + e.message + ")."; toParent("failed"); });

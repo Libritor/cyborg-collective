@@ -148,8 +148,11 @@ def main():
           labels: [...document.querySelectorAll('.site')].filter((n) => n.getClientRects().length).length,
           touch: getComputedStyle(document.querySelector('canvas')).touchAction, behind: getComputedStyle(document.documentElement).backgroundColor,
           record: !!window.__head.state.record, where: window.__head.where(), png: window.__head.png() })""")
-        check(e["embed"] and e["side"] == "none" and e["labels"] == 0 and not sockets and not e["record"] and not errors,
-              "in a frame: the head and nothing else (no words, no labels, no relay, no recorded minute, no error)", (e["side"], e["labels"], sockets, errors[:1]))
+        check(e["embed"] and e["side"] == "none" and not sockets and not e["record"] and not errors,
+              "in a frame: the head and nothing round it (no words, no relay, no recorded minute, no error)", (e["side"], sockets, errors[:1]))
+        named = pg.evaluate("() => ({ sites: window.__head.sites(), seen: [...document.querySelectorAll('.site')].filter((n) => n.getClientRects().length).map((n) => n.textContent).sort() })")
+        facing = sorted(x["name"] for x in named["sites"] if x["facing"])
+        check(len(facing) >= 2 and named["seen"] == facing and e["labels"] == len(facing), "in a frame: each electrode that faces the viewer carries its name (%s)" % ", ".join(named["seen"]), named["seen"])
         check(e["behind"] == "rgba(0, 0, 0, 0)" and e["touch"] == "pan-y", "in a frame: the page behind shows through, and a finger moving up or down is left to that page", (e["behind"], e["touch"]))
         mine = Image.open(io.BytesIO(base64.b64decode(e["png"].split(",", 1)[1]))).convert("RGBA").resize((160, 160), Image.LANCZOS)
         theirs = Image.open(os.path.join(HERE, "still.png")).convert("RGBA").resize((160, 160), Image.LANCZOS)
@@ -160,6 +163,9 @@ def main():
         check(abs(pg.evaluate("() => window.__head.where().distance") - e["where"]["distance"]) < 0.01, "in a frame: a mouse wheel does not zoom it")
         pg.mouse.move(150, 150); pg.mouse.down(); pg.mouse.move(210, 150, steps=6); pg.mouse.up(); pg.wait_for_timeout(600)
         check(abs(pg.evaluate("() => window.__head.where().azimuth") - e["where"]["azimuth"]) > 0.4, "in a frame: a drag turns it")
+        after = pg.evaluate("() => [...document.querySelectorAll('.site')].filter((n) => n.getClientRects().length).map((n) => n.textContent + '@' + Math.round(n.getBoundingClientRect().left))")
+        before = ["%s@%d" % (x["name"], round(x["x"] * 300)) for x in named["sites"] if x["facing"]]
+        check(sorted(after) != sorted(before) and len(after) >= 2, "in a frame: the names go round with their electrodes", (before, after))
         pg.context.close()
 
         if still:                                       # the page's own drawing, as pictures with nothing behind them
@@ -195,12 +201,22 @@ def main():
             # where that square lies in the view the pictures were drawn in (in the view's own pixels): the head in a
             # frame on the home page (?embed=1) shows the same square, so it takes the picture's place without a jump
             dpr = shots_[0].width / 640
+            sq = [round((x0 - (side - (x1 - x0)) // 2) / dpr, 2), round((y0 - (side - (y1 - y0)) // 2) / dpr, 2), round(side / dpr, 2)]
+            # where the electrodes' names stand in that square, in per cent from its left and its top: the home page
+            # writes them over the still picture, and takes each away where the slider's cut takes its dot away
+            found = pg.evaluate("a => { window.__head.setCut(a); return window.__head.sites(); }", STILL_FRAME / (FRAMES - 1))
+            sites = [{"name": e["name"], "left": round(100 * (e["x"] * 640 - sq[0]) / sq[2], 1), "top": round(100 * (e["y"] * 640 - sq[1]) / sq[2], 1),
+                      "facing": bool(e["facing"]), "hide_at": round(e["hideAt"], 3)} for e in found]
             with open(os.path.join(HERE, "picture.json"), "w", encoding="utf-8", newline="\n") as f:
                 json.dump({"note": "The window the still picture (still.png) and the slider's pictures (open.webp) have onto the head: a square, "
-                                   "given as left, top and side, of a view this many pixels wide and high. Written with them by test_head_page.py --still.",
-                           "view": [640, 640],
-                           "square": [round((x0 - (side - (x1 - x0)) // 2) / dpr, 2), round((y0 - (side - (y1 - y0)) // 2) / dpr, 2), round(side / dpr, 2)]}, f, indent=1)
+                                   "given as left, top and side, of a view this many pixels wide and high; and where each electrode's name stands in "
+                                   "that square (per cent from its left and top), whether its dot faces the viewer, and how far the slider goes "
+                                   "(0 to 1) before the cut takes the dot away. Written with the pictures by test_head_page.py --still.",
+                           "view": [640, 640], "square": sq, "sites": sites}, f, indent=1)
                 f.write("\n")
+            print("the home page's names for the electrodes (index.html, inside a.head-pic):")
+            print("".join('<span class="head-site" aria-hidden="true" data-hide-at="%s" style="left:%s%%;top:%s%%">%s</span>' % (e["hide_at"], e["left"], e["top"], e["name"])
+                          for e in sites if e["facing"]))
             for name in ("still.png", "open.webp", "picture.json"):
                 print("%s rewritten: %d KB" % (name, os.path.getsize(os.path.join(HERE, name)) // 1024))
             pg.context.close()

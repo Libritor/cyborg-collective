@@ -126,6 +126,13 @@ def file_checks():
         sheet_ok = w % cols == 0 and h % cell == 0 and (h // cell) * cols >= frames > (h // cell - 1) * cols
     check(sheet_ok, "the head's sheet of pictures holds the number of pictures the home page's slider steps through", m.groups() if m else "no sheet named")
 
+    # the electrodes' names over the home page's picture stand where the picture's own record says its dots are
+    wrote = sorted((name, float(left), float(top), float(hide)) for hide, left, top, name in
+                   re.findall(r'<span class="head-site"[^>]*data-hide-at="([\d.]+)" style="left:([\d.]+)%;top:([\d.]+)%">([A-Z0-9]+)</span>', read("index.html")))
+    drawn = sorted((e["name"], e["left"], e["top"], e["hide_at"]) for e in json.loads(read("head/picture.json")).get("sites", []) if e["facing"])
+    check(len(wrote) >= 2 and wrote == drawn, "the home page names the electrodes its picture shows (%s), each where its dot is" % ", ".join(w[0] for w in wrote),
+          "page %s, picture %s: run head/test_head_page.py --still and copy the line it prints into index.html" % (wrote, drawn))
+
     vend = os.path.join(ROOT, "space", "vendor", "three")
     check(os.path.exists(os.path.join(vend, "LICENSE")) and os.path.getsize(os.path.join(vend, "three.module.min.js")) > 500000,
           "the 3-D library the rooms page uses is kept beside it, with its licence")
@@ -185,6 +192,11 @@ def browser_checks(url, serve):
         check(pg.locator('.head-link a[href="head/"] img').count() == 1 and pg.locator(".head-link").is_visible(), "home, scripts off: the picture of the head is there and links to it")
         check(pg.locator('.head-link a[href*="fletcher"]').count() == 1 and "Mann" not in pg.inner_text(".head-link"), "home: the head is offered as a head, with Rich Fletcher named as the inspiration")
         check(pg.locator(".head-slider:visible").count() == 0 and pg.locator(".head-link img:visible").count() == 1, "home, scripts off: no slider that could not move anything; the still picture stands")
+        names = pg.evaluate("""() => { const pic = document.querySelector('.head-pic').getBoundingClientRect();
+          return [...document.querySelectorAll('.head-site')].filter((n) => n.getClientRects().length).map((n) => { const r = n.getBoundingClientRect();
+            return { name: n.textContent, inside: r.left >= pic.left - 1 && r.right <= pic.right + 1 && r.top >= pic.top - 1 && r.bottom <= pic.bottom + 1 }; }); }""")
+        check(sorted(n["name"] for n in names) == ["AF7", "AF8", "TP9"] and all(n["inside"] for n in names),
+              "home, scripts off: the electrodes the picture shows carry their names, inside the picture", names)
         pg.context.close()
 
         print("2. the relay gone: the record and the band carry on")
@@ -235,6 +247,14 @@ def browser_checks(url, serve):
           return { same: Math.abs(f.left - i.left) < 1 && Math.abs(f.top - i.top) < 1 && Math.abs(f.width - i.width) < 1 && Math.abs(f.height - i.height) < 1,
             still: getComputedStyle(box.querySelector('img')).visibility, ink: document.querySelector('.head-live').contentWindow.__head.coverage() }; }""")
         check(lay["same"] and lay["still"] == "hidden" and lay["ink"]["covered"] > 0.3, "the head itself stands exactly where its picture stood (drawn over %.0f %% of the frame)" % (100 * lay["ink"]["covered"]), lay)
+        named = pg.evaluate("""() => { const f = document.querySelector('.head-live'), at = f.getBoundingClientRect();
+          const mine = [...document.querySelectorAll('.head-site')].map((n) => { const r = n.getBoundingClientRect(); return { name: n.textContent, x: r.left + r.width / 2, y: r.top, seen: getComputedStyle(n).visibility !== 'hidden' }; });
+          const its = [...f.contentDocument.querySelectorAll('.site')].filter((n) => n.getClientRects().length).map((n) => { const r = n.getBoundingClientRect(); return { name: n.textContent, x: at.left + r.left + r.width / 2, y: at.top + r.top }; });
+          return { mine, its }; }""")
+        apart = [abs(a["x"] - b["x"]) + abs(a["y"] - b["y"]) for a in named["mine"] for b in named["its"] if a["name"] == b["name"]]
+        check(sorted(n["name"] for n in named["its"]) == ["AF7", "AF8", "TP9"] and not any(n["seen"] for n in named["mine"]),
+              "the head in its frame names its electrodes itself (AF7, AF8, TP9; TP10 is round the back), and the picture's names make way", named)
+        check(len(apart) == 3 and max(apart) < 3, "and each name stands where the picture's name stood (within %.1f px)" % max(apart or [99]), apart)
         w0 = pg.evaluate(where)
         box = pg.locator(".head-live").bounding_box()
         cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
@@ -310,6 +330,11 @@ def browser_checks(url, serve):
             pg.locator("#head-cut").fill(value)
             seen.append(at())
         check(len(set(seen)) == 4 and seen[0] == "0% 0%" and seen[3] == "100% 100%", "the slider steps through the pictures, closed first and fully open last", seen)
+        shown = {}
+        for value in ("6", "13", "20"):
+            pg.locator("#head-cut").fill(value)
+            shown[value] = sorted(pg.evaluate("() => [...document.querySelectorAll('.head-site')].filter((n) => n.getClientRects().length).map((n) => n.textContent)"))
+        check(shown == {"6": ["AF7", "AF8", "TP9"], "13": ["TP9"], "20": []}, "a name goes when the cut takes its electrode's dot away: forehead first, then the ear", shown)
         check(pg.evaluate("() => getComputedStyle(document.querySelector('.head-link img')).visibility") == "hidden" and pg.locator(".head-frames").is_visible(),
               "while it slides, the sheet's picture stands where the still was")
         check(not errors, "the slider: no script error", errors[:2])

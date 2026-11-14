@@ -1,5 +1,5 @@
 {
- "note": "The window the still picture (still.png) and the slider's pictures (open.webp) have onto the head: a square, given as left, top and side, of a view this many pixels wide and high. Written with them by test_head_page.py --still.",
+ "note": "The window the still picture (still.png) and the slider's pictures (open.webp) have onto the head: a square, given as left, top and side, of a view this many pixels wide and high; and where each electrode's name stands in that square (per cent from its left and top), whether its dot faces the viewer, and how far the slider goes (0 to 1) before the cut takes the dot away. Written with the pictures by test_head_page.py --still.",
  "view": [
   640,
   640
@@ -8,5 +8,35 @@
   112.5,
   129.0,
   431.0
+ ],
+ "sites": [
+  {
+   "name": "AF7",
+   "left": 28.6,
+   "top": 51.2,
+   "facing": true,
+   "hide_at": 0.493
+  },
+  {
+   "name": "AF8",
+   "left": 9.4,
+   "top": 42.2,
+   "facing": true,
+   "hide_at": 0.493
+  },
+  {
+   "name": "TP9",
+   "left": 87.2,
+   "top": 57.3,
+   "facing": true,
+   "hide_at": 0.743
+  },
+  {
+   "name": "TP10",
+   "left": 41.0,
+   "top": 39.1,
+   "facing": false,
+   "hide_at": 0.743
+  }
  ]
 }
