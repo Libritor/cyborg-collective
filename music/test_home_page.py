@@ -89,6 +89,11 @@ PHONE_STATE = """() => {
     session: navigator.audioSession ? navigator.audioSession.type : null, apple: a.apple, loop: a.loop, media: m.length,
     looping: el ? el.loop : null, paused: el ? el.paused : null, inPage: el ? document.contains(el) : null, rate,
     status: document.getElementById('listen-status').textContent }; }"""
+OVER_HEAD = """() => {
+  const note = document.getElementById('listen-note'), stage = document.querySelector('.head-stage');
+  const a = note.getBoundingClientRect(), b = stage.getBoundingClientRect();
+  return { hidden: note.hidden, floating: note.classList.contains('floating'), headInView: b.top < innerHeight && b.bottom > 0,
+    over: !note.hidden && a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top }; }"""
 STATE = """() => {
   const note = document.getElementById('listen-note');
   const r = note ? note.getBoundingClientRect() : null;
@@ -541,12 +546,18 @@ with sync_playwright() as p:
     s = page.evaluate(PHONE_STATE)
     check(s["apple"] and not s["playing"] and s["session"] == "auto" and s["media"] == 0 and s["loop"] == "none",
           "on arrival, untouched: nothing is set and nothing is made", json.dumps(s))
-    box = page.locator("#swim").bounding_box()
+    box = page.locator("p.tag").bounding_box()                   # the line under the title: plain words, at the top of the page
     page.touchscreen.tap(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
     page.wait_for_function("() => window.__player.playing", timeout=8000)
     page.wait_for_timeout(1200)
     s = page.evaluate(PHONE_STATE)
-    check(s["playing"] and s["ctx"] == "running", "one tap of a finger on the panel brings the band", json.dumps(s))
+    check(s["playing"] and s["ctx"] == "running", "one tap of a finger on the words at the top brings the band", json.dumps(s))
+    o = page.evaluate(OVER_HEAD)
+    check(o["headInView"] and o["floating"] and o["over"], "at the top of a phone's page the pinned note lands on the head's picture", json.dumps(o))
+    page.wait_for_timeout(9500)
+    o = page.evaluate(OVER_HEAD)
+    check(o["headInView"] and not o["hidden"] and not o["floating"] and not o["over"] and page.evaluate("() => window.__player.playing"),
+          "after a few seconds there it steps aside to its place under the menu: the head is in the clear and the band plays on", json.dumps(o))
     check(s["session"] == "playback", "the tap set the audio session to playback", json.dumps(s))
     check(s["media"] == 1 and s["loop"] == "playing" and s["looping"] and not s["paused"] and not s["inPage"],
           "and started one silent loop beside the band, which is not put on the page", json.dumps(s))

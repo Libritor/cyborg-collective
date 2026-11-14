@@ -334,6 +334,22 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
       note.classList.toggle("floating", !box || box.bottom < 0 || box.top > window.innerHeight);
     }
     note.hidden = false;
+    stepAside();
+  }
+
+  // On a phone the pinned note lands on the head's picture, which is in the first screenful there. Where it does,
+  // it says its piece for a few seconds and then goes to its place under the menu, beside the button and the line
+  // that says what is playing. Looked at again on every bar, so a note the head scrolls under steps aside as well.
+  const NOTE_OVER_HEAD_MS = 9000;
+  let aside = null;
+  function stepAside() {
+    if (aside || !note || note.hidden || !note.classList.contains("floating")) return;
+    const stage = document.querySelector(".head-stage");
+    if (!stage) return;
+    const a = note.getBoundingClientRect();
+    const b = stage.getBoundingClientRect();
+    if (!(a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top)) return;
+    aside = setTimeout(() => { aside = null; note.classList.remove("floating"); }, NOTE_OVER_HEAD_MS);
   }
 
   function describe() {
@@ -385,6 +401,7 @@ export async function mountPlayer({ button, status, mark = null, note = null, pa
     stopSilent();
     audible.rest();
     waves.stop();
+    if (aside) { clearTimeout(aside); aside = null; }
     if (note) note.hidden = true;
     if (chains) chains.hidden = true;
     chainView.clear();
