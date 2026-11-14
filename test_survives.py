@@ -224,8 +224,83 @@ def browser_checks(url, serve):
         check("A window the person opens" in pg.inner_text("body") and not errors, "catalogue gone: the words are there, the table says it is not loaded, no script error", errors[:2])
         pg.context.close()
 
-        print("6. the head's slider on the home page")
+        print("6. the head on the home page: it turns, it opens, and the pictures stand in where it cannot be drawn")
+        turning = "() => document.querySelector('.head-link').classList.contains('turning')"
+        where = "() => { const h = document.querySelector('.head-live').contentWindow.__head; return Object.assign(h.where(), { drawn: h.drawn }); }"
         pg, errors = page()
+        pg.goto(url, wait_until="load")
+        pg.wait_for_function(turning, timeout=60000)
+        pg.wait_for_timeout(600)
+        lay = pg.evaluate("""() => { const f = document.querySelector('.head-live').getBoundingClientRect(), box = document.querySelector('.head-link'), i = box.querySelector('img').getBoundingClientRect();
+          return { same: Math.abs(f.left - i.left) < 1 && Math.abs(f.top - i.top) < 1 && Math.abs(f.width - i.width) < 1 && Math.abs(f.height - i.height) < 1,
+            still: getComputedStyle(box.querySelector('img')).visibility, ink: document.querySelector('.head-live').contentWindow.__head.coverage() }; }""")
+        check(lay["same"] and lay["still"] == "hidden" and lay["ink"]["covered"] > 0.3, "the head itself stands exactly where its picture stood (drawn over %.0f %% of the frame)" % (100 * lay["ink"]["covered"]), lay)
+        w0 = pg.evaluate(where)
+        box = pg.locator(".head-live").bounding_box()
+        cx, cy = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + 80, cy + 20, steps=8); pg.mouse.up()
+        pg.wait_for_timeout(1200)
+        w1 = pg.evaluate(where)
+        check(abs(w1["azimuth"] - w0["azimuth"]) > 0.5 and abs(w1["polar"] - w0["polar"]) > 0.05 and pg.url.rstrip("/") == url.rstrip("/"),
+              "dragging it turns it, and the page stays where it is", (w0, w1, pg.url))
+        pg.locator("#head-cut").fill("15")
+        pg.wait_for_timeout(400)
+        w2 = pg.evaluate(where)
+        check(w2["cut"] < w1["cut"] - 30 and abs(w2["azimuth"] - w1["azimuth"]) < 0.2, "the slider opens it further, turned as it is (cut %.0f mm -> %.0f mm)" % (w1["cut"], w2["cut"]), (w1, w2))
+        pg.locator("#head-cut").fill("7.5")
+        pg.wait_for_timeout(300)
+        check(abs(pg.evaluate(where)["cut"] - (w0["cut"] + (w2["cut"] - w0["cut"]) * (7.5 - 6) / (15 - 6))) < 1.5, "and stops anywhere between the sheet's pictures")
+        y0 = pg.evaluate("() => scrollY")
+        pg.mouse.move(cx, cy); pg.mouse.wheel(0, 400)
+        pg.wait_for_timeout(500)
+        w3 = pg.evaluate(where)
+        check(pg.evaluate("() => scrollY") - y0 >= 300 and abs(w3["distance"] - w2["distance"]) < 0.01, "a mouse wheel over the head scrolls the page; the head does not swallow it to zoom")
+        pg.evaluate("() => scrollTo(0, 0)")
+        pg.wait_for_timeout(3500)                                           # the turn it was given dies away
+        d0 = pg.evaluate(where)["drawn"]
+        pg.wait_for_timeout(1500)
+        check(pg.evaluate(where)["drawn"] == d0, "left alone it is not drawn again: it costs nothing while nothing moves")
+        check(not errors, "the turning head: no script error", errors[:2])
+        pg.mouse.click(cx, cy)
+        pg.wait_for_url("**/head/", timeout=15000)
+        check(pg.url.endswith("/head/"), "a click on it that does not drag still opens the head's own page, as the picture did")
+        pg.context.close()
+
+        ctx = b.new_context(viewport={"width": 390, "height": 780}, has_touch=True, is_mobile=True, device_scale_factor=2)
+        pg = ctx.new_page()
+        pg.goto(url, wait_until="load")
+        pg.wait_for_function(turning, timeout=60000)
+        pg.wait_for_timeout(600)
+        cdp = ctx.new_cdp_session(pg)
+
+        def finger(dx, dy):
+            box = pg.locator(".head-live").bounding_box()
+            x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x, "y": y, "id": 1}]})
+            for k in range(1, 13):
+                cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x + dx * k / 12, "y": y + dy * k / 12, "id": 1}]})
+                pg.wait_for_timeout(16)
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+            pg.wait_for_timeout(900)
+
+        w0, y0 = pg.evaluate(where), pg.evaluate("() => scrollY")
+        finger(0, -200)
+        w1, y1 = pg.evaluate(where), pg.evaluate("() => scrollY")
+        check(y1 - y0 > 100 and abs(w1["polar"] - w0["polar"]) < 0.01 and abs(w1["azimuth"] - w0["azimuth"]) < 0.05,
+              "a phone: a finger moving up over the head scrolls the page (%d px) and does not tip the head" % (y1 - y0), (w0, w1))
+        finger(150, 0)
+        w2, y2 = pg.evaluate(where), pg.evaluate("() => scrollY")
+        check(abs(w2["azimuth"] - w1["azimuth"]) > 0.5 and y2 == y1, "a phone: a finger moving sideways on the head turns it, and the page stays put", (w1, w2, y1, y2))
+        ctx.close()
+
+        pg, errors = page(block=("vendor/three/",))                         # the 3-D library does not arrive: the frame says so and goes
+        pg.goto(url, wait_until="load")
+        pg.wait_for_function("() => document.querySelector('.head-link').classList.contains('sliding')", timeout=30000)
+        check(not pg.evaluate(turning) and pg.locator(".head-live").count() == 0 and pg.locator(".head-frames").is_visible(),
+              "where the head cannot be drawn, its frame is taken away and the sheet of pictures takes over")
+        pg.context.close()
+
+        pg, errors = page(block=("head/?embed",))                           # no head at all: the sheet, as before the head could turn
         pg.goto(url, wait_until="load")
         pg.locator("#head-cut").focus()                                     # touching the slider asks for the sheet at once
         pg.wait_for_function("() => document.querySelector('.head-link').classList.contains('sliding')", timeout=30000)
@@ -239,12 +314,19 @@ def browser_checks(url, serve):
               "while it slides, the sheet's picture stands where the still was")
         check(not errors, "the slider: no script error", errors[:2])
         pg.context.close()
-        pg, errors = page(block=("head/open.webp",))
+        pg, errors = page(block=("head/open.webp", "head/?embed"))
         pg.goto(url, wait_until="load")
         pg.locator("#head-cut").fill("15")
         pg.wait_for_timeout(1200)
-        check(pg.locator(".head-link img").is_visible() and not pg.evaluate("() => document.querySelector('.head-link').classList.contains('sliding')") and not errors,
-              "the sheet gone: the still picture stands, and nothing breaks", errors[:2])
+        check(pg.locator(".head-link img").is_visible() and not pg.evaluate("() => document.querySelector('.head-link').classList.contains('sliding')")
+              and not pg.evaluate(turning) and not errors, "the head and the sheet both gone: the still picture stands, and nothing breaks", errors[:2])
+        pg.context.close()
+        pg, errors = page(block=("head/open.webp",))
+        pg.goto(url, wait_until="load")
+        pg.wait_for_function(turning, timeout=60000)
+        pg.locator("#head-cut").fill("15")
+        pg.wait_for_timeout(500)
+        check(pg.evaluate(where)["cut"] < 90 and not errors, "the sheet gone but the head here: the slider opens the head itself", errors[:2])
         pg.context.close()
 
         print("7. a phone: nothing slides sideways")

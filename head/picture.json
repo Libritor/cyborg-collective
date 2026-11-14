@@ -1,0 +1,12 @@
+{
+ "note": "The window the still picture (still.png) and the slider's pictures (open.webp) have onto the head: a square, given as left, top and side, of a view this many pixels wide and high. Written with them by test_head_page.py --still.",
+ "view": [
+  640,
+  640
+ ],
+ "square": [
+  112.5,
+  129.0,
+  431.0
+ ]
+}

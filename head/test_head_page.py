@@ -135,6 +135,33 @@ def main():
         check(r.status == 200 and len(r.body()) > 20000, "the still picture is there (%d KB)" % (len(r.body()) // 1024 if r.status == 200 else 0))
         pg.context.close()
 
+        # in a frame on the home page (?embed=1): only the head, seen through the still picture's window, turning but not zooming
+        from PIL import Image
+        pg = b.new_context(viewport={"width": 300, "height": 300}).new_page()
+        errors, sockets = [], []
+        pg.on("pageerror", lambda e: errors.append(str(e)[:200]))
+        pg.on("websocket", lambda ws: sockets.append(ws.url))
+        pg.goto(url + "?embed=1&cut=0.3", wait_until="load")
+        pg.wait_for_function("() => window.__head && window.__head.ready", timeout=60000)
+        pg.wait_for_timeout(800)
+        e = pg.evaluate("""() => ({ embed: window.__head.embed, side: getComputedStyle(document.getElementById('side')).display,
+          labels: [...document.querySelectorAll('.site')].filter((n) => n.getClientRects().length).length,
+          touch: getComputedStyle(document.querySelector('canvas')).touchAction, behind: getComputedStyle(document.documentElement).backgroundColor,
+          record: !!window.__head.state.record, where: window.__head.where(), png: window.__head.png() })""")
+        check(e["embed"] and e["side"] == "none" and e["labels"] == 0 and not sockets and not e["record"] and not errors,
+              "in a frame: the head and nothing else (no words, no labels, no relay, no recorded minute, no error)", (e["side"], e["labels"], sockets, errors[:1]))
+        check(e["behind"] == "rgba(0, 0, 0, 0)" and e["touch"] == "pan-y", "in a frame: the page behind shows through, and a finger moving up or down is left to that page", (e["behind"], e["touch"]))
+        mine = Image.open(io.BytesIO(base64.b64decode(e["png"].split(",", 1)[1]))).convert("RGBA").resize((160, 160), Image.LANCZOS)
+        theirs = Image.open(os.path.join(HERE, "still.png")).convert("RGBA").resize((160, 160), Image.LANCZOS)
+        a, c = [v > 60 for v in mine.getchannel("A").getdata()], [v > 60 for v in theirs.getchannel("A").getdata()]
+        both, either = sum(1 for x, y in zip(a, c) if x and y), sum(1 for x, y in zip(a, c) if x or y)
+        check(either > 0 and both / either > 0.97, "in a frame: the head stands where the still picture has it (%.1f %% the same outline)" % (100 * both / max(1, either)))
+        pg.mouse.move(150, 150); pg.mouse.wheel(0, 300); pg.wait_for_timeout(400)
+        check(abs(pg.evaluate("() => window.__head.where().distance") - e["where"]["distance"]) < 0.01, "in a frame: a mouse wheel does not zoom it")
+        pg.mouse.move(150, 150); pg.mouse.down(); pg.mouse.move(210, 150, steps=6); pg.mouse.up(); pg.wait_for_timeout(600)
+        check(abs(pg.evaluate("() => window.__head.where().azimuth") - e["where"]["azimuth"]) > 0.4, "in a frame: a drag turns it")
+        pg.context.close()
+
         if still:                                       # the page's own drawing, as pictures with nothing behind them
             from PIL import Image
             pg = b.new_context(viewport={"width": 640, "height": 640}, device_scale_factor=2).new_page()
@@ -165,7 +192,16 @@ def main():
             # the picture that stands before the sheet is here, and with scripts off: the same square, at the slider's starting position
             out = square(shots_[STILL_FRAME]).resize((640, 640), Image.LANCZOS).quantize(colors=200, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.FLOYDSTEINBERG)
             out.save(os.path.join(HERE, "still.png"), optimize=True)
-            for name in ("still.png", "open.webp"):
+            # where that square lies in the view the pictures were drawn in (in the view's own pixels): the head in a
+            # frame on the home page (?embed=1) shows the same square, so it takes the picture's place without a jump
+            dpr = shots_[0].width / 640
+            with open(os.path.join(HERE, "picture.json"), "w", encoding="utf-8", newline="\n") as f:
+                json.dump({"note": "The window the still picture (still.png) and the slider's pictures (open.webp) have onto the head: a square, "
+                                   "given as left, top and side, of a view this many pixels wide and high. Written with them by test_head_page.py --still.",
+                           "view": [640, 640],
+                           "square": [round((x0 - (side - (x1 - x0)) // 2) / dpr, 2), round((y0 - (side - (y1 - y0)) // 2) / dpr, 2), round(side / dpr, 2)]}, f, indent=1)
+                f.write("\n")
+            for name in ("still.png", "open.webp", "picture.json"):
                 print("%s rewritten: %d KB" % (name, os.path.getsize(os.path.join(HERE, name)) // 1024))
             pg.context.close()
         b.close()

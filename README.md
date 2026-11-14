@@ -16,7 +16,7 @@ It is made of layers. Each needs only the ones above it in this table, and each 
 | The record | `app.js`, `data/*.json`, `projects.json` | scripts on | the table says it is not loaded; `record.html` still lists every session |
 | Live | the relay (`cyborg-collective-relay.onrender.com`) | the relay being up | the page says it is not connected; the record and the band carry on |
 | The band | `music/` | Web Audio | the menu says the band could not load; everything else carries on |
-| Extras | `splat-view.js`, `video-rtc.js`, the 3-D views in `space/` and `head/` | WebGL, WebRTC | cards show without a picture; `space/` offers its films as plain links; `head/` shows its still picture |
+| Extras | `splat-view.js`, `video-rtc.js`, the 3-D views in `space/` and `head/` | WebGL, WebRTC | cards show without a picture; `space/` offers its films as plain links; `head/` shows its still picture; the home page's head, which is `head/?embed=1` in a frame over that picture, gives way to the picture and the slider's sheet of pictures |
 
 `test_survives.py` takes the layers away one at a time and checks what is left. It also checks the rules that keep this true: nothing loaded from another site, every file a page asks for present, each module asked for under one version tag, `record.html` in step with the data, `projects.json` in the shape the page reads.
 
