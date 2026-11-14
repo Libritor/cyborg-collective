@@ -287,7 +287,9 @@ def keeps_to_itself(page, label):
 
 
 with sync_playwright() as p:
-    b = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required"])
+    # 6ense.com has no certificate of its own yet: the browser's habit of trying https first only adds a wait, and on a
+    # slow line that wait outlasts the test's patience
+    b = p.chromium.launch(args=["--autoplay-policy=no-user-gesture-required", "--disable-features=HttpsUpgrades,HttpsFirstBalancedModeAutoEnable"])
 
     print("1. arriving where the browser holds the sound back, then the listen button")
     page, errors = new_page(b)
