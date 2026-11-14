@@ -79,14 +79,18 @@ canvas.bands, canvas.raw { width: 100%; display: block; margin-top: 8px; }
 main > header.top { padding-top: 28px; }      /* a page whose title sits in its one column (record.html) */
 /* the head that opens: a picture that is a link, as on Rich Fletcher's page */
 /* Under the words about the name: the head with its slider on the left, what it is on the right; on a narrow
-   screen the words go under it. The slider steps through pictures of the head drawn ahead of time (.head-frames). */
+   screen the words go under it. Over the picture, once it can be drawn, lies the head itself in a frame (.head-live),
+   which turns when dragged; where it cannot be drawn the slider steps through pictures drawn ahead of time (.head-frames). */
 .head-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 10px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
-.head-stage { flex: none; width: min(300px, 100%); }
+.head-stage { flex: none; width: min(300px, 100%); position: relative; }
+.head-live { position: absolute; left: 0; top: 0; z-index: 1; width: 100%; aspect-ratio: 1 / 1; border: 0; background: transparent; visibility: hidden; }   /* above the picture's link, which it stands in for */
+.head-link.turning .head-live { visibility: visible; }
+.head-link.turning img, .head-link.turning .head-frames { visibility: hidden; }      /* the head itself stands in their place */
 .head-link .head-pic { display: block; position: relative; line-height: 0; }
 .head-link img { width: 100%; height: auto; display: block; }
 .head-frames { position: absolute; inset: 0; background-repeat: no-repeat; }
 .head-link.sliding img { visibility: hidden; }                    /* the sheet's picture stands in its place */
-.head-slider { display: flex; align-items: center; gap: 8px; margin-top: -6px; font-size: 12px; color: var(--muted); }
+.head-slider { display: flex; align-items: center; gap: 8px; margin-top: -6px; font-size: 12px; color: var(--muted); position: relative; z-index: 2; }   /* above the frame's lower edge */
 .head-slider input { flex: 1; min-width: 0; margin: 0; accent-color: var(--ink); }
 .head-link p { flex: 1 1 150px; margin: 0; }
 .head-link .head-open { display: block; color: var(--ink); font-size: 16px; font-weight: 700; text-decoration: none; margin-bottom: 3px; }

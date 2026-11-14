@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794617163">
+<link rel="stylesheet" href="style.css?v=1794621196">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -15,11 +15,11 @@
   <p class="tag">A window the person opens, not a feed that is taken. Live headbands when someone chooses to share; the record of every recording behind them, always.</p>
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
   <div class="head-link">
-    <div class="head-stage">
-      <a class="head-pic" href="head/" title="A head from a real CT scan: on its own page it turns, and the brain takes the colours of whoever is sharing"><img src="head/still.png" width="300" height="300" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"><span class="head-frames" data-sheet="head/open.webp" data-frames="21" data-cols="7" hidden></span></a>
+    <div class="head-stage" data-live="head/?embed=1">
+      <a class="head-pic" href="head/" title="A head from a real CT scan: drag it to turn it; on its own page the brain takes the colours of whoever is sharing"><img src="head/still.png" width="300" height="300" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"><span class="head-frames" data-sheet="head/open.webp" data-frames="21" data-cols="7" hidden></span></a>
       <label class="head-slider needs-js">closed <input type="range" id="head-cut" min="0" max="20" value="6" aria-label="How far the head is opened from the top"> open</label>
     </div>
-    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement. Pull the slider to open it from the top: the cut shows the scan itself at that height. On <a href="head/">its own page</a> it turns, and the brain takes the colours of whoever is sharing. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
+    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement. Drag the head to turn it, and pull the slider to open it from the top: the cut shows the scan itself at that height. On <a href="head/">its own page</a> the brain takes the colours of whoever is sharing. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
   </div>
 </header>
 <nav>
@@ -118,17 +118,72 @@
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794617163"></script>
-<script src="splat-view.js?v=1794617163"></script>
-<script src="app.js?v=1794617163"></script>
+<script src="video-rtc.js?v=1794621196"></script>
+<script src="splat-view.js?v=1794621196"></script>
+<script src="app.js?v=1794621196"></script>
 <script>
-// The head's slider. The head was drawn ahead of time at every position of the slider, by the head page itself, and
-// the pictures sit on one sheet (head/open.webp); the slider only chooses which one shows. The sheet is asked for once
-// the page has settled, or as soon as the slider is touched; until it is here, and if it never comes, the still stands.
+// The head. Three layers, each standing where the one above it is missing:
+//   1. the still picture, always there, a link to the head's own page;
+//   2. the head itself, in a frame laid over the picture (head/?embed=1): it turns when it is dragged, the slider
+//      opens it, and a click on it that does not drag follows the picture's link;
+//   3. pictures of the head drawn ahead of time at every position of the slider, on one sheet (head/open.webp):
+//      for a browser that cannot draw the head, and for a slider touched before the head has arrived.
+// The head is asked for once the page has settled, or as soon as the picture or the slider is touched; the sheet
+// only where it is needed. Until either is here, and if neither ever comes, the still stands.
 (function () {
   var box = document.querySelector(".head-link"), slider = document.getElementById("head-cut"), frames = box && box.querySelector(".head-frames");
   if (!box || !slider || !frames) return;
+  var stage = box.querySelector(".head-stage"), pic = box.querySelector(".head-pic");
   var n = Number(frames.dataset.frames), cols = Number(frames.dataset.cols), rows = Math.ceil(n / cols), here = false, asked = false;
+  var frame = null, live = false, noLive = false, patience = null;
+  function amount() { return Number(slider.value) / Number(slider.max); }
+  function send() {
+    if (live && frame && frame.contentWindow) frame.contentWindow.postMessage({ head: "cut", amount: amount() }, location.origin);
+  }
+  function withoutLive() {                 // the head cannot be drawn here: the pictures do the work
+    if (noLive) return;
+    noLive = true; live = false;
+    clearTimeout(patience);
+    box.classList.remove("turning");
+    slider.step = "1";
+    if (frame) { frame.remove(); frame = null; }
+    ask();
+  }
+  function startLive() {
+    if (frame || noLive) return;
+    var can = false;
+    try {
+      // tried, not assumed: a browser can know of 3-D drawing and still be unable to do it on this machine
+      var probe = document.createElement("canvas"), gl = probe.getContext("webgl2") || probe.getContext("webgl");
+      can = !!(stage && stage.dataset.live) && !!gl && !(navigator.connection && navigator.connection.saveData);
+      var lose = gl && gl.getExtension("WEBGL_lose_context");
+      if (lose) lose.loseContext();
+    } catch (e) { can = false; }
+    if (!can) { withoutLive(); return; }   // no 3-D here, or a visitor who asked their browser to save data: the sheet is a tenth of the size
+    frame = document.createElement("iframe");
+    frame.className = "head-live";
+    frame.title = "The head in three dimensions: drag to turn it";
+    frame.tabIndex = -1;                   // the picture's link stays the way in for a keyboard
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("scrolling", "no");
+    frame.src = stage.dataset.live + "&cut=" + amount().toFixed(3);
+    stage.insertBefore(frame, stage.firstChild);
+    patience = setTimeout(ask, 12000);     // slow to arrive: the sheet meanwhile, and the head still takes over when it comes
+  }
+  addEventListener("message", function (e) {
+    if (!frame || e.origin !== location.origin || e.source !== frame.contentWindow || !e.data) return;
+    if (e.data.head === "ready") {
+      clearTimeout(patience);
+      live = true;
+      slider.step = "0.5";                 // the head opens anywhere; the sheet had twenty-one pictures
+      box.classList.add("turning");
+      send();
+    } else if (e.data.head === "failed") {
+      withoutLive();
+    } else if (e.data.head === "open" && pic) {
+      location.href = pic.href;
+    }
+  });
   function show() {
     var f = Math.max(0, Math.min(n - 1, Math.round(Number(slider.value))));
     frames.style.backgroundPosition = ((f % cols) / (cols - 1) * 100) + "% " + (Math.floor(f / cols) / Math.max(1, rows - 1) * 100) + "%";
@@ -144,15 +199,17 @@
     };
     sheet.src = frames.dataset.sheet;
   }
-  slider.addEventListener("input", function () { ask(); if (here) show(); });
-  ["pointerdown", "focus", "touchstart"].forEach(function (e) { slider.addEventListener(e, ask, { passive: true }); });
-  box.addEventListener("pointerenter", ask);
-  if (document.readyState === "complete") setTimeout(ask, 1500); else addEventListener("load", function () { setTimeout(ask, 1500); });
+  slider.addEventListener("input", function () { if (live) send(); else ask(); if (here) show(); });
+  ["pointerdown", "focus", "touchstart"].forEach(function (e) {
+    slider.addEventListener(e, function () { if (!live) ask(); startLive(); }, { passive: true });
+  });
+  box.addEventListener("pointerenter", startLive);
+  if (document.readyState === "complete") setTimeout(startLive, 1500); else addEventListener("load", function () { setTimeout(startLive, 1500); });
 })();
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794617163")
+import("./music/player.js?v=1794621196")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
