@@ -85,7 +85,11 @@ main > header.top { padding-top: 28px; }      /* a page whose title sits in its 
 .head-stage { flex: none; width: min(300px, 100%); position: relative; }
 .head-live { position: absolute; left: 0; top: 0; z-index: 1; width: 100%; aspect-ratio: 1 / 1; border: 0; background: transparent; visibility: hidden; }   /* above the picture's link, which it stands in for */
 .head-link.turning .head-live { visibility: visible; }
-.head-link.turning img, .head-link.turning .head-frames { visibility: hidden; }      /* the head itself stands in their place */
+.head-link.turning img, .head-link.turning .head-frames, .head-link.turning .head-site { visibility: hidden; }      /* the head itself stands in their place */
+/* the electrodes' names over the picture, written as the head's own page writes them (same place, same letters, same colours) */
+.head-site { position: absolute; transform: translate(-50%, -160%); font: 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #1a1a19;
+  background: rgba(255, 255, 255, 0.9); padding: 2px 5px; border-radius: 6px; white-space: nowrap; pointer-events: none; }
+@media (prefers-color-scheme: dark) { .head-site { color: #f0efec; background: rgba(24, 26, 30, 0.9); } }
 .head-link .head-pic { display: block; position: relative; line-height: 0; }
 .head-link img { width: 100%; height: auto; display: block; }
 .head-frames { position: absolute; inset: 0; background-repeat: no-repeat; }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794621196">
+<link rel="stylesheet" href="style.css?v=1794622343">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -16,10 +16,10 @@
   <p class="about" id="about-6ense"><span class="mark6" id="mark-6ense">6ense™</span> refers to the “<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">Sixth Sense™</a>” wearable technology system that uses wearable sensors and functions like an additional human sense for a community of “cyborgs”. The term “Sixth Sense™” in this sense was coined by Steve Mann in 2001 for work he did in 1994 and 1997 (<a href="https://en.wikipedia.org/wiki/SixthSense" target="_blank" rel="noopener">link</a>).</p>
   <div class="head-link">
     <div class="head-stage" data-live="head/?embed=1">
-      <a class="head-pic" href="head/" title="A head from a real CT scan: drag it to turn it; on its own page the brain takes the colours of whoever is sharing"><img src="head/still.png" width="300" height="300" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"><span class="head-frames" data-sheet="head/open.webp" data-frames="21" data-cols="7" hidden></span></a>
+      <a class="head-pic" href="head/" title="A head from a real CT scan: drag it to turn it; on its own page the brain takes the colours of whoever is sharing"><img src="head/still.png" width="300" height="300" alt="A head rendered from a CT scan, the top cut away to show the scan's own slice of the brain inside the skull"><span class="head-frames" data-sheet="head/open.webp" data-frames="21" data-cols="7" hidden></span><span class="head-site" aria-hidden="true" data-hide-at="0.493" style="left:28.6%;top:51.2%">AF7</span><span class="head-site" aria-hidden="true" data-hide-at="0.493" style="left:9.4%;top:42.2%">AF8</span><span class="head-site" aria-hidden="true" data-hide-at="0.743" style="left:87.2%;top:57.3%">TP9</span></a>
       <label class="head-slider needs-js">closed <input type="range" id="head-cut" min="0" max="20" value="6" aria-label="How far the head is opened from the top"> open</label>
     </div>
-    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement. Drag the head to turn it, and pull the slider to open it from the top: the cut shows the scan itself at that height. On <a href="head/">its own page</a> the brain takes the colours of whoever is sharing. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
+    <p><a class="head-open" href="head/">Open a head</a> A real CT scan, shown with the person's agreement. The dots are about where a Muse headband's four electrodes rest. Drag the head to turn it, and pull the slider to open it from the top: the cut shows the scan itself at that height. On <a href="head/">its own page</a> the brain takes the colours of whoever is sharing. Inspired by <a href="https://web.media.mit.edu/~fletcher/bio.html" target="_blank" rel="noopener">Rich Fletcher</a>, whose own MRI is the link to his CV on his page at MIT.</p>
   </div>
 </header>
 <nav>
@@ -118,12 +118,13 @@
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794621196"></script>
-<script src="splat-view.js?v=1794621196"></script>
-<script src="app.js?v=1794621196"></script>
+<script src="video-rtc.js?v=1794622343"></script>
+<script src="splat-view.js?v=1794622343"></script>
+<script src="app.js?v=1794622343"></script>
 <script>
 // The head. Three layers, each standing where the one above it is missing:
-//   1. the still picture, always there, a link to the head's own page;
+//   1. the still picture, always there, a link to the head's own page, with the electrodes' names written over it
+//      where the head's own page writes them (head/picture.json says where; the head in its frame carries its own);
 //   2. the head itself, in a frame laid over the picture (head/?embed=1): it turns when it is dragged, the slider
 //      opens it, and a click on it that does not drag follows the picture's link;
 //   3. pictures of the head drawn ahead of time at every position of the slider, on one sheet (head/open.webp):
@@ -136,6 +137,7 @@
   var stage = box.querySelector(".head-stage"), pic = box.querySelector(".head-pic");
   var n = Number(frames.dataset.frames), cols = Number(frames.dataset.cols), rows = Math.ceil(n / cols), here = false, asked = false;
   var frame = null, live = false, noLive = false, patience = null;
+  var names = box.querySelectorAll(".head-site");
   function amount() { return Number(slider.value) / Number(slider.max); }
   function send() {
     if (live && frame && frame.contentWindow) frame.contentWindow.postMessage({ head: "cut", amount: amount() }, location.origin);
@@ -187,6 +189,8 @@
   function show() {
     var f = Math.max(0, Math.min(n - 1, Math.round(Number(slider.value))));
     frames.style.backgroundPosition = ((f % cols) / (cols - 1) * 100) + "% " + (Math.floor(f / cols) / Math.max(1, rows - 1) * 100) + "%";
+    // a name goes when the cut takes away the dot it belongs to, as on the head's own page
+    for (var i = 0; i < names.length; i += 1) names[i].hidden = f / (n - 1) >= Number(names[i].dataset.hideAt);
   }
   function ask() {
     if (asked) return;
@@ -209,7 +213,7 @@
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794621196")
+import("./music/player.js?v=1794622343")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
