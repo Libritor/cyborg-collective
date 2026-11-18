@@ -145,6 +145,12 @@ def file_checks():
     have = sorted(d for d in os.listdir(os.path.join(ROOT, "scans", "runs")) if os.path.isdir(os.path.join(ROOT, "scans", "runs", d)))
     check(listed == have and "<script" not in read("scans/index.html").lower() and all('id="%s"' % s in read("scans/index.html") for s in listed),
           "the list of scans is a page with no script that names exactly the scans that are there", (listed, have))
+    # the scans pages wear the home page's look: its stylesheet first, and the colours scans.css repeats for the laptop are the same ones
+    tokens = lambda css: [re.sub(r"\s+", " ", t) for t in re.findall(r"--bg:[^}]+", css)]
+    here, home = tokens(read("scans/scans.css")), tokens(read("style.css"))
+    linked = [rel for rel in ("scans/index.html", "scans/how.html", "scans/view.html", "scans/live.html")
+              if re.search(r'<link rel="stylesheet" href="\.\./style\.css">\s*<link rel="stylesheet" href="scans\.css\?v=\w+">', read(rel))]
+    check(len(home) == 3 and here == home and len(linked) == 4, "the scans pages load the home page's stylesheet, and the colours repeated in scans.css are its own", (here, home, linked))
     # how a scan is made: a plain page, every tool it names is beside it, and none of them names somebody's own folders
     how = read("scans/how.html")
     named = re.findall(r'href="(tools/[^"]+)"', how)
@@ -192,6 +198,8 @@ def browser_checks(url, serve):
         check(pg.locator("table.sessions:visible").count() == 0 and pg.locator("#listen:visible").count() == 0, "home, scripts off: no empty tables, no dead button")
         check(pg.locator('nav a[href="space/"]').count() == 1, "home: the menu links to the rooms")
         check(pg.locator('nav a[href="scans/"]').count() == 1, "home: the menu links to the scans")
+        check(all(pg.locator('#scans a.door[href="%s"]' % h).is_visible() for h in ("scans/", "scans/live.html", "scans/how.html")),
+              "home, scripts off: a section opens the scans, the live page and how a scan is made")
         pg.goto(url + "scans/", wait_until="load")
         listed = json.loads(read("scans/scans.json"))["scans"]
         check(pg.locator("article.scan").count() == len(listed) and pg.locator("article.scan img").count() >= len(listed)

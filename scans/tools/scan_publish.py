@@ -18,9 +18,11 @@ scans/runs/<id>/ of the clone of the site's repository:
     files to print               an object's STL and its sliced 3MF; a room's diorama STL, zipped
     meta.json                    the numbers, the words, and which files the viewer loads
 
-and beside them scans/scans.json (the list), scans/index.html (the list as a plain page: no script), scans/view.html
-(the viewer, which is web/splat/index.html), scans/vendor/ (three.js and Spark: the site keeps its libraries beside
-its pages) and scans/test_scans_page.py.
+and beside them, rewritten every time (write_pages): scans/index.html (the scans as cards) and scans/how.html (how a
+scan is made, with the tools), both plain pages with no script whose words and markup are in scan_pages.py;
+scans/view.html (the viewer, web/splat/index.html) and scans/live.html (web/scans/live.html); scans/scans.css (the
+look: the home page's, see that file); scans/tools/ (the tools as plain files, TOOLS below); scans/vendor/ (three.js
+and Spark: the site keeps its libraries beside its pages); scans/scans.json, scans/cover.jpg and the pages' tests.
 
 Then it commits scans/ in the clone under the clone's own git identity and pushes it: GitHub Pages serves it a minute
 or two later. A push here does not touch the relay. Publishing is public: a scan of a room shows the room.
@@ -29,7 +31,7 @@ or two later. A push here does not touch the relay. Publishing is public: a scan
 import argparse
 import base64
 import datetime
-import html
+import hashlib
 import json
 import os
 import re
@@ -84,6 +86,7 @@ TOOLS = [
     ]),
     ("To this site", [
         ("scan_publish.py", "Puts a finished scan here (the splat compressed by Open3D), takes one off, and writes these pages."),
+        ("scan_pages.py", "The words and the markup of the list of scans and of this page."),
         ("quest_splat.py", "The live view's sender: takes the app's depth readings over the USB cable, keeps one per 2 cm, records them, passes them to the relay."),
         (os.path.join("..", "start_quest_splat.ps1"), "The live sender on its own, without a scan."),
         ("splat_live_check.py", "Sends a labelled test pattern through the public relay and checks that the home page draws it and lets it go."),
@@ -277,7 +280,7 @@ def stage(run, clone, sid=None, title=None, note=None, kind=None):
     return sid
 
 
-# ------------------------------------------------------------------ the list, the viewer, the libraries
+# ------------------------------------------------------------------ the pages, the viewer, the look, the libraries, the tools
 def scans_in(clone):
     root = os.path.join(clone, "scans", "runs")
     metas = []
@@ -289,235 +292,14 @@ def scans_in(clone):
     return sorted(metas, key=lambda m: (m["kind"] == "test", [-ord(c) for c in (m.get("made") or "")], m["id"]))
 
 
-def mb(n):
-    return f"{n / 1e6:.0f} MB" if n >= 1e7 else f"{n / 1e6:.1f} MB" if n >= 1e6 else f"{max(1, round(n / 1e3))} kB"
-
-
-def facts(m):
-    rows = []
-    s, tr, pr, rm = m.get("size_cm"), m.get("train") or {}, m.get("print") or {}, m.get("room") or {}
-    if m["mode"] == "object" and s:
-        rows.append(("Real size", f"{s[0]} × {s[2]} × {s[1]} cm high"))
-    rows.append(("Pictures", str(m.get("pictures", "—"))))
-    if tr.get("gaussians"):
-        part = m.get("splat_count") if m.get("splat_count") != tr["gaussians"] else None
-        rows.append(("Splat", f"{tr['gaussians']:,} Gaussians trained in {tr.get('steps')} steps"
-                     + ("" if not part else f"; {part:,} of them are the object itself" if m["mode"] == "object" else f"; {part:,} kept for this page")))
-    if tr.get("held_out_psnr_db"):
-        rows.append(("Pictures kept back", f"reproduced at {tr['held_out_psnr_db']} dB"))
-    c = m.get("check") or {}
-    if c.get("median_mm") is not None:
-        rows.append(("Against the true shape", f"{c['median_mm']} mm (half the surface); {c.get('p95_mm')} mm (95 %)"))
-    slice_words = lambda t: re.sub(r"^sliced \S+ for the H2C: ", "", t or "")
-    if pr.get("print_size_mm"):
-        rows.append(("Print", " × ".join(f"{v:.0f}" for v in pr["print_size_mm"]) + " mm" + (f"; {slice_words(pr.get('slice'))}" if pr.get("slice") else "")))
-    if rm.get("size_m"):
-        rows.append(("Room model", f"{rm['size_m'][0]} × {rm['size_m'][2]} m, {rm['size_m'][1]} m high (an estimate)"))
-        rp = rm.get("print") or {}
-        if rp.get("size_mm"):
-            rows.append(("Diorama print", f"{rp.get('scale')}, " + " × ".join(f"{v:.0f}" for v in rp["size_mm"]) + " mm"
-                         + (f"; {slice_words(rp.get('slice'))}" if rp.get("slice") else "")))
-    return rows
-
-
-LIST_HEAD = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scans in 3-D</title>
-<!-- Written by scan_publish.py from scans/runs/*/meta.json. No script: this page is the list as plain words and
-     pictures; view.html draws a scan in 3-D. -->
-<style>
-  :root { color-scheme: light dark; --bg: #f6f7f9; --card: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e5e7eb; --accent: #1f4e79; --test: #92400e; --seen: #166534; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33; --accent: #7fb3e6; --test: #fbbf24; --seen: #86efac; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
-  a { color: var(--accent); overflow-wrap: anywhere; }
-  h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
-  .lede { max-width: 72ch; margin: 0 0 8px; }
-  .doors { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 12px 0; }
-  .doors a { display: inline-block; text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; }
-  .doors b { color: var(--accent); }
-  .muted { color: var(--muted); font-size: 13.5px; max-width: 80ch; }
-  .scan { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 20px 0; }
-  .pics img { display: block; width: 100%; height: auto; border-radius: 8px; background: #fff; }
-  .words { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px 28px; margin-top: 14px; }
-  .words > * { min-width: 0; }
-  @media (min-width: 900px) { .words { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); } }
-  h2 { margin: 0 0 4px; font-size: 20px; }
-  .kind { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid currentColor; border-radius: 999px; padding: 1px 9px; margin-bottom: 8px; }
-  .kind.test { color: var(--test); } .kind.headset { color: var(--seen); }
-  .note { margin: 0 0 10px; }
-  dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 0 0 12px; font-size: 14px; }
-  dt { color: var(--muted); } dd { margin: 0; }
-  .open { display: inline-block; font-weight: 600; text-decoration: none; color: var(--card); background: var(--accent); border-radius: 8px; padding: 7px 14px; margin: 0 0 10px; }
-  .files { margin: 0; padding: 0; list-style: none; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  footer { margin-top: 28px; }
-</style>
-</head>
-<body>
-<main>
-<h1>Scans in 3-D</h1>
-<p class="lede">Things and places photographed with a Meta Quest 3S headset and rebuilt as Gaussian splats: clouds of soft coloured blobs, trained until they reproduce the photographs. From the splat of one object a closed solid is made and sliced for a 3-D printer.</p>
-<p class="doors"><a href="live.html"><b>Live</b>: what a headset is scanning now, as Gaussians, while it scans</a> <a href="how.html"><b>How a scan is made</b>, with the tools</a></p>
-<p class="muted">How a scan gets here: the headset keeps pictures, with its own position for each; a laptop trains the splat from them (Brush), makes the solid, and compresses the splat (Open3D); the viewer on this site (Spark and three.js, both kept beside the page) draws it. The headset has no lidar: where depth is used, it is the depth the headset works out from its two tracking cameras. &ldquo;Pictures kept back&rdquo;: a tenth of the pictures are not used for training, and the number says how closely the splat reproduces them (higher is closer).</p>
-"""
-
-HOW_HEAD = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>How a scan is made</title>
-<!-- Written by scan_publish.py, which also copies the tools named here into tools/. No script. -->
-<style>
-  :root { color-scheme: light dark; --bg: #f6f7f9; --card: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e5e7eb; --accent: #1f4e79; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33; --accent: #7fb3e6; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 860px; margin: 0 auto; padding: 28px 16px 56px; }
-  a { color: var(--accent); overflow-wrap: anywhere; }
-  h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
-  h2 { margin: 30px 0 8px; font-size: 20px; }
-  h3 { margin: 18px 0 4px; font-size: 15px; color: var(--muted); font-weight: 600; }
-  p, li { max-width: 74ch; }
-  .muted { color: var(--muted); font-size: 13.5px; }
-  ol.chain { padding-left: 22px; } ol.chain li { margin: 0 0 8px; }
-  .table-scroll { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
-  th, td { text-align: left; vertical-align: top; padding: 6px 10px; border-top: 1px solid var(--line); }
-  tr:first-child th, tr:first-child td { border-top: 0; }
-  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
-  td.file { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
-  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
-  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-size: 13px; }
-</style>
-</head>
-<body>
-<main>
-<p class="muted"><a href="./">← all scans</a> · <a href="live.html">live</a></p>
-<h1>How a scan is made</h1>
-<p>A thing or a place is photographed with a Meta Quest 3S headset, a laptop turns the photographs into a Gaussian splat and, for an object, into a closed solid sliced for a 3-D printer, and the result goes onto this site. Everything it is made with is on this page.</p>
-
-<h2>The chain</h2>
-<ol class="chain">
-<li><b>The headset keeps pictures.</b> Its app keeps a picture from the passthrough camera every 5 cm or 6 degrees of head movement, with the headset's own position and direction for it and an 80 × 60 grid of depth rays behind it. Pulling the trigger on a thing names it as the object. The headset has no lidar: its depth comes from its two tracking cameras.</li>
-<li><b>Live, if asked for.</b> While it scans, the app can also send one depth reading per ray to the laptop over the USB cable. The laptop keeps one per 2 cm of surface and passes them through the relay; <a href="live.html">the live page</a> draws each as a Gaussian the moment it arrives. These are placed, not trained.</li>
-<li><b>The laptop trains the splat.</b> The headset's positions are used as they are, with no structure from motion. The pictures are cropped round the object and <a href="https://github.com/ArthurBrussee/brush">Brush</a> trains the Gaussians for 8,000 steps, about two minutes on a laptop's graphics card. A tenth of the pictures are kept back and compared with what the splat draws from their positions.</li>
-<li><b>From splat to solid.</b> The splat's depth is drawn from every camera position and voted into a grid: outside where enough cameras see past a cell, surface where they see it, solid where none could see, so the body is closed. It is cut flat on the surface it stood on.</li>
-<li><b>Sliced.</b> The solid is scaled and sliced for a Bambu H2C with the slicer's command line. Nothing is sent to a printer.</li>
-<li><b>Published, if asked for.</b> <a href="https://www.open3d.org/">Open3D</a> reads the trained splat and writes it compressed, about a tenth of the size; that file, the solid, a render and the print files go into this site's repository. Open3D does not make the splat: it has no training. The camera pictures are not published.</li>
-</ol>
-<pre>.\\start_quest_scan.ps1                  scan, splat, solid, print file: everything stays on the laptop
-.\\start_quest_scan.ps1 -Live -Publish   the same, with the live view and the finished scan on this site</pre>
-
-<h2>What has been checked, and what has not</h2>
-<ul>
-<li><b>Against known shapes.</b> Two made-up scans of known models, drawn at the headset camera's geometry with noise in the depth, went through the same steps: half of the T. rex's surface lies within 0.47 mm of the true one, its sizes within 0.3 %, its volume within 0.5 %; the Triceratops, 0.37 mm. Both are <a href="./">on the list</a>, labelled as tests.</li>
-<li><b>On the headset.</b> One sitting so far, from one seat in a room: 26 pictures, a view to look round rather than an object. Its depth rays land within 0.02 px sideways and 4 px vertically of where they were cast, so the camera model holds on the device.</li>
-<li><b>These pages.</b> Each has a browser test that travels with it (<a href="test_scans_page.py">test_scans_page.py</a>, <a href="test_live_page.py">test_live_page.py</a>); the live page's test sends a made-up room through a relay and requires the page to draw it and let it go.</li>
-<li><b>Not yet.</b> A walk all the way round one object with the headset; the live view from the headset itself (only made-up rooms have been sent so far); AR and VR inside the headset from this site; a print.</li>
-</ul>
-
-<h2>The tools</h2>
-<p>Plain files, as they are used; nothing here is built. They are Python (numpy, scipy, numba, Open3D, scikit-image, Pillow, playwright), PowerShell, and one C# script for Unity 6 with Meta's XR packages. Their own defaults name folders in the user's home folder.</p>
-"""
-
-HOW_FOOT = """
-<h2>What they stand on</h2>
-<ul>
-<li><a href="https://github.com/ArthurBrussee/brush">Brush</a> trains the splat (Apache 2.0).</li>
-<li><a href="https://www.open3d.org/">Open3D</a> compresses it to <code>.spz</code> (MIT).</li>
-<li><a href="https://sparkjs.dev/">Spark</a> and <a href="https://threejs.org/">three.js</a> draw it in the browser (both MIT; both kept in <code>vendor/</code> beside these pages, with their licences).</li>
-<li>Meta's passthrough camera and depth interfaces on the headset; Bambu Studio's command line for slicing.</li>
-</ul>
-<p class="muted">Part of <a href="../">6ense.com</a> · <a href="./">scans</a> · <a href="live.html">live</a> · <a href="../space/">rooms rebuilt from walks</a></p>
-</main>
-</body>
-</html>
-"""
-
-LIST_FOOT = """<footer class="muted">
-<p>In a headset, AR and VR need a secure address, which 6ense.com does not have yet: the same page is at <a href="{secure}">{secure_words}</a>, where each scan has an Enter AR or Enter VR button.</p>
-<p>Part of <a href="../">6ense.com</a> · <a href="../space/">rooms rebuilt from walks</a> · <a href="../record.html">the record as a plain page</a> · published by the wearer; the camera pictures and the raw recordings stay with them, and what is here was computed from them.</p>
-</footer>
-</main>
-</body>
-</html>
-"""
-
-
-def write_list(clone):
-    metas = scans_in(clone)
-    e = html.escape
-    parts = [LIST_HEAD]
-    if not metas:
-        parts.append('<p class="lede">No scan is published at the moment.</p>\n')
-    for m in metas:
-        sid = m["id"]
-        pics = "".join(f'<img src="runs/{sid}/{e(p["file"])}" alt="{e(p["alt"])}" width="{p["w"]}" height="{p["h"]}" decoding="async">'
-                       for p in m["pictures_shown"])
-        rows = "".join(f"<dt>{e(a)}</dt><dd>{e(b)}</dd>" for a, b in facts(m))
-        files = "".join(f'<li><a href="runs/{sid}/{e(d["file"])}" download>{e(d["label"])}</a> <span class="muted">{mb(d["bytes"])}</span></li>' for d in m["downloads"])
-        badge = ('<span class="kind test">a test of the method</span>' if m["kind"] == "test"
-                 else '<span class="kind headset">seen by a headset</span>')
-        opener = "Look round it in 3-D" if m["mode"] == "view" else "Turn it round in 3-D"
-        parts.append(f"""<article class="scan" id="{sid}">
-<div class="pics"><a href="view.html?scan={sid}">{pics}</a></div>
-<div class="words">
-<div>
-<h2>{e(m["title"])}</h2>
-{badge}
-<p class="note">{e(m["note"])}</p>
-<a class="open" href="view.html?scan={sid}">{opener}</a>
-</div>
-<div>
-<dl>{rows}</dl>
-<ul class="files">{files}</ul>
-</div>
-</div>
-</article>
-""")
-    parts.append(LIST_FOOT.format(secure=SECURE_COPY, secure_words=SECURE_COPY.split("//", 1)[1]))
-    root = os.path.join(clone, "scans")
-    os.makedirs(root, exist_ok=True)
-    with open(os.path.join(root, "index.html"), "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("".join(parts))
-    with open(os.path.join(root, "scans.json"), "w", encoding="utf-8", newline="\n") as fh:
-        json.dump({"scans": [{k: m.get(k) for k in ("id", "title", "kind", "mode", "made", "published", "splat_count")} for m in metas]}, fh, indent=1)
-    return metas
-
-
-def sync_page(clone):
-    """The viewer and its libraries, as they are here, into scans/."""
-    sys.path.insert(0, VIEWER)
-    import fetch_vendor
-    if fetch_vendor.missing():
-        raise SystemExit("the viewer's libraries are not here: run  python " + os.path.join(VIEWER, "fetch_vendor.py"))
-    root = os.path.join(clone, "scans")
-    os.makedirs(root, exist_ok=True)
-    shutil.copy(os.path.join(VIEWER, "index.html"), os.path.join(root, "view.html"))
-    for _, rel, _ in fetch_vendor.FILES:
-        dst = os.path.join(root, "vendor", rel)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        shutil.copy(os.path.join(VIEWER, "vendor", rel), dst)
-    for name in sorted(os.listdir(EXTRA)) if os.path.isdir(EXTRA) else []:
-        if os.path.isfile(os.path.join(EXTRA, name)):
-            shutil.copy(os.path.join(EXTRA, name), os.path.join(root, name))
-    write_how(clone)
-
-
-def write_how(clone):
-    """scans/how.html (how a scan is made) and scans/tools/ (the tools, as plain files)."""
-    root = os.path.join(clone, "scans")
+def publish_tools(root):
+    """The tools as plain files in scans/tools/; -> [(group, [(file name, what it is for), ...]), ...] for the page that lists them."""
     tools = os.path.join(root, "tools")
     if os.path.isdir(tools):
         shutil.rmtree(tools)
     os.makedirs(tools)
-    e = html.escape
-    parts = [HOW_HEAD]
+    home = os.path.basename(os.path.expanduser("~"))
+    groups = []
     for title, files in TOOLS:
         rows = []
         for src, job in files:
@@ -525,18 +307,50 @@ def write_how(clone):
             if not os.path.exists(path):
                 raise SystemExit(f"a tool named for the site is not here: {path}")
             text = open(path, encoding="utf-8", errors="replace").read()
-            home = os.path.basename(os.path.expanduser("~"))
             if re.search(r"Users[\\/]+" + re.escape(home), text, re.I):
                 raise SystemExit(f"{path} names this computer's user folder: make that path relative to the home folder before it is published")
-            name = os.path.basename(path)
-            shutil.copy(path, os.path.join(tools, name))
-            rows.append(f'<tr><td class="file"><a href="tools/{e(name)}">{e(name)}</a></td><td>{e(job)}</td></tr>')
-        parts.append(f'<h3>{e(title)}</h3>\n<div class="table-scroll"><table>\n' + "\n".join(rows) + "\n</table></div>\n")
-    parts.append('<p class="muted">The viewer is <a href="view.html">view.html</a> and the live page <a href="live.html">live.html</a>: their source is the page itself. '
-                 '<code>scan_view.py</code> expects the viewer as <code>web/splat/index.html</code> beside it, with the libraries <code>fetch_vendor.py</code> fetches.</p>\n')
-    parts.append(HOW_FOOT)
-    with open(os.path.join(root, "how.html"), "w", encoding="utf-8", newline="\n") as fh:
-        fh.write("".join(parts))
+            shutil.copy(path, os.path.join(tools, os.path.basename(path)))
+            rows.append((os.path.basename(path), job))
+        groups.append((title, rows))
+    return groups
+
+
+def write_pages(clone):
+    """Everything in scans/ beside the scans themselves: the list, how a scan is made, the viewer and the live page (as
+    they are here, with the home page's stylesheet linked), the look, the libraries, the tests, the tools, and the one
+    picture other pages show for the scans (cover.jpg: the first scan's)."""
+    sys.path[:0] = [HERE, VIEWER]
+    import fetch_vendor
+    import scan_pages
+    if fetch_vendor.missing():
+        raise SystemExit("the viewer's libraries are not here: run  python " + os.path.join(VIEWER, "fetch_vendor.py"))
+    root = os.path.join(clone, "scans")
+    os.makedirs(root, exist_ok=True)
+    css = open(os.path.join(VIEWER, "scans.css"), "rb").read()
+    stamp = hashlib.sha1(css).hexdigest()[:8]              # the look's address changes when the look does, so no browser keeps an old one
+    metas = scans_in(clone)
+
+    def put(name, text):
+        with open(os.path.join(root, name), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(text)
+
+    put("index.html", scan_pages.list_page(metas, stamp))
+    put("scans.json", json.dumps({"scans": [{k: m.get(k) for k in ("id", "title", "kind", "mode", "made", "published", "splat_count")} for m in metas]}, indent=1))
+    put("view.html", scan_pages.with_site_style(open(os.path.join(VIEWER, "index.html"), encoding="utf-8").read(), stamp))
+    put("live.html", scan_pages.with_site_style(open(os.path.join(EXTRA, "live.html"), encoding="utf-8").read(), stamp))
+    with open(os.path.join(root, "scans.css"), "wb") as fh:
+        fh.write(css)
+    for _, rel, _ in fetch_vendor.FILES:
+        dst = os.path.join(root, "vendor", rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy(os.path.join(VIEWER, "vendor", rel), dst)
+    for name in sorted(os.listdir(EXTRA)):                 # the pages' tests travel with them
+        if os.path.isfile(os.path.join(EXTRA, name)) and name != "live.html":
+            shutil.copy(os.path.join(EXTRA, name), os.path.join(root, name))
+    put("how.html", scan_pages.how_page(publish_tools(root), stamp))
+    if metas:
+        shutil.copy(os.path.join(root, "runs", metas[0]["id"], metas[0]["pictures_shown"][0]["file"]), os.path.join(root, "cover.jpg"))
+    return metas
 
 
 def main():
@@ -587,8 +401,7 @@ def main():
         with open(kept, "w", encoding="utf-8") as fh:
             json.dump({k: m[k] for k in ("id", "title", "note", "kind")}, fh, indent=1)
         what = what or f"Scans: {title}"
-    sync_page(clone)
-    metas = write_list(clone)
+    metas = write_pages(clone)
     log(f"the list has {len(metas)} scan(s): " + ", ".join(m["id"] for m in metas))
     if a.no_push:
         log("written into the clone; nothing committed or pushed (--no-push)")

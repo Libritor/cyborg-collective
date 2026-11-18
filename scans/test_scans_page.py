@@ -92,7 +92,7 @@ def browser_checks(url, listed, shots):
         cards = pg.locator("article.scan")
         check(cards.count() == len(listed), "every scan has its card (%d)" % cards.count(), listed)
         text = pg.inner_text("body")
-        check("Gaussian splats" in text and "no lidar" in text, "it says what a scan is, and that the headset has no lidar")
+        check("Gaussian splat" in text and "no lidar" in text and "How these pages are honest" in text, "it says what a scan is, that the headset has no lidar, and how the pages are honest")
         for sid in listed:
             card = pg.locator("article#%s" % sid)
             check(card.locator("img").count() >= 1 and card.locator('a.open[href="view.html?scan=%s"]' % sid).count() == 1 and card.locator("dl dt").count() >= 3,
@@ -102,6 +102,38 @@ def browser_checks(url, listed, shots):
                 r = pg.context.request.get(url + "scans/" + src)
                 check(r.status == 200 and "image/jpeg" in r.headers.get("content-type", ""), "%s: %s is a picture that answers" % (sid, src), r.status)
         check(not outside, "the list asks nothing of another site", outside[:3])
+        pg.context.close()
+
+        print("1b. the look: the home page's, full width, and reachable from it")
+        LOOK = """() => { const b = getComputedStyle(document.body), a = document.querySelector('nav a:not([aria-current])'), h = document.querySelector('header.top h1'), m = document.querySelector('.masthead');
+          return { bg: b.backgroundColor, ink: b.color, font: b.fontFamily, size: b.fontSize, nav: a ? getComputedStyle(a).color : null,
+                   h1: h ? getComputedStyle(h).fontSize + ' ' + getComputedStyle(h).fontWeight : null,
+                   wide: m ? Math.round(m.getBoundingClientRect().width) - innerWidth : -9999,
+                   site: [...document.styleSheets].some(s => s.href && s.href.split('?')[0].endsWith('/style.css')) }; }"""
+        for scheme in ("light", "dark"):
+            ctx = b.new_context(viewport={"width": 1440, "height": 900}, color_scheme=scheme)
+            pg = ctx.new_page()
+            pg.goto(url, wait_until="domcontentloaded")
+            pg.wait_for_timeout(600)
+            home = pg.evaluate(LOOK)
+            for path in ("scans/", "scans/how.html", "scans/view.html?scan=%s" % listed[0], "scans/live.html?relay=off"):
+                pg.goto(url + path, wait_until="domcontentloaded")
+                pg.wait_for_timeout(600)
+                look = pg.evaluate(LOOK)
+                same = all(look[k] == home[k] for k in ("bg", "ink", "font", "size", "nav", "h1"))
+                check(same and look["site"], "%s, %s: the home page's stylesheet, colours and type" % (path.split("?")[0], scheme), (look, home))
+                check(-1 <= look["wide"] <= 1, "%s, %s: as wide as the window" % (path.split("?")[0], scheme), look["wide"])
+            ctx.close()
+        pg, errors, outside = page(js=False)
+        pg.goto(url, wait_until="load")
+        doors = [pg.locator('#scans a[href="%s"]' % h).count() for h in ("scans/", "scans/live.html", "scans/how.html")]
+        check(doors == [1, 1, 1] and pg.locator('nav a[href="scans/"]').count() == 1 and pg.locator('#scans img[src="scans/cover.jpg"]').count() == 1,
+              "the home page has a section that opens the scans, the live page and how a scan is made, and its menu has the scans", doors)
+        check(pg.context.request.get(url + "scans/cover.jpg").status == 200, "the picture the home page shows for the scans answers")
+        for path in ("scans/", "scans/how.html"):
+            pg.goto(url + path, wait_until="load")
+            links = pg.evaluate("() => [...document.querySelectorAll('nav a')].map(a => a.getAttribute('href'))")
+            check(links[:4] == ["../", "./", "live.html", "how.html"], "%s: its menu leads home, to the scans, to the live page and to how a scan is made" % path, links)
         pg.context.close()
 
         print("2. the viewer, each scan")

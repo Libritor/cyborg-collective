@@ -1,0 +1,188 @@
+/* The scans pages, in the home page's own look.
+
+   On the site every scans page loads the home page's stylesheet first (../style.css) and this file after it, so the
+   colours, the type, the masthead, the menu, the tiles, the cards and the footer are the home page's own rules. On
+   the laptop, where scan_view.py serves the viewer by itself, the home page's stylesheet is not there: the first
+   part of this file repeats the few of its rules these pages stand on, word for word, so the viewer looks the same
+   there. The site's test (test_survives.py) fails if the colours repeated here stop matching style.css.
+
+   Second part: what only the scans pages have (the dark panel with the chain, a scan's card, the 3-D stage). */
+
+/* ---------------------------------------------------------------- repeated from the home page's style.css */
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e5e7eb;
+  --good: #16a34a; --ok: #d97706; --bad: #dc2626; --accent: #1f4e79; --accent2: #c0392b;
+  --noclaim: #9ca3af; --soft: #eef2f7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33;
+    --accent: #7fb3e6; --accent2: #f1948a; --noclaim: #6b7280; --soft: #1c2029;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33;
+  --accent: #7fb3e6; --accent2: #f1948a; --noclaim: #6b7280; --soft: #1c2029;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+       font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+.masthead { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); grid-template-rows: auto auto auto 1fr;
+  column-gap: 28px; padding: 28px 24px 8px; }
+.masthead > header.top, .masthead > nav { grid-column: 1; }
+.masthead > .band-col { grid-column: 2; grid-row: 1 / 5; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.masthead > nav { padding: 8px 0 0; }
+header.top { max-width: none; margin: 0; padding: 0 0 8px; }
+header.top h1 { margin: 0; font-size: 30px; letter-spacing: -0.01em; }
+header.top .tag { color: var(--muted); font-size: 16px; margin: 4px 0 0; }
+header.top .about { font-size: 14px; line-height: 1.5; margin: 12px 0 0; max-width: 78ch; }
+nav { max-width: none; margin: 0; padding: 8px 24px 0; display: flex; gap: 14px; flex-wrap: wrap; font-size: 14px; }
+nav a { text-decoration: none; color: var(--muted); border-bottom: 1px solid transparent; }
+nav a:hover { color: var(--ink); border-color: var(--ink); }
+main { max-width: none; margin: 0; padding: 8px 24px 40px; }
+section { margin: 28px 0; }
+section > h2 { font-size: 21px; margin: 0 0 4px; }
+section > h3 { font-size: 17px; margin: 28px 0 4px; }
+section > .sub { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+.tiles { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; min-width: 140px; flex: 1 1 140px; }
+.tile b { display: block; font-size: 22px; }
+.tile span { color: var(--muted); font-size: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 14px; }
+.badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); margin-left: 6px; vertical-align: middle; }
+.status { font-size: 13px; color: var(--muted); }
+.status code { background: var(--soft); padding: 1px 5px; border-radius: 4px; }
+.table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.noscript-note { max-width: 70ch; margin: 0 0 18px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+table.sessions { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.sessions th, table.sessions td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.sessions th { color: var(--muted); font-weight: 600; font-size: 12px; }
+footer { max-width: none; margin: 0; padding: 16px 24px 40px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); }
+footer ul { padding-left: 18px; }
+.nav-btn { font: inherit; font-size: 14px; color: var(--ink); background: transparent; border: 1px solid var(--muted); border-radius: 999px; padding: 2px 12px; cursor: pointer; line-height: 1.5; }
+.nav-btn:hover, .nav-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg, #fff); border-color: var(--ink); }
+.nav-btn[disabled] { opacity: 0.5; cursor: default; }
+.mark6 { font-weight: 700; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) { header.top h1 { font-size: 24px; } .tile b { font-size: 18px; } }
+
+/* ---------------------------------------------------------------- the scans pages' own */
+/* the line over the title: where this page hangs in the site */
+.crumb { margin: 0 0 2px; font-size: 13px; color: var(--muted); }
+.crumb a { color: inherit; }
+nav a[aria-current="page"] { color: var(--ink); border-color: var(--ink); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* one column on a narrow screen, in this order: the words, the dark panel, the menu, what is beside the stage */
+.masthead > .side { grid-column: 1; min-width: 0; }
+@media (max-width: 900px) {
+  .masthead { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  .masthead > .band-col { display: contents; }
+  .masthead > header.top { order: 1; }
+  .masthead .dark-panel { order: 2; margin-top: 14px; }
+  .masthead > nav { order: 3; }
+  .masthead > .side { order: 4; }
+  .masthead > header.top, .masthead > nav, .masthead > .side, .masthead .dark-panel { grid-column: 1; grid-row: auto; }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* a dark panel, dark in both themes as the home page's are */
+.dark-panel { margin: 0; min-width: 0; background: #0b0e14; border: 1px solid #1c212b; border-radius: 12px; color: #aeb7c4; overflow: hidden; }
+.dark-panel figcaption { padding: 9px 14px 0; font-size: 12px; line-height: 1.4; color: #aeb7c4; }
+.dark-panel figcaption b { color: #e5e7eb; }
+.dark-panel .how { margin: 4px 14px 0; font-size: 12px; color: #7d8794; }
+.dark-panel .gold { color: #e0b366; } .dark-panel .cold { color: #7fb3e6; }
+
+/* the chain, drawn the way the home page draws its chains: balls on lines */
+.chain-svg { display: block; width: 100%; min-width: 620px; height: auto; padding: 4px 6px 10px; }      /* on a phone it scrolls sideways in its panel and stays readable */
+.pc-ball { fill: #0b0e14; stroke: #7fb3e6; stroke-width: 1.6; }
+.pc-ball.gold { stroke: #e0b366; stroke-width: 2.4; fill: #3a2f17; }
+.pc-ball.live { stroke: #37d67a; }
+.pc-edge { fill: none; stroke: #7fb3e6; stroke-width: 1.6; }
+.pc-edge.live { stroke: #37d67a; stroke-dasharray: 4 4; }
+.pc-edge.gold { stroke: #e0b366; }
+.pc-name, .pc-what { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-anchor: middle;
+  paint-order: stroke; stroke: #0b0e14; stroke-width: 3px; stroke-linejoin: round; }
+.pc-name { fill: #e5e7eb; }
+.pc-what { fill: #8b94a1; font-size: 10.5px; }
+.pc-name.gold { fill: #e0b366; } .pc-name.live { fill: #37d67a; }
+
+/* a scan on the list: a card, as a person's card on the home page */
+.scan { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.scan-pic { display: block; margin: -14px -14px 2px; border-radius: 12px 12px 0 0; overflow: hidden; background: #fff; line-height: 0; }
+.scan-pic img { display: block; width: 100%; height: auto; }
+.scan h3 { margin: 0; font-size: 17px; }
+.scan .note { margin: 0; font-size: 14px; }
+.scan dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 0; font-size: 13px; }
+.scan dt { color: var(--muted); } .scan dd { margin: 0; }
+.scan .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: auto 0 0; padding-top: 6px; font-size: 13px; }
+.scan .files { color: var(--muted); }
+.badge.seen { color: var(--good); } .badge.test { color: var(--ok); }
+.badge.first { margin-left: 0; }
+
+/* buttons, as the home page's menu button */
+.btn { display: inline-block; font: inherit; font-size: 14px; line-height: 1.5; color: var(--ink); background: transparent; border: 1px solid var(--muted);
+  border-radius: 999px; padding: 2px 12px; cursor: pointer; text-decoration: none; }
+.btn:hover, .btn[aria-pressed="true"], .btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--card); font-weight: 600; padding: 4px 14px; }
+.btn.primary:hover { filter: brightness(1.12); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+
+/* doors: a few large links side by side */
+.doors { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 14px; margin: 10px 0 0; }
+.door { display: block; text-decoration: none; color: var(--ink); }
+.door b { display: block; font-size: 16px; }
+.door span { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.door:hover { border-color: var(--accent); }
+
+/* how a scan is made: steps side by side, the tools in cards */
+.steps { counter-reset: step; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px; margin: 10px 0 0; padding: 0; list-style: none; }
+.steps li { counter-increment: step; font-size: 14px; }
+.steps li b { display: block; font-size: 15px; margin-bottom: 2px; }
+.steps li b::before { content: counter(step) " "; color: var(--accent); font-variant-numeric: tabular-nums; margin-right: 4px; }
+.steps li.asked { border-style: dashed; }
+.tools { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap: 14px; margin: 10px 0 0; }
+.grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr)); }       /* as the home page's, and never wider than a phone */
+.tools h3 { margin: 0 0 6px; font-size: 15px; }
+.tools table.sessions td:first-child { white-space: nowrap; font: 12.5px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.tools table.sessions tr:last-child td { border-bottom: 0; }
+.run { margin: 10px 0 0; display: grid; gap: 2px; }
+.run code { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; }
+.run span { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
+.run span:last-child { margin-bottom: 0; }
+.checked { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: 14px; margin: 10px 0 0; }
+.checked .card { font-size: 14px; }
+.checked .card b:first-child { display: block; font-size: 15px; margin-bottom: 2px; }
+.checked .card.notyet { border-style: dashed; }
+
+/* the 3-D stage: a dark panel as tall as the window, beside the words */
+.stage-panel { position: sticky; top: 28px; height: calc(100vh - 56px); min-height: 420px; }
+.stage-panel #stage, .stage-panel #idle { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.stage-panel canvas { display: block; touch-action: none; cursor: grab; outline: none; }
+.stage-panel canvas:active { cursor: grabbing; }
+.stage-panel #status { position: absolute; left: 10px; bottom: 10px; max-width: calc(100% - 20px); padding: 4px 9px; border-radius: 6px; font-size: 12px;
+  color: #aeb7c4; background: rgba(11, 14, 20, 0.78); pointer-events: none; }
+.stage-panel #xr { position: absolute; right: 10px; bottom: 10px; max-width: min(260px, calc(100% - 20px)); font-size: 12px; }
+.stage-panel #xr .ask { display: block; padding: 6px 9px; border-radius: 6px; color: #aeb7c4; background: rgba(11, 14, 20, 0.78); }
+.stage-panel #xr a { color: #e5e7eb; }
+.side .about { font-size: 14px; line-height: 1.5; margin: 12px 0 0; max-width: 78ch; }
+.side .tiles { margin: 12px 0 0; }
+.side .tile { flex: 1 1 120px; min-width: 120px; padding: 8px 12px; }
+.side .tile b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.side .files { margin: 12px 0 0; font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.side .now { display: flex; align-items: baseline; gap: 8px; margin: 12px 0 0; font-size: 16px; }
+.side .now .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--noclaim); }
+.side .now .dot.on { background: var(--good); box-shadow: 0 0 0 4px color-mix(in srgb, var(--good) 22%, transparent); }
+.side .now b { font-weight: 600; }
+@media (max-width: 900px) { .stage-panel { position: relative; top: 0; height: 62vh; min-height: 320px; } }
+
+/* shown inside another page (the live page, while nobody is scanning): the stage alone */
+body.bare { overflow: hidden; }
+body.bare .masthead { display: block; padding: 0; }
+body.bare header.top, body.bare nav, body.bare .side, body.bare footer { display: none; }
+body.bare .stage-panel { position: fixed; inset: 0; height: auto; min-height: 0; border: 0; border-radius: 0; margin: 0; }
+body.bare #status, body.bare #xr { display: none; }
+
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }

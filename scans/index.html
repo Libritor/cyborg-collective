@@ -4,92 +4,126 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scans in 3-D</title>
-<!-- Written by scan_publish.py from scans/runs/*/meta.json. No script: this page is the list as plain words and
-     pictures; view.html draws a scan in 3-D. -->
-<style>
-  :root { color-scheme: light dark; --bg: #f6f7f9; --card: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e5e7eb; --accent: #1f4e79; --test: #92400e; --seen: #166534; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33; --accent: #7fb3e6; --test: #fbbf24; --seen: #86efac; } }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 1120px; margin: 0 auto; padding: 28px 16px 48px; }
-  a { color: var(--accent); overflow-wrap: anywhere; }
-  h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
-  .lede { max-width: 72ch; margin: 0 0 8px; }
-  .doors { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 12px 0; }
-  .doors a { display: inline-block; text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; }
-  .doors b { color: var(--accent); }
-  .muted { color: var(--muted); font-size: 13.5px; max-width: 80ch; }
-  .scan { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 20px 0; }
-  .pics img { display: block; width: 100%; height: auto; border-radius: 8px; background: #fff; }
-  .words { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px 28px; margin-top: 14px; }
-  .words > * { min-width: 0; }
-  @media (min-width: 900px) { .words { grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); } }
-  h2 { margin: 0 0 4px; font-size: 20px; }
-  .kind { display: inline-block; font-size: 12px; font-weight: 600; letter-spacing: 0.02em; border: 1px solid currentColor; border-radius: 999px; padding: 1px 9px; margin-bottom: 8px; }
-  .kind.test { color: var(--test); } .kind.headset { color: var(--seen); }
-  .note { margin: 0 0 10px; }
-  dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 14px; margin: 0 0 12px; font-size: 14px; }
-  dt { color: var(--muted); } dd { margin: 0; }
-  .open { display: inline-block; font-weight: 600; text-decoration: none; color: var(--card); background: var(--accent); border-radius: 8px; padding: 7px 14px; margin: 0 0 10px; }
-  .files { margin: 0; padding: 0; list-style: none; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 16px; }
-  footer { margin-top: 28px; }
-</style>
+<meta name="description" content="What a person wearing a headset looks at, rebuilt in 3-D: drawn as Gaussians while they look, trained into a Gaussian splat minutes later, and for an object made into a solid that can be printed and held.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Scans in 3-D">
+<meta property="og:description" content="What a person wearing a headset looks at, rebuilt in 3-D: drawn as Gaussians while they look, trained into a Gaussian splat minutes later, and for an object made into a solid that can be printed and held.">
+<meta property="og:image" content="http://6ense.com/scans/cover.jpg">
+<!-- Written by scan_publish.py (scan_pages.py). No script on this page. -->
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="scans.css?v=53740d06">
 </head>
 <body>
+<div class="masthead">
+<header class="top">
+  <p class="crumb"><a href="../">Cyborg Collective</a> · <span class="mark6">6ense™</span></p>
+  <h1>Scans in 3-D</h1>
+  <p class="tag">What a person wearing a headset looks at, rebuilt in 3-D: drawn as Gaussians while they look, trained into a Gaussian splat minutes later, and for an object made into a solid that can be printed and held.</p>
+  <p class="about">A headset on the head is a camera that knows where it is. These pages use that and little else: its pictures, its own positions, and the depth it works out from its two tracking cameras (it has no lidar). A laptop does the rest, with tools that are published beside the results, and every result says what it is: seen by a headset, or a test of the method against a shape that is known.</p>
+</header>
+<nav aria-label="Scans">
+  <a href="../">Home</a><a href="./" aria-current="page">Scans</a><a href="live.html">Live</a><a href="how.html">How a scan is made</a><a href="../space/">Rooms in 3-D</a><a href="../record.html">The record</a>
+</nav>
+<div class="side">
+<div class="tiles">
+  <div class="tile"><b>3</b><span>scans here</span></div>
+  <div class="tile"><b>1</b><span>seen by a headset</span></div>
+  <div class="tile"><b>1,258,914</b><span>Gaussians trained</span></div>
+  <div class="tile"><b>248</b><span>pictures they were trained from</span></div>
+  <div class="tile"><b>0.37 mm</b><span>closest to a known shape (half the surface)</span></div>
+  <div class="tile"><b>1.8–3.7 min</b><span>to train one on a laptop</span></div>
+</div>
+<div class="doors">
+  <a class="card door" href="live.html"><b>Live Gaussian splatting</b><span>What a headset is scanning now, drawn as Gaussians while it scans. When nobody is scanning, the most recent finished scan.</span></a>
+  <a class="card door" href="how.html"><b>How a scan is made</b><span>The chain from headset to print file, what has been checked and what has not, and every tool as a plain file.</span></a>
+</div>
+</div>
+<div class="band-col">
+<figure class="dark-panel chain-panel">
+<figcaption><b>6ense™</b> the chain · from what a headset sees to something that can be held</figcaption>
+<p class="how">Blue is what a laptop makes after the scan; <span style="color:#37d67a">green</span> goes out while the headset is still scanning; <span class="gold">gold</span> is this site.</p>
+<div class="table-scroll"><svg class="chain-svg" viewBox="0 0 770 316" role="img" aria-labelledby="chain-title chain-desc">
+<title id="chain-title">The chain from a headset to a print file and to this site</title>
+<desc id="chain-desc">A headset, worn, keeps pictures with its position and depth rays. A laptop trains a Gaussian splat from them, makes a closed solid from the splat and slices it into a print file. While scanning, live Gaussians, one per depth reading, go to this site. Afterwards the trained splat, compressed, goes to this site too.</desc>
+<path class="pc-edge " d="M83 78 L219 78"/>
+<path class="pc-edge " d="M245 78 L397 78"/>
+<path class="pc-edge " d="M423 78 L553 78"/>
+<path class="pc-edge " d="M579 78 L687 78"/>
+<path class="pc-edge live" d="M70 91 C70 256, 110 256, 219 256"/>
+<path class="pc-edge live" d="M245 256 C436.0 256, 436.0 226, 627 226"/>
+<path class="pc-edge " d="M410 91 L410 155"/>
+<path class="pc-edge gold" d="M423 168 C580 168, 640 178, 640 213"/>
+<circle class="pc-ball " cx="70" cy="78" r="13"/>
+<text class="pc-name " x="70" y="41">headset</text>
+<text class="pc-what" x="70" y="56">a Quest 3S, worn</text>
+<circle class="pc-ball " cx="232" cy="78" r="13"/>
+<text class="pc-name " x="232" y="41">pictures</text>
+<text class="pc-what" x="232" y="56">with position + depth rays</text>
+<circle class="pc-ball " cx="410" cy="78" r="13"/>
+<text class="pc-name " x="410" y="41">splat</text>
+<text class="pc-what" x="410" y="56">trained by Brush, ~2 min</text>
+<circle class="pc-ball " cx="566" cy="78" r="13"/>
+<text class="pc-name " x="566" y="41">solid</text>
+<text class="pc-what" x="566" y="56">closed, flat base</text>
+<circle class="pc-ball " cx="700" cy="78" r="13"/>
+<text class="pc-name " x="700" y="41">print file</text>
+<text class="pc-what" x="700" y="56">sliced, Bambu H2C</text>
+<circle class="pc-ball live" cx="232" cy="256" r="13"/>
+<text class="pc-name live" x="232" y="287">live Gaussians</text>
+<text class="pc-what" x="232" y="302">one per depth reading</text>
+<circle class="pc-ball " cx="410" cy="168" r="13"/>
+<text class="pc-name " x="410" y="199">compressed</text>
+<text class="pc-what" x="410" y="214">Open3D, .spz, a tenth</text>
+<circle class="pc-ball gold" cx="640" cy="226" r="13"/>
+<text class="pc-name gold" x="640" y="257">this site</text>
+<text class="pc-what" x="640" y="272">live · scans</text>
+</svg></div>
+</figure>
+</div>
+</div>
 <main>
-<h1>Scans in 3-D</h1>
-<p class="lede">Things and places photographed with a Meta Quest 3S headset and rebuilt as Gaussian splats: clouds of soft coloured blobs, trained until they reproduce the photographs. From the splat of one object a closed solid is made and sliced for a 3-D printer.</p>
-<p class="doors"><a href="live.html"><b>Live</b>: what a headset is scanning now, as Gaussians, while it scans</a> <a href="how.html"><b>How a scan is made</b>, with the tools</a></p>
-<p class="muted">How a scan gets here: the headset keeps pictures, with its own position for each; a laptop trains the splat from them (Brush), makes the solid, and compresses the splat (Open3D); the viewer on this site (Spark and three.js, both kept beside the page) draws it. The headset has no lidar: where depth is used, it is the depth the headset works out from its two tracking cameras. &ldquo;Pictures kept back&rdquo;: a tenth of the pictures are not used for training, and the number says how closely the splat reproduces them (higher is closer).</p>
-<article class="scan" id="room-17-nov">
-<div class="pics"><a href="view.html?scan=room-17-nov"><img src="runs/room-17-nov/picture.jpg" alt="The splat seen from the spot it was photographed from, looking round in eight directions" width="1400" height="525" decoding="async"></a></div>
-<div class="words">
-<div>
-<h2>A room, from one seat</h2>
-<span class="kind headset">seen by a headset</span>
-<p class="note">Looked at from one seat with a Meta Quest 3S on 17 November 2026: 26 pictures. Nothing was walked round, so this is a view to look round from where it was photographed; away from that spot it has gaps. The 3-D model of the room is an estimate: the headset measured only the wall with the map, and the rest of the shape comes from a depth-estimating network pinned to one measured point per picture. Published by the person whose room it is; the camera pictures stay with them.</p>
-<a class="open" href="view.html?scan=room-17-nov">Look round it in 3-D</a>
-</div>
-<div>
-<dl><dt>Pictures</dt><dd>26</dd><dt>Splat</dt><dd>525,956 Gaussians trained in 7000 steps; 400,000 kept for this page</dd><dt>Pictures kept back</dt><dd>reproduced at 33.35 dB</dd><dt>Room model</dt><dd>4.64 × 4.7 m, 2.95 m high (an estimate)</dd><dt>Diorama print</dt><dd>1:30, 155 × 156 × 76 mm; 14h 34m 56s print time, 222.39 g PLA, 379 layers</dd></dl>
-<ul class="files"><li><a href="runs/room-17-nov/view.spz" download>the splat (.spz)</a> <span class="muted">6.7 MB</span></li><li><a href="runs/room-17-nov/room.glb" download>the room model (.glb)</a> <span class="muted">16 MB</span></li><li><a href="runs/room-17-nov/room_diorama_stl.zip" download>diorama STL, 1:30 (zip)</a> <span class="muted">18 MB</span></li></ul>
-</div>
-</div>
-</article>
-<article class="scan" id="trex-test">
-<div class="pics"><a href="view.html?scan=trex-test"><img src="runs/trex-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467" decoding="async"></a></div>
-<div class="words">
-<div>
-<h2>T. rex (a test of the method)</h2>
-<span class="kind test">a test of the method</span>
-<p class="note">Not a headset scan. A T. rex model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 61 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.47 mm of the true one.</p>
-<a class="open" href="view.html?scan=trex-test">Turn it round in 3-D</a>
-</div>
-<div>
-<dl><dt>Real size</dt><dd>18.2 × 13.0 × 11.3 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>439,587 Gaussians trained in 8000 steps; 5,491 of them are the object itself</dd><dt>Pictures kept back</dt><dd>reproduced at 37.71 dB</dd><dt>Against the true shape</dt><dd>0.47 mm (half the surface); 1.57 mm (95 %)</dd><dt>Print</dt><dd>120 × 86 × 75 mm; 1h 33m 49s print time, 30.44 g PLA, 373 layers</dd></dl>
-<ul class="files"><li><a href="runs/trex-test/object.spz" download>the splat (.spz)</a> <span class="muted">97 kB</span></li><li><a href="runs/trex-test/object_print.stl" download>STL to print (120 mm)</a> <span class="muted">4.7 MB</span></li><li><a href="runs/trex-test/object_h2c.3mf" download>sliced for a Bambu H2C (.3mf)</a> <span class="muted">6.2 MB</span></li></ul>
-</div>
-</div>
-</article>
-<article class="scan" id="triceratops-test">
-<div class="pics"><a href="view.html?scan=triceratops-test"><img src="runs/triceratops-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467" decoding="async"></a></div>
-<div class="words">
-<div>
-<h2>Triceratops (a test of the method)</h2>
-<span class="kind test">a test of the method</span>
-<p class="note">Not a headset scan. A Triceratops model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 39 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.37 mm of the true one.</p>
-<a class="open" href="view.html?scan=triceratops-test">Turn it round in 3-D</a>
-</div>
-<div>
-<dl><dt>Real size</dt><dd>6.1 × 13.2 × 7.1 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>293,371 Gaussians trained in 6000 steps; 5,606 of them are the object itself</dd><dt>Pictures kept back</dt><dd>reproduced at 39.64 dB</dd><dt>Against the true shape</dt><dd>0.37 mm (half the surface); 1.68 mm (95 %)</dd><dt>Print</dt><dd>56 × 120 × 65 mm</dd></dl>
-<ul class="files"><li><a href="runs/triceratops-test/object.spz" download>the splat (.spz)</a> <span class="muted">92 kB</span></li><li><a href="runs/triceratops-test/object_print.stl" download>STL to print (120 mm)</a> <span class="muted">4.7 MB</span></li></ul>
-</div>
-</div>
-</article>
-<footer class="muted">
-<p>In a headset, AR and VR need a secure address, which 6ense.com does not have yet: the same page is at <a href="https://cyborg-collective-relay.onrender.com/scans/">cyborg-collective-relay.onrender.com/scans/</a>, where each scan has an Enter AR or Enter VR button.</p>
-<p>Part of <a href="../">6ense.com</a> · <a href="../space/">rooms rebuilt from walks</a> · <a href="../record.html">the record as a plain page</a> · published by the wearer; the camera pictures and the raw recordings stay with them, and what is here was computed from them.</p>
-</footer>
+<section id="scans">
+  <h2>The scans</h2>
+  <p class="sub">Each opens in 3-D: an object to turn round, beside the solid made from it; a place to look round from where it was photographed. “Pictures kept back”: a tenth of the pictures are not used for training, and the number says how closely the splat reproduces them (higher is closer).</p>
+  <div class="grid">
+  <article class="card scan" id="room-17-nov">
+    <a class="scan-pic" href="view.html?scan=room-17-nov"><img src="runs/room-17-nov/picture.jpg" alt="The splat seen from the spot it was photographed from, looking round in eight directions" width="1400" height="525"></a>
+    <h3>A room, from one seat</h3>
+    <div><span class="badge seen first">seen by a headset</span></div>
+    <p class="note">Looked at from one seat with a Meta Quest 3S on 17 November 2026: 26 pictures. Nothing was walked round, so this is a view to look round from where it was photographed; away from that spot it has gaps. The 3-D model of the room is an estimate: the headset measured only the wall with the map, and the rest of the shape comes from a depth-estimating network pinned to one measured point per picture. Published by the person whose room it is; the camera pictures stay with them.</p>
+    <dl><dt>Pictures</dt><dd>26</dd><dt>Splat</dt><dd>525,956 Gaussians, 7,000 steps; 400,000 shown here</dd><dt>Pictures kept back</dt><dd>reproduced at 33.35 dB</dd><dt>Room model</dt><dd>4.64 × 4.7 m, 2.95 m high (an estimate)</dd><dt>Diorama print</dt><dd>1:30, 155 × 156 × 76 mm; 14h 34m 56s, 222.39 g PLA</dd></dl>
+    <p class="actions"><a class="btn primary open" href="view.html?scan=room-17-nov">Look round it in 3-D</a><span class="files"><a href="runs/room-17-nov/view.spz" download>the splat (.spz)</a> 6.7 MB · <a href="runs/room-17-nov/room.glb" download>the room model (.glb)</a> 16 MB · <a href="runs/room-17-nov/room_diorama_stl.zip" download>diorama STL, 1:30 (zip)</a> 18 MB</span></p>
+  </article>
+  <article class="card scan" id="trex-test">
+    <a class="scan-pic" href="view.html?scan=trex-test"><img src="runs/trex-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467"></a>
+    <h3>T. rex (a test of the method)</h3>
+    <div><span class="badge test first">a test of the method</span></div>
+    <p class="note">Not a headset scan. A T. rex model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 61 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.47 mm of the true one.</p>
+    <dl><dt>Real size</dt><dd>18.2 × 13.0 × 11.3 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>439,587 Gaussians, 8,000 steps; 5,491 are the object</dd><dt>Pictures kept back</dt><dd>reproduced at 37.71 dB</dd><dt>From the true shape</dt><dd>0.47 mm for half the surface, 1.57 mm for 95 %</dd><dt>Print</dt><dd>120 × 86 × 75 mm; 1h 33m 49s, 30.44 g PLA</dd></dl>
+    <p class="actions"><a class="btn primary open" href="view.html?scan=trex-test">Turn it round in 3-D</a><span class="files"><a href="runs/trex-test/object.spz" download>the splat (.spz)</a> 97 kB · <a href="runs/trex-test/object_print.stl" download>STL to print (120 mm)</a> 4.7 MB · <a href="runs/trex-test/object_h2c.3mf" download>sliced for a Bambu H2C (.3mf)</a> 6.2 MB</span></p>
+  </article>
+  <article class="card scan" id="triceratops-test">
+    <a class="scan-pic" href="view.html?scan=triceratops-test"><img src="runs/triceratops-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467"></a>
+    <h3>Triceratops (a test of the method)</h3>
+    <div><span class="badge test first">a test of the method</span></div>
+    <p class="note">Not a headset scan. A Triceratops model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 39 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.37 mm of the true one.</p>
+    <dl><dt>Real size</dt><dd>6.1 × 13.2 × 7.1 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>293,371 Gaussians, 6,000 steps; 5,606 are the object</dd><dt>Pictures kept back</dt><dd>reproduced at 39.64 dB</dd><dt>From the true shape</dt><dd>0.37 mm for half the surface, 1.68 mm for 95 %</dd><dt>Print</dt><dd>56 × 120 × 65 mm</dd></dl>
+    <p class="actions"><a class="btn primary open" href="view.html?scan=triceratops-test">Turn it round in 3-D</a><span class="files"><a href="runs/triceratops-test/object.spz" download>the splat (.spz)</a> 92 kB · <a href="runs/triceratops-test/object_print.stl" download>STL to print (120 mm)</a> 4.7 MB</span></p>
+  </article>
+  </div>
+</section>
 </main>
+<footer>
+  <b>How these pages are honest</b>
+  <ul>
+    <li>Seen by a headset, or a test: every scan carries one of the two labels. A test was drawn on a computer from a model whose shape is known, so that the result could be measured; it is not passed off as a headset scan.</li>
+    <li>What is published is what was computed: the splat, the solid, renders of them and the print files. The camera pictures stay with the person who took them.</li>
+    <li>A place photographed from one spot is shown as that: a view to look round from where it was taken, with gaps away from that spot and no solid. A room model beside it is an estimate, and its card says where its shape comes from.</li>
+    <li>Live Gaussians are placed, not trained: one for each reading of the headset's depth sensing, drawn as it arrives. The trained splat of the same sitting comes minutes later. The relay passes the live ones on and keeps none.</li>
+    <li>The headset has no lidar: its depth is what it works out from its two tracking cameras.</li>
+    <li>Not yet done, and said where it matters: a walk all the way round one object with the headset; the live view from the headset itself (made-up rooms have been sent so far); AR and VR inside the headset from this site; a print.</li>
+  </ul>
+  <p>In a headset, AR and VR need a secure address, which 6ense.com does not have yet: the same pages are at <a href="https://cyborg-collective-relay.onrender.com/scans/">cyborg-collective-relay.onrender.com/scans/</a>, where a scan has an Enter AR or Enter VR button. Part of <a href="../">6ense.com</a> · <a href="../space/">rooms rebuilt from walks</a> · <a href="../record.html">the record as a plain page</a>.</p>
+</footer>
 </body>
 </html>

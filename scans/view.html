@@ -3,87 +3,84 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Quest scan</title>
+<title>A scan in 3-D</title>
+<meta name="description" content="A scan made with a headset, as the Gaussian splat trained from its pictures and the solid made from it for a 3-D printer: turn it round, or look round from where it was photographed.">
 <!-- The object the Quest scanned, as the Gaussian splat trained from its pictures, and the solid made from it for
-     the printer. On the laptop: drag to turn, wheel to zoom. In the Quest Browser: "Enter" puts it in the room at
-     real size (right stick: turn and resize; trigger: splat / solid / both).
+     the printer. Drag to turn, wheel to zoom. In the Quest Browser, "Enter AR" puts it in the room at real size
+     (right stick: turn and resize; trigger: splat / solid / both).
      One file, two places. On the laptop scan_view.py serves it with the run folder's files under data/. On the
      published site it is scans/view.html and ?scan=<id> names a folder under runs/ written by scan_publish.py,
-     whose meta.json says which files to load (the splats compressed to .spz there). -->
-<style>
-  :root { color-scheme: dark; --ink: #e9edf2; --dim: #9aa6b4; --panel: rgba(18, 22, 28, 0.86); --line: #2c3540; --go: #37d67a; }
-  html, body { margin: 0; height: 100%; background: #0d1014; color: var(--ink); font: 14px/1.45 system-ui, "Segoe UI", sans-serif; overflow: hidden; }
-  canvas { display: block; }
-  #panel { position: fixed; left: 12px; top: 12px; width: min(330px, calc(100vw - 24px)); background: var(--panel); border: 1px solid var(--line);
-           border-radius: 10px; padding: 12px 14px; backdrop-filter: blur(6px); }
-  #panel h1 { font-size: 15px; margin: 0 0 2px; }
-  #panel .sub { color: var(--dim); font-size: 12px; margin-bottom: 8px; }
-  #facts { margin: 6px 0 10px; padding: 0; list-style: none; font-size: 13px; }
-  #facts li { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding: 3px 0; }
-  #facts span:first-child { color: var(--dim); }
-  .row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-  button, a.btn { font: inherit; color: var(--ink); background: #1b222b; border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; cursor: pointer; text-decoration: none; }
-  button.on { border-color: var(--go); color: var(--go); }
-  #status { position: fixed; left: 12px; bottom: 12px; color: var(--dim); font-size: 12px; background: var(--panel); padding: 4px 8px; border-radius: 6px; max-width: calc(100vw - 24px); box-sizing: border-box; }
-  #xr { position: fixed; right: 12px; bottom: 12px; }
-  #xr .ask { display: block; max-width: 250px; color: var(--dim); font-size: 12px; background: var(--panel); padding: 6px 9px; border-radius: 6px; }
-  #xr .ask a, #note a, #panel .back { color: var(--ink); }
-  #panel .back { display: inline-block; font-size: 12px; margin-bottom: 6px; }
-  #note { color: var(--dim); font-size: 12.5px; margin: 0 0 8px; }
-  #more > summary { cursor: pointer; color: var(--dim); font-size: 12px; margin-bottom: 4px; }
-  #plain { max-width: 60ch; margin: 28px auto; padding: 0 16px; } #plain a { color: inherit; }
-  @media (max-width: 700px) { #status { bottom: 56px; } }
-</style>
-<noscript><style>#panel, #status, #xr { display: none; }</style></noscript>
+     whose meta.json says which files to load (the splats compressed to .spz there).
+     The look is the home page's: on the site the line below is replaced by a link to the home page's stylesheet;
+     scans.css, beside this file, repeats what it needs of it for the laptop and adds the stage. -->
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="scans.css?v=53740d06">
+<noscript><style>#panel, .band-col, #menu { display: none; }</style></noscript>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/", "@sparkjsdev/spark": "./vendor/spark.module.min.js" } }
 </script>
 </head>
 <body>
-<noscript><div id="plain">
-  <h1>A scan in 3-D</h1>
-  <p>Drawing a scan so that it can be turned round needs JavaScript, which is off in this browser. <a href="./">The list of scans</a> shows each one as a picture, with its numbers and its files, and needs none.</p>
-</div></noscript>
-<div id="panel">
-  <a class="back" id="back" href="./" hidden>← all scans</a>
-  <h1 id="title">Quest scan</h1>
-  <div class="sub" id="sub">loading…</div>
-  <details id="more" open>
-    <summary>about this scan</summary>
-    <p id="note" hidden></p>
-    <ul id="facts"></ul>
-  </details>
-  <div class="row">
-    <button id="bSplat" class="on">splat</button>
-    <button id="bSolid">solid</button>
-    <button id="bRoom">room</button>
-    <button id="bTurn" class="on">turn</button>
-    <button id="bModel" style="display:none">3-D model</button>
+<div class="masthead">
+<header class="top">
+  <p class="crumb" id="crumb">Quest scan</p>
+  <h1 id="title">A scan in 3-D</h1>
+  <p class="tag" id="sub">loading…</p>
+  <noscript><p class="noscript-note" id="plain">Drawing a scan so that it can be turned round needs JavaScript, which is off in this browser. <a href="./">The list of scans</a> shows each one as a picture, with its numbers and its files, and needs none.</p></noscript>
+</header>
+<nav id="menu" aria-label="Scans" hidden>
+  <a href="../">Home</a><a href="./">Scans</a><a href="live.html">Live</a><a href="how.html">How a scan is made</a>
+</nav>
+<div class="side" id="panel">
+  <p class="about" id="note" hidden></p>
+  <div class="tiles" id="facts"></div>
+  <div class="row" role="group" aria-label="What is shown">
+    <button class="btn on" id="bSplat" aria-pressed="true">splat</button>
+    <button class="btn" id="bSolid" aria-pressed="false">solid</button>
+    <button class="btn" id="bRoom" aria-pressed="false" title="The surroundings it was scanned in">room</button>
+    <button class="btn on" id="bTurn" aria-pressed="true">turn</button>
+    <button class="btn" id="bModel" aria-pressed="false" hidden>3-D model</button>
+    <button class="btn" id="bXr">Enter AR</button>
   </div>
-  <div class="row" id="files"></div>
+  <p class="files" id="files"></p>
 </div>
-<div id="status">starting</div>
-<div id="xr"></div>
+<div class="band-col">
+  <figure class="dark-panel stage-panel" aria-label="The scan in 3-D: drag to turn, scroll to zoom">
+    <div id="stage"></div>
+    <div id="status">starting</div>
+    <div id="xr"></div>
+  </figure>
+</div>
+</div>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SparkRenderer, SplatMesh, SparkXr } from '@sparkjsdev/spark';
 
-const say = (t) => { document.getElementById('status').textContent = t; };
+const $ = (id) => document.getElementById(id);
+const say = (t) => { $('status').textContent = t; };
 const q = new URLSearchParams(location.search);
 const state = { ready: false, splats: 0, error: null, xr: false, frames: 0 };
 window.viewer = state;
-// ?bare=1: shown inside another page (live.html, while nobody is scanning): the picture alone, no panel
-if (q.has('bare')) for (const id of ['panel', 'status', 'xr']) document.getElementById(id).style.display = 'none';
+// ?bare=1: shown inside another page (live.html, while nobody is scanning): the stage alone
+if (q.has('bare')) document.body.classList.add('bare');
+const BACK = 0x0b0e14;       // the stage: dark in both themes, as the home page's panels are
 
+const stage = $('stage');
 const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: q.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
-renderer.setClearColor(0x0d1014, 1);
-document.body.appendChild(renderer.domElement);
+renderer.setClearColor(BACK, 1);
+stage.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.01, 100);
+const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 100);
+function fitStage() {        // the picture is as large as its panel, whatever the window does
+  if (renderer.xr.isPresenting) return;
+  const w = Math.max(1, stage.clientWidth), h = Math.max(1, stage.clientHeight);
+  renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+fitStage();
+new ResizeObserver(fitStage).observe(stage);
 const spark = new SparkRenderer({ renderer });
 scene.add(spark);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x556070, 2.2));
@@ -95,14 +92,17 @@ const turn = new THREE.Group(); stand.add(turn);
 const plate = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.004, 64), new THREE.MeshStandardMaterial({ color: 0x2a323c, roughness: 0.9 }));
 plate.position.y = -0.002; turn.add(plate);
 let object = null, solid = null, room = null, size = 0.2;
-const show = { splat: true, solid: false, room: false, turn: !q.has('still') };
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const show = { splat: true, solid: false, room: false, turn: !q.has('still') && !calm };
 
 // which scan: on the laptop the one run scan_view.py serves under data/; on the site ?scan=<id>, a folder under runs/
 const scan = (q.get('scan') || '').replace(/[^\w.-]/g, '');
 const base = scan ? `runs/${scan}/` : 'data/';
 state.scan = scan || null;
-if (scan) document.getElementById('back').hidden = false;
-if (innerWidth < 700) document.getElementById('more').open = false;      // a phone: the picture first, the words on request
+if (scan) {
+  $('menu').hidden = false;
+  $('crumb').innerHTML = '<a href="../">Cyborg Collective</a> · <a href="./">Scans in 3-D</a>';
+}
 const meta = await fetch(base + 'meta.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null);
 // "view": not one object but everything that was looked at, to be seen from the spot it was photographed from
 const viewMode = !!(meta && meta.mode === 'view');
@@ -116,36 +116,42 @@ const F = !meta ? {} : {
   model: meta.model || (had['room.glb'] ? 'room.glb' : null) };
 const stamp = '?v=' + encodeURIComponent((meta && meta.made) || '');
 const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-if (!meta) { say(scan ? 'there is no scan called ' + scan : 'no scan yet: run quest_scan.py, then reload'); state.error = 'no meta.json'; }
-else {
+const press = (id, on) => { const b = $(id); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); };
+const hint = () => viewMode ? 'drag to look round' : 'drag to turn, scroll to zoom';
+if (!meta) {
+  say(scan ? 'there is no scan called ' + scan : 'no scan yet: run quest_scan.py, then reload'); state.error = 'no meta.json';
+  $('sub').textContent = scan ? 'There is no scan called ' + scan + '.' : 'No scan yet.';
+} else {
   const test = meta.kind === 'test';
-  document.getElementById('title').textContent = document.title = meta.title || meta.name;
+  $('title').textContent = document.title = meta.title || meta.name;
   const s = meta.size_cm || [20, 20, 20];
   size = Math.max(s[0], s[1], s[2]) / 100;
-  document.getElementById('sub').textContent = (test ? 'a test of the method, not a headset scan'
-    : viewMode ? 'what the Quest 3S looked at, from where it was' : 'scanned with the Quest 3S') + ` · ${meta.made || ''}`;
-  if (meta.note) { const n = document.getElementById('note'); n.textContent = meta.note; n.hidden = false; }
-  const common = [['pictures', meta.pictures],
-    ['splat', meta.train && meta.train.gaussians ? `${meta.train.gaussians.toLocaleString()} Gaussians, ${meta.train.steps} steps` : '—'],
-    ['held-out pictures', meta.train && meta.train.held_out_psnr_db ? `${meta.train.held_out_psnr_db} dB` : '—']];
-  const rm = meta.room;
-  const facts = viewMode ? common.concat(rm && rm.size_m
-      ? [['room model', `${rm.size_m[0]} × ${rm.size_m[2]} m, ${rm.size_m[1]} m high (estimated)`],
-         ['diorama print', rm.print && rm.print.size_mm ? `${rm.print.scale}, ${rm.print.size_mm.map(v => Math.round(v)).join(' × ')} mm` : '—'],
-         ['slicer', rm.print && rm.print.slice ? rm.print.slice.replace(/^sliced \S+ for the H2C: /, '') : '—']]
-      : [['solid', 'none: the pictures are from one spot']])
-    : [['real size', `${s[0]} × ${s[2]} × ${s[1]} cm high`]].concat(common,
-      meta.check && meta.check.median_mm != null ? [['against the true shape', `${meta.check.median_mm} mm (median)`]] : [], [
-      ['print', meta.print && meta.print.print_size_mm ? `${meta.print.print_size_mm.map(v => Math.round(v)).join(' × ')} mm` : '—'],
-      ['slicer', meta.print && meta.print.slice ? meta.print.slice.replace(/^sliced \S+ for the H2C: /, '') : '—']]);
-  document.getElementById('facts').innerHTML = facts.map(([a, b]) => `<li><span>${esc(a)}</span><span>${esc(b)}</span></li>`).join('');
+  $('sub').textContent = (test ? 'A test of the method, not a headset scan'
+    : viewMode ? 'What a Quest 3S looked at, from where it was' : 'Scanned with a Quest 3S') + (meta.made ? ` · ${meta.made.slice(0, 10)}` : '');
+  if (meta.note) { const n = $('note'); n.textContent = meta.note; n.hidden = false; }
+  // the numbers, as tiles
+  const tr = meta.train || {}, pr = meta.print || {}, rm = meta.room || {}, rp = rm.print || {};
+  const sliced = (t) => (t || '').replace(/^sliced \S+ for the H2C: /, '').replace(/ print time/, '').replace(/, \d+ layers$/, '');
+  const mm = (a) => a.map(v => Math.round(v)).join(' × ') + ' mm';
+  const facts = [];
+  if (!viewMode) facts.push([`${s[0]} × ${s[2]} × ${s[1]} cm`, 'real size, the last its height']);
+  facts.push([meta.pictures, 'pictures']);
+  if (tr.gaussians) facts.push([tr.gaussians.toLocaleString(), `Gaussians, trained in ${Number(tr.steps).toLocaleString()} steps`]);
+  if (tr.held_out_psnr_db) facts.push([`${tr.held_out_psnr_db} dB`, 'pictures kept back, reproduced at']);
+  if (meta.check && meta.check.median_mm != null) facts.push([`${meta.check.median_mm} mm`, 'from the true shape (half the surface)']);
+  if (pr.print_size_mm) facts.push([mm(pr.print_size_mm), 'the print']);
+  if (pr.slice) facts.push([sliced(pr.slice), 'to print it']);
+  if (rm.size_m) facts.push([`${rm.size_m[0]} × ${rm.size_m[2]} m`, `room model, ${rm.size_m[1]} m high (an estimate)`]);
+  if (rp.size_mm) facts.push([`${rp.scale} · ${mm(rp.size_mm)}`, 'diorama print']);
+  if (rp.slice) facts.push([sliced(rp.slice), 'to print the diorama']);
+  $('facts').innerHTML = facts.map(([v, l]) => `<div class="tile"><b>${esc(v)}</b><span>${esc(l)}</span></div>`).join('');
   // files to take away: a published scan lists its own; on the laptop, whatever the run made
   const mb = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)} MB` : `${Math.max(1, Math.round(n / 1e3))} kB`;
-  document.getElementById('files').innerHTML = meta.downloads
-    ? meta.downloads.map(d => `<a class="btn" href="${base}${esc(d.file)}" download title="${mb(d.bytes)}">${esc(d.label)}</a>`).join('')
+  $('files').innerHTML = meta.downloads
+    ? meta.downloads.map(d => `<span><a href="${base}${esc(d.file)}" download>${esc(d.label)}</a> ${mb(d.bytes)}</span>`).join('')
     : [['object_print.stl', 'STL'], ['object_real_size.stl', 'STL 1:1'], ['object_h2c.3mf', 'H2C 3MF'],
        ['room.glb', 'model GLB'], ['room_diorama.stl', 'diorama STL'], ['room_diorama_h2c.3mf', 'diorama H2C 3MF']]
-      .filter(([f]) => had[f]).map(([f, t]) => `<a class="btn" href="${base}${f}" download="${meta.name}_${f}">${t}</a>`).join('');
+      .filter(([f]) => had[f]).map(([f, t]) => `<span><a href="${base}${f}" download="${meta.name}_${f}">${t}</a></span>`).join('');
   plate.scale.set(size * 0.75, 1, size * 0.75);
   say('loading the splat');
   try {
@@ -162,7 +168,7 @@ else {
     }, undefined, (e) => { state.solidError = String(e); });
   }
   state.ready = !state.error;
-  if (state.ready) say(`${state.splats.toLocaleString()} Gaussians · ` + (viewMode ? 'drag to look round' : 'drag to turn, wheel to zoom'));
+  if (state.ready) say(`${state.splats.toLocaleString()} Gaussians · ` + hint());
 }
 
 // view mode: the surface model of the surroundings (room.glb), looked at from outside like a doll's house, in place
@@ -171,7 +177,7 @@ let model = null, modelOn = false, seatCam = null;
 const roof = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1e6);
 function showModel(on) {
   modelOn = on;
-  document.getElementById('bModel').classList.toggle('on', on);
+  press('bModel', on);
   const openAbove = (meta.room && meta.room.open_above_m) || 2.3;
   roof.constant = renderer.xr.isPresenting ? (on ? 0.95 + openAbove / 12 : 1e6) : openAbove;
   if (on && !model) {
@@ -201,7 +207,7 @@ function showModel(on) {
     // the model's sideways origin is the spot the pictures were taken from, not the room's middle: aim at where the mesh is
     if (model) { const b = new THREE.Box3().setFromObject(model); b.getCenter(controls.target); controls.target.y = b.min.y + (b.max.y - b.min.y) * 0.35; }
     camera.position.copy(controls.target).add(new THREE.Vector3(R * 1.25, R * 1.5, R * 1.25));
-    say('the 3-D model · drag to turn, wheel to zoom');
+    say('the 3-D model · drag to turn, scroll to zoom');
   } else if (seatCam) {
     camera.position.copy(seatCam.p); controls.target.copy(seatCam.t);
     controls.minDistance = seatCam.min; controls.maxDistance = seatCam.max; controls.rotateSpeed = seatCam.rs; seatCam = null;
@@ -218,23 +224,24 @@ function apply() {
   plate.scale.set(size * (both ? 1.35 : 0.75), 1, size * 0.75);
   if (!renderer.xr.isPresenting) {
     const dir = camera.position.clone().sub(controls.target).normalize();
-    camera.position.copy(controls.target).addScaledVector(dir, (both ? 3.4 : 2.5) * size);
+    const far = Math.max(1, 1.25 / camera.aspect);           // a tall, narrow stage: stand further back so the whole of it is in view
+    camera.position.copy(controls.target).addScaledVector(dir, (both ? 3.4 : 2.5) * size * far);
   }
   if (show.room && !room && F.scene) {
     room = new SplatMesh({ url: base + F.scene + stamp }); stand.add(room);
   }
   if (room) room.visible = show.room;
   plate.visible = !show.room;
-  for (const [id, k] of [['bSplat', 'splat'], ['bSolid', 'solid'], ['bRoom', 'room'], ['bTurn', 'turn']]) document.getElementById(id).classList.toggle('on', show[k]);
+  for (const [id, k] of [['bSplat', 'splat'], ['bSolid', 'solid'], ['bRoom', 'room'], ['bTurn', 'turn']]) press(id, show[k]);
 }
 for (const [id, k] of [['bSplat', 'splat'], ['bSolid', 'solid'], ['bRoom', 'room'], ['bTurn', 'turn']])
-  document.getElementById(id).onclick = () => { show[k] = !show[k]; if (k === 'room' && show.room) { show.turn = false; turn.rotation.y = 0; } apply(); };
+  $(id).onclick = () => { show[k] = !show[k]; if (k === 'room' && show.room) { show.turn = false; turn.rotation.y = 0; } apply(); };
 if (q.has('solid')) show.solid = true;
 if (q.has('nosplat')) show.splat = false;
 if (q.has('room')) { show.room = true; show.turn = false; }
-if (!F.scene) document.getElementById('bRoom').style.display = 'none';
-if (!F.solid) document.getElementById('bSolid').style.display = 'none';
-if (viewMode) for (const id of ['bSplat', 'bSolid', 'bRoom', 'bTurn']) document.getElementById(id).style.display = 'none';
+if (!F.scene) $('bRoom').hidden = true;
+if (!F.solid) $('bSolid').hidden = true;
+if (viewMode || !meta) for (const id of ['bSplat', 'bSolid', 'bRoom', 'bTurn']) $(id).hidden = true;
 
 const controls = new OrbitControls(camera, renderer.domElement);
 if (viewMode) {
@@ -247,34 +254,37 @@ if (viewMode) {
   controls.target.copy(camera.position).addScaledVector(fwd, 0.2);
   controls.minDistance = 0.05; controls.maxDistance = 0.8; controls.rotateSpeed = -0.35;
 } else {
-  // on the laptop: look at the object from a little above
+  // look at the object from a little above
   controls.target.set(0, size * 0.35, 0);
   camera.position.set(size * 1.5, size * 1.0, size * 1.7);
 }
 controls.enableDamping = true; controls.update();
 apply();
 if (viewMode && F.model) {
-  const b = document.getElementById('bModel');
-  b.style.display = '';
+  const b = $('bModel');
+  b.hidden = false;
   b.onclick = () => showModel(!modelOn);
   if (q.has('model')) showModel(true);
 }
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
 
 // in the headset: the object at real size on a stand a metre in front of where you were looking when you entered
 let scale = 1, lastToggle = 0;
 // A browser offers AR and VR only to a page at a secure address. Where this one is not, and the scan says where a
-// secure copy of the site is, the corner points there in place of a button that could do nothing.
+// secure copy of the site is, the stage's corner points there in place of a button that could do nothing.
 if (!navigator.xr && meta && meta.secure_copy && !isSecureContext) {
-  document.getElementById('xr').innerHTML = `<span class="ask">In a headset: AR and VR need a secure address. <a href="${esc(meta.secure_copy)}view.html?scan=${esc(scan)}">Open this scan on the site's secure copy</a>.</span>`;
+  $('xr').innerHTML = `<span class="ask">In a headset: AR and VR need a secure address. <a href="${esc(meta.secure_copy)}view.html?scan=${esc(scan)}">Open this scan on the site's secure copy</a>.</span>`;
   state.secureCopy = true;
 }
-const sparkXr = !navigator.xr ? null : new SparkXr({
-  renderer, mode: viewMode ? 'vrar' : 'arvr', referenceSpaceType: 'local-floor', elementId: undefined, element: undefined, button: true, enableHands: false,
+const bXr = $('bXr');
+if (!navigator.xr || !meta) bXr.hidden = true;
+const xrWord = () => (sparkXr && sparkXr.mode === 'immersive-vr') ? 'VR' : 'AR';
+const sparkXr = (!navigator.xr || !meta) ? null : new SparkXr({
+  renderer, mode: viewMode ? 'vrar' : 'arvr', referenceSpaceType: 'local-floor', element: bXr, enableHands: false,
+  onReady: (ok) => { if (ok) bXr.textContent = 'Enter ' + xrWord(); },       // the button shows only where a headset can take it
   onEnterXr: () => {
     state.xr = true;
     renderer.setClearColor(0x000000, 0);
-    document.getElementById('panel').style.display = 'none';
+    bXr.textContent = 'Exit ' + xrWord();
     scale = 1; stand.scale.setScalar(1);
     if (viewMode) {
       // the place itself, at its own size, round you: the spot the pictures were taken from under your feet, the
@@ -285,9 +295,9 @@ const sparkXr = !navigator.xr ? null : new SparkXr({
   },
   onExitXr: () => {
     state.xr = false;
-    renderer.setClearColor(0x0d1014, 1);
-    document.getElementById('panel').style.display = '';
-    stand.position.set(0, 0, 0); stand.scale.setScalar(1); stand.rotation.set(0, 0, 0); apply();
+    renderer.setClearColor(BACK, 1);
+    bXr.textContent = 'Enter ' + xrWord();
+    stand.position.set(0, 0, 0); stand.scale.setScalar(1); stand.rotation.set(0, 0, 0); apply(); fitStage();
   },
 });
 window.sparkXr = sparkXr;
