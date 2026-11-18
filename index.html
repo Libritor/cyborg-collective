@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794984382">
+<link rel="stylesheet" href="style.css?v=1794985068">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -103,7 +103,7 @@
       <a href="trust/anticipation/"><img class="figure" src="trust/anticipation/skill_by_horizon.svg" width="1440" height="1080" alt="Four panels of forecast skill against horizon for three pools of headband recordings, within a session and across sessions, against persistence and against the session mean"></a>
       <div>
         <b>How far ahead can a headband be read?</b>
-        <span>A pre-registered test on the recordings on the owner's laptop, with this page's gate deciding which recordings count (13 of 115). Ridge on the last 16 s of the activation index removes 0.30 to 0.46 of the error of “it stays where it is” 2 to 16 s ahead, on held-out time and held-out sessions. The session's own mean removes 0.25 to 0.42 by itself, so most of that is drift back to the level. Beyond the level, the past adds a few hundredths at 2 s and nothing by 16 s. A model trained on other heads reads the owner's as well as one trained on his own. No plunge is in it: no before-or-after-plunge recording passed the gate.</span>
+        <span>A pre-registered test on the recordings on the owner's laptop, with this page's gate deciding which recordings count (13 of 115). Ridge on the last 16 s of the activation index removes 0.29 to 0.46 of the error of “it stays where it is” 2 to 16 s ahead, on held-out time and held-out sessions. The session's own mean removes 0.25 to 0.42 by itself, so most of that is drift back to the level. Beyond the level, the past adds a few hundredths at 2 s and nothing by 16 s. A model trained on other heads reads the owner's as well as one trained on his own. No plunge is in it: no before-or-after-plunge recording passed the gate.</span>
         <p class="cap">Ridge on the lags, trained on other sessions: pooled skill with its 95 % interval.</p>
         <div class="table-scroll"><table class="numbers">
           <thead><tr><th>Pool</th><th>vs. persistence, 2 s</th><th>16 s</th><th>vs. the session mean, 2 s</th><th>16 s</th></tr></thead>
@@ -189,9 +189,9 @@
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794984382"></script>
-<script src="splat-view.js?v=1794984382"></script>
-<script src="app.js?v=1794984382"></script>
+<script src="video-rtc.js?v=1794985068"></script>
+<script src="splat-view.js?v=1794985068"></script>
+<script src="app.js?v=1794985068"></script>
 <script>
 // The head. Three layers, each standing where the one above it is missing:
 //   1. the still picture, always there, a link to the head's own page, with the electrodes' names written over it
@@ -284,7 +284,7 @@
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794984382")
+import("./music/player.js?v=1794985068")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
