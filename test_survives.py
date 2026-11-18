@@ -137,6 +137,15 @@ def file_checks():
     check(os.path.exists(os.path.join(vend, "LICENSE")) and os.path.getsize(os.path.join(vend, "three.module.min.js")) > 500000,
           "the 3-D library the rooms page uses is kept beside it, with its licence")
 
+    # the scans: the list is a plain page that names exactly the scans that are there, and the viewer's libraries are beside it
+    sv = os.path.join(ROOT, "scans", "vendor")
+    check(all(os.path.exists(os.path.join(sv, f)) for f in ("THREE_LICENSE", "SPARK_LICENSE", "three.module.js", "three.core.js", "spark.module.min.js")),
+          "the libraries the scans' viewer uses are kept beside it, with their licences")
+    listed = sorted(s["id"] for s in json.loads(read("scans/scans.json"))["scans"])
+    have = sorted(d for d in os.listdir(os.path.join(ROOT, "scans", "runs")) if os.path.isdir(os.path.join(ROOT, "scans", "runs", d)))
+    check(listed == have and "<script" not in read("scans/index.html").lower() and all('id="%s"' % s in read("scans/index.html") for s in listed),
+          "the list of scans is a page with no script that names exactly the scans that are there", (listed, have))
+
 
 # ------------------------------------------------------------------ the pages in a browser, layers taken away
 ROWS = "() => document.querySelectorAll('#rows tr.row').length"
@@ -174,6 +183,18 @@ def browser_checks(url, serve):
         check(not stale, "home, scripts off: nothing claims to be loading, connecting or empty", stale)
         check(pg.locator("table.sessions:visible").count() == 0 and pg.locator("#listen:visible").count() == 0, "home, scripts off: no empty tables, no dead button")
         check(pg.locator('nav a[href="space/"]').count() == 1, "home: the menu links to the rooms")
+        check(pg.locator('nav a[href="scans/"]').count() == 1, "home: the menu links to the scans")
+        pg.goto(url + "scans/", wait_until="load")
+        listed = json.loads(read("scans/scans.json"))["scans"]
+        check(pg.locator("article.scan").count() == len(listed) and pg.locator("article.scan img").count() >= len(listed)
+              and all(pg.locator('article#%s a[href="view.html?scan=%s"]' % (s["id"], s["id"])).count() >= 1 for s in listed),
+              "scans, scripts off: every scan is listed with its picture, its numbers and its link (%d)" % len(listed))
+        for s in listed:
+            r = pg.context.request.get(url + "scans/runs/%s/picture.jpg" % s["id"])
+            check(r.status == 200 and "image/jpeg" in r.headers.get("content-type", ""), "scans: the picture of %s answers" % s["id"], r.status)
+        pg.goto(url + "scans/view.html?scan=%s" % (listed[0]["id"] if listed else "none"), wait_until="load")
+        check(pg.locator("#plain").is_visible() and pg.locator('#plain a[href="./"]').count() == 1, "a scan's 3-D view, scripts off: it says so and points to the list")
+        pg.goto(url, wait_until="load")
         pg.goto(url + "record.html", wait_until="load")
         n = pg.locator("table.sessions tbody tr").count()
         check(n == len(json.loads(read("data/index.json"))["sessions"]), "record.html, scripts off: every session is on the page (%d rows)" % n)
@@ -355,7 +376,7 @@ def browser_checks(url, serve):
         pg.context.close()
 
         print("7. a phone: nothing slides sideways")
-        for path in ("", "record.html", "space/", "head/"):
+        for path in ("", "record.html", "space/", "head/", "scans/"):
             pg, _ = page(width=390, height=844)
             pg.goto(url + path, wait_until="load")
             if path == "":
