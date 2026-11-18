@@ -217,8 +217,8 @@ def browser_checks(url, serve):
         check(all(pg.locator('#scans a.door[href="%s"]' % h).is_visible() for h in ("scans/", "scans/live.html", "scans/how.html")),
               "home, scripts off: a section opens the scans, the live page and how a scan is made")
         check(pg.locator('nav a[href="#trust"]').count() == 1, "home: the menu links to the trust cards")
-        check(pg.locator("#trust").is_visible() and pg.locator("#trust .door").count() == 2 and pg.locator("#receipt").is_visible() and pg.locator("#tiers").is_visible(),
-              "home, scripts off: the two trust cards stand (the receipt and the tiers)")
+        check(pg.locator("#trust").is_visible() and pg.locator("#trust .door").count() == 3 and pg.locator("#receipt").is_visible() and pg.locator("#tiers").is_visible(),
+              "home, scripts off: the three trust cards stand (the receipt, the tiers, the anticipation)")
         check(pg.locator('#receipt a[href="trust/reality_gates_preprint_2026.pdf"]').count() == 2 and pg.locator('#receipt img.figure[src^="trust/danger_curve.svg"]').count() == 1,
               "home: the receipt card shows the difficulty curve and links the preprint, from the picture and by name")
         for f, kind in (("trust/reality_gates_preprint_2026.pdf", "application/pdf"), ("trust/danger_curve.svg", "image/svg+xml")):
@@ -229,6 +229,22 @@ def browser_checks(url, serve):
         check(rows == 7 and tiers.count("Verified") == 2 and tiers.count("Measured") == 2 and tiers.count("Refused") == 1 and "Estimated" in tiers and "Self-reported" in tiers,
               "home, scripts off: the tier table names a check for each kind of number on the page (%d rows)" % rows, tiers)
         check(pg.locator('#tiers a[href="https://www.mersivity.com/research/safety-ai.htm"]').count() == 1, "home: the refused row links the audit it rests on")
+        check(pg.locator("#anticipation").is_visible() and pg.locator('#anticipation a[href="trust/anticipation/"]').count() == 2
+              and pg.locator('#anticipation img.figure[src^="trust/anticipation/skill_by_horizon.svg"]').count() == 1
+              and pg.locator("#anticipation table.numbers tbody tr").count() == 3,
+              "home, scripts off: the anticipation card stands, with its figure, its three rows and its two links to the page")
+        pg.goto(url + "trust/anticipation/", wait_until="load")
+        body = pg.inner_text("body")
+        check("How far ahead can a headband be read?" in body and "What this does not show" in body and pg.locator("table.numbers").count() >= 5,
+              "anticipation page, scripts off: the reading, the tables and the limits are there")
+        for f, kind in (("trust/anticipation/skill_by_horizon.svg", "image/svg+xml"), ("trust/anticipation/skill_by_horizon.pdf", "application/pdf"),
+                        ("trust/anticipation/code.zip", "zip"), ("trust/anticipation/PREDICTIONS.md", "text/")):
+            r = pg.context.request.get(url + f)
+            check(r.status == 200 and kind in r.headers.get("content-type", ""), "anticipation: %s answers as %s" % (f, kind), (r.status, r.headers.get("content-type")))
+        check(all(pg.locator('a[href="%s"]' % h).count() >= 1 for h in ("PREDICTIONS.md", "FORECAST.md", "PROPOSALS.md", "PROPOSALS_BLIND.md", "code.zip")),
+              "anticipation page: the pre-registration, every cell, both ledgers and the code are offered as files")
+        check("ChanBefore" not in body and "SARAH" not in body and "tagged SM" not in body, "anticipation page: no other wearer is named")
+        pg.goto(url, wait_until="load")
         pg.goto(url + "scans/", wait_until="load")
         listed = json.loads(read("scans/scans.json"))["scans"]
         check(pg.locator("article.scan").count() == len(listed) and pg.locator("article.scan img").count() >= len(listed)
@@ -427,7 +443,7 @@ def browser_checks(url, serve):
         pg.context.close()
 
         print("7. a phone: nothing slides sideways")
-        for path in ("", "record.html", "space/", "head/", "scans/", "scans/how.html", "scans/live.html?relay=off"):
+        for path in ("", "record.html", "space/", "head/", "scans/", "scans/how.html", "scans/live.html?relay=off", "trust/anticipation/"):
             pg, _ = page(width=390, height=844)
             pg.goto(url + path, wait_until="load")
             if path == "":

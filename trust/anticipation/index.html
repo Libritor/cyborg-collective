@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How far ahead can a headband be read?</title>
+<link rel="stylesheet" href="../../style.css">
+<style>
+.page { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
+.page h1 { font-size: 26px; margin: 0 0 6px; }
+.page h2 { font-size: 20px; margin: 30px 0 6px; }
+.page h3 { font-size: 16px; margin: 22px 0 4px; }
+.page p, .page li { max-width: 78ch; }
+.page figure { margin: 18px 0; }
+.page figure img { width: 100%; height: auto; background: #fff; border-radius: 10px; }
+.page figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
+.page .crumbs { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+.page .crumbs a { margin-right: 12px; }
+.page table.numbers { margin: 8px 0 4px; }
+.page .tier { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.page .files li { margin: 3px 0; }
+.page .foot { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 14px; }
+</style>
+</head>
+<body>
+<div class="page">
+<p class="crumbs"><a href="../../">6ense.com</a><a href="../../#trust">Trust</a></p>
+<h1>How far ahead can a headband be read?</h1>
+<p class="sub">A pre-registered test of anticipating the Muse activation index 2 to 16 s ahead, on the owner's own head and on the lab's cold-exposure recordings, with the gates the lab's papers use, and a local language model whose claims about the same data the same gate judged. Everything ran on one laptop; the raw recordings never left it.</p>
+
+<figure>
+<a href="skill_by_horizon.pdf"><img src="skill_by_horizon.svg" width="1440" height="1080" alt="Four panels of pooled forecast skill against horizon (2, 4, 8, 16 s) for three pools, within a session and across sessions, against persistence and against the session mean, with bootstrap intervals"></a>
+<figcaption>Pooled skill = 1 − MSE(model)/MSE(baseline), ridge on the last 16 s of the index, 95 % intervals from 2000 session bootstraps. Left: against "it stays where it is". Right: against the session's own mean. Top: trained on the first 60 % of a session, tested on the last 40 %. Bottom: trained on other sessions. Two cold points at 4 s are off the scale because one session's within-session model, the variant with band and motion features, extrapolated badly; the lags-only model did not. <a href="skill_by_horizon_dark.svg">Dark version</a> · <a href="skill_by_horizon.pdf">PDF</a>.</figcaption>
+</figure>
+
+<h2>What the data allowed</h2>
+<p>A recording entered a pool only if it was at least 3 minutes long and yielded 60 clean, contiguous 18-second windows under the gate: contact 2 or better on the electrode, under 200 µV peak to peak, 90 % of the samples arrived, two of four electrodes accepted. The gate, not the analyst, decided who got in.</p>
+<div class="table-scroll"><table class="numbers"><thead><tr><th>Pool</th><th>Recordings ≥ 3 min</th><th>Usable fraction, mean</th><th>Eligible</th><th>Minutes used</th></tr></thead><tbody>
+<tr><td>mine (the owner's head)</td><td class='n'>14</td><td class='n'>0.45</td><td class='n'>6</td><td class='n'>51</td></tr>
+<tr><td>cold periods</td><td class='n'>89</td><td class='n'>0.11</td><td class='n'>6</td><td class='n'>84</td></tr>
+<tr><td>all</td><td class='n'>115</td><td class='n'>0.16</td><td class='n'>13</td><td class='n'>225</td></tr>
+</tbody></table></div>
+<ul>
+<li>The six eligible sessions of the owner's head are one afternoon, 2025-12-13, recorded while the recorder was being written.</li>
+<li>No recording labelled as before or after a plunge reached 60 clean windows. The cold pool is six recordings from the cold-exposure periods, none a plunge, wearers unnamed and not the owner. Nothing here is a plunge response.</li>
+<li>Coverage is what separates cold from calm: 7 % of the cold-period recordings qualify against 43 % of the owner's, and the usable fraction at the recording level is 0.11 against 0.45.</li>
+</ul>
+
+<h2>What was found</h2>
+<ol>
+<li><b>The index can be anticipated 2 to 16 s ahead, relative to "it stays where it is".</b> Ridge on the last eight values removes 0.30 to 0.46 of persistence's squared error in every pool, on held-out time and on held-out sessions, every interval clear of zero.</li>
+<li><b>Most of that is drift back to the session's level.</b> The session mean by itself, used as the forecast, removes +0.31 (owner) and +0.25 (cold periods) of persistence's error at 2 s. The game's quantity wanders about a level and persistence chases the noise.</li>
+<li><b>Beyond the level, 16 s of history adds a little at 2 s and nothing by 16 s.</b> A within-session permutation test, which shuffles the older history while every target keeps its own current value, says the past does carry information (p = 0.005 in all six primary cells, Holm-adjusted 0.030); the amount is a few hundredths to 0.16 of the error.</li>
+<li><b>Nothing personal at these horizons.</b> A model trained on other people's sessions anticipates the owner's as well as one trained on his own (+0.41 against +0.40).</li>
+<li><b>The small recurrent network lost to ridge everywhere.</b> Fifty to two hundred minutes per pool is not enough for it.</li>
+<li><b>The pre-registered primary model was the fragile one.</b> Ridge with band powers and motion added extrapolated badly on two January sessions when trained on a session's first 60 %; lags alone did not. Three predictions read as refuted for that reason; the lags-only numbers are the ones to trust, and both are published.</li>
+<li><b>Asleep the picture inverts</b>: in the one overnight recording persistence is a good baseline and the mean a bad one. One night; an observation.</li>
+</ol>
+
+<h3>Skill, ridge on the lags, trained on other sessions</h3>
+<p class="sub">Pooled skill with its interval; columns are how far ahead.</p>
+<div class="table-scroll"><table class="numbers"><thead><tr><th>against persistence</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
+<tr><td>mine</td><td class='n'>+0.38 [+0.27, +0.44]</td><td class='n'>+0.41 [+0.30, +0.46]</td><td class='n'>+0.42 [+0.35, +0.46]</td><td class='n'>+0.38 [+0.26, +0.42]</td></tr>
+<tr><td>cold periods</td><td class='n'>+0.33 [+0.25, +0.38]</td><td class='n'>+0.38 [+0.31, +0.42]</td><td class='n'>+0.38 [+0.27, +0.46]</td><td class='n'>+0.40 [+0.29, +0.46]</td></tr>
+<tr><td>all</td><td class='n'>+0.36 [+0.33, +0.41]</td><td class='n'>+0.38 [+0.34, +0.43]</td><td class='n'>+0.40 [+0.36, +0.45]</td><td class='n'>+0.36 [+0.32, +0.42]</td></tr>
+</tbody></table></div>
+<div class="table-scroll"><table class="numbers"><thead><tr><th>against the session mean</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
+<tr><td>mine</td><td class='n'>+0.03 [-0.07, +0.15]</td><td class='n'>+0.02 [-0.06, +0.10]</td><td class='n'>+0.00 [-0.07, +0.05]</td><td class='n'>-0.05 [-0.20, +0.03]</td></tr>
+<tr><td>cold periods</td><td class='n'>+0.16 [+0.06, +0.22]</td><td class='n'>+0.08 [-0.05, +0.14]</td><td class='n'>+0.00 [-0.11, +0.05]</td><td class='n'>-0.03 [-0.20, +0.01]</td></tr>
+<tr><td>all</td><td class='n'>+0.46 [+0.04, +0.59]</td><td class='n'>+0.44 [+0.01, +0.57]</td><td class='n'>+0.41 [-0.00, +0.55]</td><td class='n'>+0.40 [-0.07, +0.52]</td></tr>
+</tbody></table></div>
+
+<h3>The pre-registered predictions</h3>
+<div class="table-scroll"><table class="numbers"><thead><tr><th></th><th>Prediction</th><th>Verdict</th></tr></thead><tbody>
+<tr><td>P1</td><td>On the owner&#x27;s head, within a session, skill over persistence at 2 s between 0.05 and 0.30</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P2</td><td>Skill over the session mean falls with horizon and is at most 0.05 at 16 s, in every pool</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P3</td><td>The GRU never beats ridge by more than 0.05</td><td><span class='tier tier-verified'>supported</span></td></tr><tr><td>P4</td><td>Across-session ridge exceeds within-session ridge at 2 s by at most 0.03</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P5</td><td>A model trained on other heads reads the owner&#x27;s within 0.05 of one trained on his own</td><td><span class='tier tier-verified'>supported</span></td></tr><tr><td>P6</td><td>The cold pool&#x27;s skill at 2 s is within 0.10 of the owner&#x27;s</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P7</td><td>The cold pool&#x27;s usable fraction is lower than the owner&#x27;s by at least 0.15 (as worded, inside the eligible pools)</td><td><span class='tier tier-refused'>refuted</span></td></tr>
+</tbody></table></div>
+<p>P1 is refuted upward: the owner's head was more predictable than written, for the reason in point 2. P2, P4 and P6 fall to the fragile model in point 6 and to this n. The full design, with the two amendments made before the first run, is in <a href="PREDICTIONS.md">PREDICTIONS.md</a>.</p>
+
+<h2>A local model proposes, the gate disposes</h2>
+<p>Ornith, a 9-billion-parameter model running on the laptop through Ollama, saw only a briefing: the column dictionary, counts per pool and condition, group means, and in the first round the forecasting summary. It was asked for twelve falsifiable claims in a fixed grammar (two groups compared on a statistic, a correlation across sessions, or a forecast-skill statement). Each claim met a permutation test or the held-out forecast result, with Holm correction across all its claims, groups under five sessions abstaining. The ledger is the result.</p>
+<h3>Round one: the model saw the forecast numbers</h3>
+<p class='sub'>12 claims: 6 supported, 0 refuted, 2 inconclusive at this n, 1 abstained, 3 malformed.</p>
+<div class='table-scroll'><table class='numbers'><thead><tr><th>#</th><th>The claim</th><th>Outcome</th><th>What the gate saw</th><th>The model's reason</th></tr></thead><tbody>
+<tr><td>1</td><td>usable_fraction in mine/any &gt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>The owner&#x27;s own head has 0.45 usable fraction vs 0.11 for cold exposure, a 4-fold difference likely driven by better electrode contact and less motion.</td></tr>
+<tr><td>2</td><td>gyro_rms_mean - usable_fraction across all</td><td><span class='tier tier-estimated'>inconclusive</span></td><td class='n'>rho -0.073; n 78; p_stated_holm 0.255</td><td>Motion (gyro) is 21.4 average for all sessions; high motion should degrade signal, reducing usable fraction.</td></tr>
+<tr><td>3</td><td>mean_logbeta + mean_loggamma across all</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>rho 0.966; n 39; p_stated_holm 0.000</td><td>Beta and gamma are high-frequency bands; they should be positively correlated in band power.</td></tr>
+<tr><td>4</td><td>gyro_rms_mean in mine/any &lt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>The owner&#x27;s head shows 10.8 mean gyro while cold exposure shows 25.3, consistent with more movement during cold plunges.</td></tr>
+<tr><td>5</td><td>mean_index in mine/any &gt; mine_sleep/sleep</td><td><span class='tier '>abstain</span></td><td class='n'>reason underpowered: n_a=7, n_b=1 (need 5 each)</td><td>The owner&#x27;s awake sessions have mean_index 0.078 vs -0.150 during sleep, consistent with activation index being positive in awake states.</td></tr>
+<tr><td>6</td><td>ridge_all on mine/A h=1: skill &gt;= 0.2</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>pooled_skill 0.393; ci [+0.119, +0.507]; min_skill 0.200</td><td>Mine h=1 skill is +0.393 with 95% CI [+0.119, +0.507] excluding zero, well above min_skill threshold.</td></tr>
+<tr><td>7</td><td>ridge_all on mine/A h=4: skill &gt;= 0.2</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>pooled_skill 0.450; ci [+0.286, +0.528]; min_skill 0.200</td><td>Mine h=4 skill is +0.450 with 95% CI [+0.286, +0.528] excluding zero, strong predictive power.</td></tr>
+<tr><td>8</td><td>ridge_all on cold/A h=1: skill &gt;= -0.1</td><td><span class='tier tier-estimated'>inconclusive</span></td><td class='n'>pooled_skill 0.155; ci [-0.078, +0.347]; min_skill -0.100</td><td>Cold h=1 skill is +0.155 with 95% CI [-0.078, +0.347] which includes zero, but with min_skill of -0.100, it is marginally supported.</td></tr>
+<tr><td>9</td><td>mean_index + mean_logbeta across all</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>rho 0.566; n 39; p_stated_holm 0.000</td><td>Higher activation index should correlate with higher beta power.</td></tr>
+<tr><td>10</td><td>mean_logalpha in mine/any &lt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>Mine alpha is 0.48 while cold alpha is 0.82, suggesting more alpha (relaxation) during cold exposure.</td></tr>
+<tr><td>11</td><td>ridge_all on all/A h=4: skill &gt;= 0.2</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>pooled_skill 0.249; ci [+0.030, +0.461]; min_skill 0.200</td><td>All h=4 skill is +0.249 with 95% CI [+0.030, +0.461] excluding zero, supporting h=4 forecast for all sessions.</td></tr>
+<tr><td>12</td><td>gyro_rms_mean + mean_logtheta across all</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>rho 0.786; n 29; p_stated_holm 0.000</td><td>Motion may increase theta power (drowsiness/noise), expecting positive correlation.</td></tr>
+</tbody></table></div>
+<h3>Round two, blind: the forecast numbers withheld</h3>
+<p class='sub'>12 claims: 2 supported, 2 refuted, 3 inconclusive at this n, 1 abstained, 4 malformed.</p>
+<div class='table-scroll'><table class='numbers'><thead><tr><th>#</th><th>The claim</th><th>Outcome</th><th>What the gate saw</th><th>The model's reason</th></tr></thead><tbody>
+<tr><td>1</td><td>usable_fraction in mine/any &gt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>The owner&#x27;s own head (mine, 0.45) shows much higher usable fraction than cold-exposure sessions (cold, 0.11), likely because the owner can adjust the headband more carefully.</td></tr>
+<tr><td>2</td><td>gyro_rms_mean - usable_fraction across all</td><td><span class='tier tier-estimated'>inconclusive</span></td><td class='n'>rho -0.073; n 78; p_stated_holm 1.000</td><td>Higher head motion (gyro) should reduce the fraction of usable epochs due to motion artifacts corrupting the signal.</td></tr>
+<tr><td>3</td><td>mean_logalpha + mean_logtheta across all</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>rho 0.890; n 39; p_stated_holm 0.001</td><td>Alpha and theta bands typically co-vary as slow oscillations; positive correlation in log power is expected across sessions.</td></tr>
+<tr><td>4</td><td>mean_logbeta + mean_loggamma across all</td><td><span class='tier tier-verified'>supported (empirical)</span></td><td class='n'>rho 0.966; n 39; p_stated_holm 0.001</td><td>Beta and gamma bands often increase together during active states; a positive correlation in log power is plausible across sessions.</td></tr>
+<tr><td>5</td><td>mean_index in mine/any &gt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>The activation index (beta+gamma)/(theta+alpha) is higher in mine (0.078) than cold (0.062), suggesting the owner&#x27;s baseline state is more aroused or the cold dampens high-frequency power.</td></tr>
+<tr><td>6</td><td>mean_logalpha in mine/any &lt; cold/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 2 sessions</td><td>Mine has lower mean logalpha (0.48) than cold (0.82), possibly because cold exposure increases alpha power (relaxation response) while the owner&#x27;s baseline is more active.</td></tr>
+<tr><td>7</td><td>minutes + usable_fraction across all</td><td><span class='tier tier-estimated'>inconclusive</span></td><td class='n'>rho 0.118; n 115; p_stated_holm 0.514</td><td>Longer recording sessions may allow better electrode settling, leading to higher usable fraction over time.</td></tr>
+<tr><td>8</td><td>mean_logalpha in mine_sleep/any &lt; all/any</td><td><span class='tier tier-refused'>malformed</span></td><td class='n'>reason groups overlap on 1 sessions</td><td>Sleep shows very low alpha (0.17) compared to all sessions (0.73), consistent with alpha suppression during sleep.</td></tr>
+<tr><td>9</td><td>gyro_rms_mean - mean_index across all</td><td><span class='tier tier-estimated'>inconclusive</span></td><td class='n'>rho -0.107; n 29; p_stated_holm 1.000</td><td>Higher head motion should disrupt the activation index by introducing noise that inflates theta/alpha or disrupts beta/gamma balance.</td></tr>
+<tr><td>10</td><td>usable_fraction in mine/any &lt; mine_sleep/any</td><td><span class='tier '>abstain</span></td><td class='n'>reason underpowered: n_a=14, n_b=1 (need 5 each)</td><td>Mine (0.45) has lower usable fraction than mine_sleep (0.96), which is expected since sleep epochs are cleaner and the overnight recording was well-worn.</td></tr>
+<tr><td>11</td><td>mean_logbeta - mean_logalpha across all</td><td><span class='tier tier-refused'>refuted</span></td><td class='n'>rho 0.755; n 39; p_stated_holm 1.000</td><td>Beta and alpha are often inversely related (beta up during alertness, alpha up during rest), so a negative correlation is plausible across sessions.</td></tr>
+<tr><td>12</td><td>mean_loggamma - mean_logalpha across all</td><td><span class='tier tier-refused'>refuted</span></td><td class='n'>rho 0.649; n 39; p_stated_holm 1.000</td><td>Gamma power is typically low during relaxed states where alpha dominates, suggesting a negative correlation between gamma and alpha across sessions.</td></tr>
+</tbody></table></div>
+<p>Reading the two rounds together: shown the forecast numbers, the model proposed them back; shown none, it proposed no forecast at all. Its supported claims are correlations that are nearly definitional on a four-electrode headband. Its refuted claims are textbook intuitions (beta and gamma fall as alpha rises) that run the other way across these sessions, where every band moves with amplitude and contact. It compared "the owner" with "cold periods" seven times in a way the gate could not test, after being told how. And once it set a negative skill threshold and called the result "marginally supported"; the gate returned inconclusive. The gate held every time.</p>
+
+<h2>What this does not show</h2>
+<p>It does not show that a plunge response can be anticipated, that any mental state is read, or that the index after a plunge means arousal rather than muscle. Anticipation at 2 to 4 s is real and is mostly reversion to the level, which is exactly what a game can use to cancel its one to two seconds of latency. Anticipating the response to cold needs marked plunges (in and out markers, a 60 s baseline, 10 to 15 minutes after exit) and a leave-one-plunge-out test, which is the next thing to record.</p>
+
+<h2>Files</h2>
+<ul class="files">
+<li><a href="PREDICTIONS.md">The pre-registration</a>, committed before the first run, with its two amendments.</li>
+<li><a href="FORECAST.md">Every forecasting cell</a>: both protocols, three models and two baselines, four horizons, intervals, the permutation null, the Holm-adjusted primary cells.</li>
+<li><a href="PROPOSALS.md">Round one</a> and <a href="PROPOSALS_BLIND.md">round two</a> of the proposer, with <a href="proposals_round1_prompt.txt">what it was shown</a> (<a href="proposals_round2_prompt.txt">blind</a>), <a href="proposals_round1_reply.txt">what it replied</a> (<a href="proposals_round2_reply.txt">blind</a>) and the ledgers (<a href="proposals_round1_ledger.jsonl">1</a>, <a href="proposals_round2_ledger.jsonl">2</a>).</li>
+<li><a href="code.zip">The code</a>: the epoch gate, the pools, the forecasting, the claim grammar, the tests and the scripts. Point it at a folder of MuseLog CSV files and it rebuilds all of this in a few minutes.</li>
+</ul>
+<p class="foot">Nothing on this page is verified in the exact sense; the best a forecast or a proposed claim can earn is empirical, with its interval. The per-session tables the model saw are not published because their keys carry the recordings' names. The raw recordings stay with the people who made them.</p>
+</div>
+</body>
+</html>

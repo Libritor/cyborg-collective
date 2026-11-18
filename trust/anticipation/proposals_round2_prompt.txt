@@ -1,0 +1,27 @@
+You are a careful neuroscientist proposing falsifiable claims about a small EEG dataset. You see only the briefing. Reply with JSON only: {"claims": [...]}, each claim exactly in one of these three forms:
+{"id": "c1", "type": "compare_groups", "stat": STAT, "group_a": {"pool": POOL, "condition": COND}, "group_b": {"pool": POOL, "condition": COND}, "direction": ">" or "<", "rationale": "..."}
+{"id": "c2", "type": "correlation", "x": STAT, "y": STAT, "pool": POOL, "sign": "+" or "-", "rationale": "..."}
+{"id": "c3", "type": "forecast", "pool": POOL, "protocol": "A" or "B", "model": "ridge_lags" or "ridge_all" or "gru", "horizon": 1, 2, 4 or 8, "min_skill": number, "rationale": "..."}
+STAT is one of ['minutes', 'usable_fraction', 'mean_index', 'sd_index', 'mean_logalpha', 'mean_logtheta', 'mean_logbeta', 'mean_loggamma', 'gyro_rms_mean', 'skill_A_h1', 'skill_A_h4', 'skill_mean_A_h1']. POOL is one of ['mine', 'cold', 'all', 'mine_sleep']. COND is one of ['any', 'pre', 'post', 'warm', 'cold', 'sleep', 'unlabelled']. Propose what you believe is true of such data, including claims about cold exposure, about the owner's own head, and about how far ahead the signal can be forecast. Do not propose the same claim twice.
+
+COLUMN DICTIONARY (one row per recording session of a 4-electrode consumer EEG headband, 2 s epochs):
+  minutes; usable_fraction (share of epochs passing the contact + 200 uV gate); mean_index and sd_index (the activation index log10((beta+gamma)/(theta+alpha)) over usable epochs); mean_logtheta/alpha/beta/gamma (log10 band power, channel mean); gyro_rms_mean (head motion); skill_A_h1, skill_A_h4 (forecast skill of a ridge model over persistence 2 s and 8 s ahead, within-session, held-out time); skill_mean_A_h1 (the same against the session mean). Missing skills = the session had too few valid sequences.
+POOLS: mine = the owner's own head; cold = the lab's cold-exposure periods (wearer mixed); all = every session; mine_sleep = one overnight recording. A session can be in mine and cold at once (filter by condition, or compare mine against cold/unlabelled, to keep two groups disjoint).
+CONDITIONS (from the filename only): pre (before a plunge), post (after), warm, cold, sleep, unlabelled.
+COUNTS:
+  pool mine: 14 sessions
+  pool cold: 89 sessions
+  pool all: 115 sessions
+  pool mine_sleep: 1 sessions
+  condition pre: 4 sessions (in cold: 4)
+  condition post: 4 sessions (in cold: 4)
+  condition warm: 3 sessions (in cold: 3)
+  condition cold: 1 sessions (in cold: 1)
+  condition sleep: 1 sessions (in cold: 0)
+GROUP MEANS (pool: usable_fraction, mean_index, mean_logalpha, gyro_rms_mean, skill_A_h1):
+  mine: 0.45, 0.078, 0.48, 10.8, (forecast skill withheld in this round)
+  cold: 0.11, 0.062, 0.82, 25.3, (forecast skill withheld in this round)
+  all: 0.16, 0.055, 0.73, 21.4, (forecast skill withheld in this round)
+  mine_sleep: 0.96, -0.150, 0.17, 3.1, (forecast skill withheld in this round)
+FORECAST SUMMARY: withheld in this round. Forecast claims are predictions: state the skill you expect a ridge model on 16 s of history to reach over persistence, at the horizon you choose.
+RULES OF THE GATE: a group comparison needs at least 5 sessions per group and the groups must not overlap; a correlation needs at least 10 sessions; Holm correction across all your claims; a forecast claim is supported only if the held-out pooled skill is at least min_skill with an interval excluding zero.
