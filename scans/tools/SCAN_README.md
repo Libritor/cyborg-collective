@@ -77,6 +77,15 @@ Two separate things can go to 6ense.com, each only when asked for, because both 
   The camera pictures are not published. `-Title` and `-Note` set the words; they are kept in the run's
   `publish.json`. `python scan_publish.py --remove <id>` takes a scan off; `--list` shows what is up;
   `--no-push` writes into the clone of the site without committing.
+- **The live page**, `6ense.com/scans/live.html` (`web/scans/live.html`): live Gaussian splatting. Each splat the
+  relay passes on becomes one Gaussian (a flat soft disc on the surface it hit, from its position, facing, size and
+  colour) and the site's splat renderer draws them as they arrive: one per 2 cm cell, surfaces seen from behind
+  left out so a room can be looked into, a marker where the headset is, and "ride with the headset" to stand
+  there. When nobody is scanning it shows the most recent finished scan and says so. The home page's live card
+  links to it. Placed, not trained: the trained splat is the one `-Publish` puts up afterwards.
+- **The tools themselves** are on the site as plain files, `6ense.com/scans/tools/`, listed with what each is for
+  on `6ense.com/scans/how.html` (how a scan is made). `scan_publish.py` writes both (`TOOLS` in it is the list)
+  and refuses a tool that names this computer's user folder.
 - **AR and VR in the headset** need a secure address, which 6ense.com does not have yet. The relay serves a copy of
   the whole site at one: `https://cyborg-collective-relay.onrender.com/scans/`. The viewer on 6ense.com points there.
 - Open3D cannot make a splat (0.20 reads, shows and converts them; it has no training). Its job here is the
@@ -145,6 +154,11 @@ Checked on this laptop (17 Nov 2026):
   (durability 71, home page 101, rooms 146).
 - Live view: `scan_session.py`'s start and stop of `quest_splat.py --no-launch` on this laptop (listening, the
   port forwarded through adb, stopped by its stop file).
+- The live page: `python scans/test_live_page.py` (18 checks: nobody scanning, a made-up room arriving as one
+  Gaussian per cell and drawn, not piling up when sent twice, the look-in from outside, riding with the headset
+  towards the right wall, the sender leaving, scripts off, a phone); with `--through <relay>` the made-up room goes
+  through a relay as a headset's computer would send it (21 checks; passed through a private relay and through the
+  public one to the published page).
 
 Not checked: a walk round one object on the headset (so: the real depth API's quality on a small object, the ring
 of dots, B), the rebuilt app's waiting-free camera read on the device, the page inside the Quest Browser, a print,

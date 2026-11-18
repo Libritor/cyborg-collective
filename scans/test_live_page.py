@@ -181,7 +181,11 @@ def main():
         check(st["ready"] and st["idle"] == first["id"] and not st["live"], "the page starts, nobody is live, and it takes the first scan on the list (%s)" % first["id"], st)
         check("nobody is scanning right now" in pg.inner_text("#what") and first["title"] in pg.inner_text("#facts") and "most recent finished scan" in pg.inner_text("#facts"),
               "it says that nobody is scanning and names the finished scan it shows instead", pg.inner_text("#what"))
-        frame = next((f for f in pg.frames if "view.html" in f.url), None)
+        frame, t0 = None, time.time()
+        while not frame and time.time() - t0 < 30:                  # the frame has its address only once its page has begun to arrive
+            frame = next((f for f in pg.frames if "view.html" in f.url), None)
+            if not frame:
+                pg.wait_for_timeout(300)
         ok = False
         if frame:
             try:
