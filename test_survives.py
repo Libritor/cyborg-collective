@@ -159,6 +159,22 @@ def file_checks():
                if re.search(r"[A-Za-z]:[\\/]+Users[\\/]+\w", open(os.path.join(ROOT, "scans", "tools", t), encoding="utf-8", errors="replace").read())]
     check("<script" not in how.lower() and len(named) >= 15 and not gone and not private,
           "how a scan is made: a page with no script, with the %d tools it names beside it and no private folder named in them" % len(named), (gone, private))
+    # the receipt card under Trust: every number on it is in the preprint it links (PyMuPDF reads the PDF)
+    pdf = os.path.join(ROOT, "trust", "reality_gates_preprint_2026.pdf")
+    try:
+        import fitz
+    except ImportError:
+        fitz = None
+    home = read("index.html")
+    card = home[home.index('id="receipt"'):home.index('id="tiers"')]
+    nums = sorted(set(re.findall(r"0\.\d{3}", card)))
+    check(len(nums) >= 12 and os.path.exists(pdf), "the receipt card carries its numbers and the preprint it links is in the repository", (len(nums), os.path.exists(pdf)))
+    if fitz is not None and os.path.exists(pdf):
+        text = " ".join(page.get_text() for page in fitz.open(pdf))
+        missing = [n for n in nums if n not in text and n.lstrip("0") not in text]
+        check(not missing, "every number on the receipt card is in the preprint it links (%d numbers)" % len(nums), missing)
+    else:
+        print("  (PyMuPDF not importable: the receipt card's numbers were not read against the preprint)")
 
 
 # ------------------------------------------------------------------ the pages in a browser, layers taken away
@@ -200,6 +216,19 @@ def browser_checks(url, serve):
         check(pg.locator('nav a[href="scans/"]').count() == 1, "home: the menu links to the scans")
         check(all(pg.locator('#scans a.door[href="%s"]' % h).is_visible() for h in ("scans/", "scans/live.html", "scans/how.html")),
               "home, scripts off: a section opens the scans, the live page and how a scan is made")
+        check(pg.locator('nav a[href="#trust"]').count() == 1, "home: the menu links to the trust cards")
+        check(pg.locator("#trust").is_visible() and pg.locator("#trust .door").count() == 2 and pg.locator("#receipt").is_visible() and pg.locator("#tiers").is_visible(),
+              "home, scripts off: the two trust cards stand (the receipt and the tiers)")
+        check(pg.locator('#receipt a[href="trust/reality_gates_preprint_2026.pdf"]').count() == 2 and pg.locator('#receipt img.figure[src^="trust/danger_curve.svg"]').count() == 1,
+              "home: the receipt card shows the difficulty curve and links the preprint, from the picture and by name")
+        for f, kind in (("trust/reality_gates_preprint_2026.pdf", "application/pdf"), ("trust/danger_curve.svg", "image/svg+xml")):
+            r = pg.context.request.get(url + f)
+            check(r.status == 200 and kind in r.headers.get("content-type", ""), "trust: %s answers as %s" % (f, kind), (r.status, r.headers.get("content-type")))
+        tiers = [t.strip() for t in pg.evaluate("() => [...document.querySelectorAll('#tiers table.tiers tbody .tier')].map((n) => n.textContent)")]
+        rows = pg.locator("#tiers table.tiers tbody tr").count()
+        check(rows == 7 and tiers.count("Verified") == 2 and tiers.count("Measured") == 2 and tiers.count("Refused") == 1 and "Estimated" in tiers and "Self-reported" in tiers,
+              "home, scripts off: the tier table names a check for each kind of number on the page (%d rows)" % rows, tiers)
+        check(pg.locator('#tiers a[href="https://www.mersivity.com/research/safety-ai.htm"]').count() == 1, "home: the refused row links the audit it rests on")
         pg.goto(url + "scans/", wait_until="load")
         listed = json.loads(read("scans/scans.json"))["scans"]
         check(pg.locator("article.scan").count() == len(listed) and pg.locator("article.scan img").count() >= len(listed)
