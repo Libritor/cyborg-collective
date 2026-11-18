@@ -1,0 +1,77 @@
+{
+ "id": "trex-test",
+ "kind": "test",
+ "mode": "object",
+ "name": "_synth_trex",
+ "made": "2026-11-17 15:48",
+ "published": "2026-11-17 19:30",
+ "secure_copy": "https://cyborg-collective-relay.onrender.com/scans/",
+ "size_cm": [
+  18.2,
+  11.3,
+  13.0
+ ],
+ "print": {
+  "scale": 0.6609,
+  "print_size_mm": [
+   120.0,
+   85.8,
+   74.6
+  ],
+  "real_size_mm": [
+   181.6,
+   129.8,
+   112.9
+  ],
+  "slice": "sliced _synth_trex_print.stl for the H2C: 1h 33m 49s print time, 30.44 g PLA, 373 layers"
+ },
+ "pictures": 111,
+ "train": {
+  "steps": 8000,
+  "seconds": 130,
+  "gaussians": 439587,
+  "held_out_psnr_db": 37.71
+ },
+ "splat": "object.spz",
+ "splat_count": 5491,
+ "scene": "scene.spz",
+ "solid": "object.glb",
+ "pictures_shown": [
+  {
+   "file": "picture.jpg",
+   "alt": "The splat (top row) and the solid made from it (bottom row), from six sides",
+   "w": 1400,
+   "h": 467
+  }
+ ],
+ "downloads": [
+  {
+   "file": "object.spz",
+   "label": "the splat (.spz)",
+   "bytes": 97493
+  },
+  {
+   "file": "object_print.stl",
+   "label": "STL to print (120 mm)",
+   "bytes": 4690684
+  },
+  {
+   "file": "object_h2c.3mf",
+   "label": "sliced for a Bambu H2C (.3mf)",
+   "bytes": 6196458
+  }
+ ],
+ "check": {
+  "median_mm": 0.47,
+  "p95_mm": 1.57,
+  "size_error_pct": [
+   -0.2,
+   -0.3,
+   -0.3
+  ],
+  "volume_cm3": 210.1,
+  "true_volume_cm3": 211.0
+ },
+ "title": "T. rex (a test of the method)",
+ "note": "Not a headset scan. A T. rex model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 61 cm away, with the Quest 3S camera's geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.47 mm of the true one."
+}

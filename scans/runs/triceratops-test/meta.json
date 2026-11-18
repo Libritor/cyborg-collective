@@ -1,0 +1,71 @@
+{
+ "id": "triceratops-test",
+ "kind": "test",
+ "mode": "object",
+ "name": "_synth_tric",
+ "made": "2026-11-17 15:16",
+ "published": "2026-11-17 19:30",
+ "secure_copy": "https://cyborg-collective-relay.onrender.com/scans/",
+ "size_cm": [
+  6.1,
+  7.1,
+  13.2
+ ],
+ "print": {
+  "scale": 0.9083,
+  "print_size_mm": [
+   55.8,
+   120.0,
+   64.7
+  ],
+  "real_size_mm": [
+   61.5,
+   132.1,
+   71.3
+  ],
+  "slice": null
+ },
+ "pictures": 111,
+ "train": {
+  "steps": 6000,
+  "seconds": 106,
+  "gaussians": 293371,
+  "held_out_psnr_db": 39.64
+ },
+ "splat": "object.spz",
+ "splat_count": 5606,
+ "solid": "object.glb",
+ "pictures_shown": [
+  {
+   "file": "picture.jpg",
+   "alt": "The splat (top row) and the solid made from it (bottom row), from six sides",
+   "w": 1400,
+   "h": 467
+  }
+ ],
+ "downloads": [
+  {
+   "file": "object.spz",
+   "label": "the splat (.spz)",
+   "bytes": 92435
+  },
+  {
+   "file": "object_print.stl",
+   "label": "STL to print (120 mm)",
+   "bytes": 4675184
+  }
+ ],
+ "check": {
+  "median_mm": 0.37,
+  "p95_mm": 1.68,
+  "size_error_pct": [
+   -0.4,
+   -1.9,
+   -0.5
+  ],
+  "volume_cm3": 112.9,
+  "true_volume_cm3": 111.6
+ },
+ "title": "Triceratops (a test of the method)",
+ "note": "Not a headset scan. A Triceratops model made for the Dino Print game was drawn on the computer from 111 viewpoints all round it, 39 cm away, with the Quest 3S camera's geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.37 mm of the true one."
+}

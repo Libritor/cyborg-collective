@@ -1,0 +1,76 @@
+{
+ "id": "room-17-nov",
+ "kind": "headset",
+ "mode": "view",
+ "name": "20261117_room_view",
+ "made": "2026-11-17 16:47",
+ "published": "2026-11-17 19:29",
+ "secure_copy": "https://cyborg-collective-relay.onrender.com/scans/",
+ "print": {
+  "scale": null,
+  "print_size_mm": null,
+  "real_size_mm": null,
+  "slice": null
+ },
+ "pictures": 26,
+ "train": {
+  "steps": 7000,
+  "seconds": 224,
+  "gaussians": 525956,
+  "held_out_psnr_db": 33.35
+ },
+ "eye_height_m": 1.302,
+ "look_yaw_rad": 1.523,
+ "look_pitch_rad": 0.176,
+ "yaw_span_rad": [
+  -0.3859,
+  3.432
+ ],
+ "room": {
+  "size_m": [
+   4.64,
+   2.95,
+   4.7
+  ],
+  "open_above_m": 2.317,
+  "print": {
+   "scale": "1:30",
+   "size_mm": [
+    154.6,
+    156.1,
+    75.7
+   ],
+   "slice": "sliced room_diorama.stl for the H2C: 14h 34m 56s print time, 222.39 g PLA, 379 layers"
+  }
+ },
+ "splat": "view.spz",
+ "splat_count": 400000,
+ "model": "room.glb",
+ "pictures_shown": [
+  {
+   "file": "picture.jpg",
+   "alt": "The splat seen from the spot it was photographed from, looking round in eight directions",
+   "w": 1400,
+   "h": 525
+  }
+ ],
+ "downloads": [
+  {
+   "file": "view.spz",
+   "label": "the splat (.spz)",
+   "bytes": 6728713
+  },
+  {
+   "file": "room.glb",
+   "label": "the room model (.glb)",
+   "bytes": 16423712
+  },
+  {
+   "file": "room_diorama_stl.zip",
+   "label": "diorama STL, 1:30 (zip)",
+   "bytes": 17763151
+  }
+ ],
+ "title": "A room, from one seat",
+ "note": "Looked at from one seat with a Meta Quest 3S on 17 November 2026: 26 pictures. Nothing was walked round, so this is a view to look round from where it was photographed; away from that spot it has gaps. The 3-D model of the room is an estimate: the headset measured only the wall with the map, and the rest of the shape comes from a depth-estimating network pinned to one measured point per picture. Published by the person whose room it is; the camera pictures stay with them."
+}

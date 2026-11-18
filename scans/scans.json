@@ -1,0 +1,31 @@
+{
+ "scans": [
+  {
+   "id": "room-17-nov",
+   "title": "A room, from one seat",
+   "kind": "headset",
+   "mode": "view",
+   "made": "2026-11-17 16:47",
+   "published": "2026-11-17 19:29",
+   "splat_count": 400000
+  },
+  {
+   "id": "trex-test",
+   "title": "T. rex (a test of the method)",
+   "kind": "test",
+   "mode": "object",
+   "made": "2026-11-17 15:48",
+   "published": "2026-11-17 19:30",
+   "splat_count": 5491
+  },
+  {
+   "id": "triceratops-test",
+   "title": "Triceratops (a test of the method)",
+   "kind": "test",
+   "mode": "object",
+   "made": "2026-11-17 15:16",
+   "published": "2026-11-17 19:30",
+   "splat_count": 5606
+  }
+ ]
+}
