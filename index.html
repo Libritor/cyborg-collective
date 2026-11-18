@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794965660">
+<link rel="stylesheet" href="style.css?v=1794980958">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -23,7 +23,7 @@
   </div>
 </header>
 <nav>
-  <a href="#live">Live</a><a href="#record">The record</a><button id="listen" class="nav-btn needs-js" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it for this visit">♪ listen</button><span id="listen-status" class="nav-note needs-js">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a><a href="space/" title="Rooms rebuilt from a headset's pictures, to walk through in 3-D, each with the film of its depth maps">Rooms in 3-D</a><a href="scans/" title="Things and places scanned with a headset, as Gaussian splats to turn round or look round, with the solids made from them for a 3-D printer">Scans in 3-D</a>
+  <a href="#live">Live</a><a href="#record">The record</a><a href="#trust">Trust</a><button id="listen" class="nav-btn needs-js" aria-pressed="false" disabled title="The band plays by default: the brainwaves of the people sharing live; when nobody is, a piece generated from the record. This button stops it for this visit">♪ listen</button><span id="listen-status" class="nav-note needs-js">loading the band</span><a href="music/listen.html?relay=1" title="Mar(G)off: the full instrument, with the desk and the keys">The desk</a><a href="mood.html" title="How the room is feeling, counted anonymously from the phones that chose to be counted">Room mood</a><a href="space/" title="Rooms rebuilt from a headset's pictures, to walk through in 3-D, each with the film of its depth maps">Rooms in 3-D</a><a href="scans/" title="Things and places scanned with a headset, as Gaussian splats to turn round or look round, with the solids made from them for a 3-D printer">Scans in 3-D</a>
 </nav>
 <aside id="listen-note" class="listen-note" aria-live="polite" hidden></aside>
 <div class="band-col needs-js">
@@ -58,6 +58,47 @@
     <a class="card door" href="scans/"><img src="scans/cover.jpg" width="1400" height="525" alt="The most recent scan, drawn from its Gaussian splat"><b>The scans</b><span>Each one opens in 3-D, to turn round or to look round from where it was photographed, with its numbers and its files.</span></a>
     <a class="card door" href="scans/live.html"><b>Live Gaussian splatting</b><span>What a headset is scanning now, drawn as Gaussians while it scans. When nobody is scanning, the most recent finished scan.</span></a>
     <a class="card door" href="scans/how.html"><b>How a scan is made</b><span>The chain from headset to print file, what has been checked and what has not, and every tool as a plain file.</span></a>
+  </div>
+</section>
+
+<section id="trust">
+  <h2>Trust</h2>
+  <p class="sub">The rule this page runs on, shown twice. First a benchmark from the author's work on AI that proposes and exact checks that dispose: the interface may say <i>verified</i> only when a check fired. Then that rule applied to every kind of number on this page, with what was checked and what was not.</p>
+  <div class="doors">
+    <div class="card door" id="receipt">
+      <a href="trust/reality_gates_preprint_2026.pdf" title="Reality Gates: Un-Foolable Exact Certificates for AI-Proposed Scientific Hypotheses (preprint, 2026, PDF)"><img class="figure" src="trust/danger_curve.svg" width="1058" height="686" alt="A slope chart: the false-acceptance rate of four language models rises from near zero on normal exact claims to between one and twenty-seven percent on hard ones, while the exact gate stays at zero on both"></a>
+      <p class="cap">False acceptance of false exact claims, normal against hard, for four frontier models and the exact gate (the project's difficulty curve, drawn from the results in Table 2 of the preprint; n = 240, Gemini Pro's hard tier n = 80).</p>
+      <b>AI with a receipt</b>
+      <span>A model proposes. An exact check disposes. The answer carries a tier, and the tier <i>verified</i> can only come from a check that fired: in the preprint that is a theorem about the software, not a policy. On 240 claims in four domains (unit fractions, modular arithmetic, hadron quantum numbers, ground-state energies) the gate admitted no false claim at full coverage. Every model did.</span>
+      <div class="table-scroll"><table class="numbers">
+        <thead><tr><th>Judge of hard exact claims</th><th>False acceptance <small>[95% interval]</small></th></tr></thead>
+        <tbody>
+          <tr><td>Exact gate</td><td class="n">0.000, at full coverage</td></tr>
+          <tr><td>Claude Sonnet</td><td class="n">0.010 [0.002, 0.055]</td></tr>
+          <tr><td>GPT-5.6 Sol</td><td class="n">0.075 [0.040, 0.136]</td></tr>
+          <tr><td>Gemini 2.5 Pro</td><td class="n">0.256 [0.146, 0.411]</td></tr>
+          <tr><td>Gemini 2.5 Flash</td><td class="n">0.271 [0.196, 0.362]</td></tr>
+        </tbody>
+      </table></div>
+      <span>Asked to check its own answers, GPT-4o-mini admitted a quarter of its false ones (0.250, interval 0.112 to 0.469). A model cannot certify its own claims; a check outside it can.</span>
+      <p class="links"><a href="trust/reality_gates_preprint_2026.pdf">The preprint (PDF, 2026)</a><a href="https://gitlab.com/logical-truth-finding/axiomatic-universe">The benchmark and the gates</a><a href="https://newaxiomai.com/">New Axiom, the chat that wears the tier</a></p>
+    </div>
+    <div class="card door" id="tiers">
+      <b>The same tiers, on a head</b>
+      <span><i>Verified</i> means an exact check fired. <i>Measured</i> means an instrument reading, shown with its quality. <i>Estimated</i> means a model's number against the person's own baseline. <i>Self-reported</i> is what the person typed. <i>Refused</i> means a gate said no. Nothing on this page is promoted past its evidence.</span>
+      <div class="table-scroll"><table class="tiers">
+        <thead><tr><th>The claim</th><th>What is checked</th><th>Tier</th></tr></thead>
+        <tbody>
+          <tr><td>“97 is prime”</td><td>Exact arithmetic, in <a href="https://newaxiomai.com/">New Axiom</a>.</td><td><span class="tier tier-verified">Verified</span></td></tr>
+          <tr><td>“This page contains the word you searched for”</td><td>The page was fetched and read before it was listed (the <a href="https://gitlab.com/logical-truth-finding/canos/-/tree/verified-search">verified search</a> in the CanOS browser).</td><td><span class="tier tier-verified">Verified</span></td></tr>
+          <tr><td>Electrode contact on a live headband</td><td>The headband's own quality signal per electrode; with fewer than 3 of 4 in contact the app sends <i>no claim</i>.</td><td><span class="tier tier-measured">Measured</span></td></tr>
+          <tr><td>A two-second epoch in the record</td><td>Counted clean only when its peak-to-peak swing stays under 200 µV.</td><td><span class="tier tier-measured">Measured</span></td></tr>
+          <tr><td>The activation estimate on a card or in the game</td><td>A z-score against the person's own baseline, with an EMG guard and contact gating; never called emotion.</td><td><span class="tier tier-estimated">Estimated</span></td></tr>
+          <tr><td>A mood on a card or in a check-in</td><td>Typed by the person; never inferred from the signal.</td><td><span class="tier tier-self">Self-reported</span></td></tr>
+          <tr><td>“Adapt the EEG model to this person”</td><td>An <a href="https://www.mersivity.com/research/safety-ai.htm">audit of eight adaptation methods</a> found their failures land on corrupted windows, so the model holds there.</td><td><span class="tier tier-refused">Refused</span></td></tr>
+        </tbody>
+      </table></div>
+    </div>
   </div>
 </section>
 
@@ -124,14 +165,15 @@
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>Splats: a headset's card can show what its depth sensing sees as coloured blobs in 3-D. They are laid down straight from depth and the camera's colour, one for each 2 cm of surface; nothing is trained, so this is not an optimised Gaussian-splat scene. Unlike a camera's picture they do pass through the relay on their way to you. The relay keeps none of them; the recording (a ROS 2 bag and a splat file) stays on the computer the headset hangs off.</li>
     <li>Scans: each one says whether a headset saw it or whether it is a test of the method, drawn on a computer from a shape that is known so that the result can be measured. What is published of a scan was computed from its pictures (the splat, the solid, renders, print files); the camera pictures themselves are not here. The live Gaussians on <a href="scans/live.html">the live page</a> are placed from depth, not trained.</li>
+    <li>Trust: the two cards under Trust keep the same rule as the rest of the page. The benchmark numbers are copied from the preprint linked there (its Tables 2 and 3) and the figure was drawn from the same results; the tier table says, for each kind of number on this page, what was checked and what was not.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
     <li>The band's waves: the dots in the brain-wave panel at the top of the page are samples, not decoration, drawn in microvolts against seconds. With nobody live, and while the band is silent, they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794622343"></script>
-<script src="splat-view.js?v=1794622343"></script>
-<script src="app.js?v=1794964114"></script>
+<script src="video-rtc.js?v=1794980958"></script>
+<script src="splat-view.js?v=1794980958"></script>
+<script src="app.js?v=1794980958"></script>
 <script>
 // The head. Three layers, each standing where the one above it is missing:
 //   1. the still picture, always there, a link to the head's own page, with the electrodes' names written over it
@@ -224,7 +266,7 @@
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794622343")
+import("./music/player.js?v=1794980958")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
