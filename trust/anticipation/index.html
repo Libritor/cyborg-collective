@@ -4,80 +4,106 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>How far ahead can a headband be read?</title>
+<meta name="description" content="A pre-registered test of anticipating a Muse headband's activation index 2 to 16 s ahead, under the gates the lab's papers use, with a local language model's claims judged by the same gate.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="How far ahead can a headband be read?">
+<meta property="og:description" content="Ridge on the last 16 s removes 0.29 to 0.46 of persistence's error 2 to 16 s ahead; most of it is drift back to the level; nothing personal at these horizons; no plunge is in it.">
+<!-- Written by publish_page.py of the eeg-anticipation repository. No script on this page. -->
 <link rel="stylesheet" href="../../style.css">
-<style>
-.page { max-width: 980px; margin: 0 auto; padding: 24px 16px 60px; }
-.page h1 { font-size: 26px; margin: 0 0 6px; }
-.page h2 { font-size: 20px; margin: 30px 0 6px; }
-.page h3 { font-size: 16px; margin: 22px 0 4px; }
-.page p, .page li { max-width: 78ch; }
-.page figure { margin: 18px 0; }
-.page figure img { width: 100%; height: auto; background: #fff; border-radius: 10px; }
-.page figcaption { color: var(--muted); font-size: 13px; margin-top: 6px; }
-.page .crumbs { font-size: 14px; color: var(--muted); margin-bottom: 14px; }
-.page .crumbs a { margin-right: 12px; }
-.page table.numbers { margin: 8px 0 4px; }
-.page .tier { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
-.page .files li { margin: 3px 0; }
-.page .foot { color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); margin-top: 36px; padding-top: 14px; }
-</style>
+<link rel="stylesheet" href="anticipation.css">
 </head>
 <body>
-<div class="page">
-<p class="crumbs"><a href="../../">6ense.com</a><a href="../../#trust">Trust</a></p>
-<h1>How far ahead can a headband be read?</h1>
-<p class="sub">A pre-registered test of anticipating the Muse activation index 2 to 16 s ahead, on the owner's own head and on the lab's cold-exposure recordings, with the gates the lab's papers use, and a local language model whose claims about the same data the same gate judged. Everything ran on one laptop; the raw recordings never left it.</p>
-
-<figure>
-<a href="skill_by_horizon.pdf"><img src="skill_by_horizon.svg" width="1440" height="1080" alt="Four panels of pooled forecast skill against horizon (2, 4, 8, 16 s) for three pools, within a session and across sessions, against persistence and against the session mean, with bootstrap intervals"></a>
-<figcaption>Pooled skill = 1 − MSE(model)/MSE(baseline), ridge on the last 16 s of the index, 95 % intervals from 2000 session bootstraps. Left: against "it stays where it is". Right: against the session's own mean. Top: trained on the first 60 % of a session, tested on the last 40 %. Bottom: trained on other sessions. Two cold points at 4 s are off the scale because one session's within-session model, the variant with band and motion features, extrapolated badly; the lags-only model did not. <a href="skill_by_horizon_dark.svg">Dark version</a> · <a href="skill_by_horizon.pdf">PDF</a>.</figcaption>
+<div class="masthead">
+<header class="top">
+  <p class="crumb"><a href="../../">Cyborg Collective</a> · <a href="../../#trust">Trust</a></p>
+  <h1>How far ahead can a headband be read?</h1>
+  <p class="tag">A pre-registered test of anticipating a Muse headband's activation index 2 to 16 s ahead, under the gates the lab's papers use.</p>
+  <p class="about">On the owner's own head and on the lab's cold-exposure recordings, the question was how much of the next 2 to 16 s is already in the last 16 s, and whether a local language model, shown only the aggregate tables, says anything about the data that the same gate lets stand. Everything ran on one laptop; the raw recordings never left it; the design was written down and committed before the first run.</p>
+</header>
+<nav aria-label="Anticipation">
+  <a href="../../">Home</a><a href="../../#trust">Trust</a><a href="#data">The data</a><a href="#found">What was found</a><a href="#model">The model's claims</a><a href="#limits">What it does not show</a><a href="#files">Files</a><a href="../../record.html">The record</a>
+</nav>
+<div class="side">
+<p class="status">Pre-registered in <a href="PREDICTIONS.md">PREDICTIONS.md</a>, with two amendments made before the first run. Rerun it yourself: <a href="code.zip">code.zip</a>, pointed at a folder of MuseLog recordings, rebuilds every number on this page in a few minutes on a laptop.</p>
+</div>
+<div class="band-col">
+<figure class="dark-panel">
+<figcaption><b>6ense™</b> anticipation · pooled skill against how far ahead, 2 to 16 s, three pools of recordings</figcaption>
+<a class="fig" href="skill_by_horizon.pdf"><img src="skill_by_horizon_dark.svg" width="1440" height="1080" alt="Four panels of pooled forecast skill against horizon (2, 4, 8, 16 s) for three pools, within a session and across sessions, against persistence and against the session mean, with bootstrap intervals"></a>
+<p class="how">Skill = 1 − MSE(model)/MSE(baseline), ridge on the last 16 s of the index, 95 % intervals from 2000 session bootstraps. Left: against "it stays where it is". Right: against the session's own mean. Top: trained on the first 60 % of a session, tested on the last 40 %. Bottom: trained on other sessions. Two cold points at 4 s are off the scale: one session's within-session model, the variant with band and motion features, extrapolated badly; the lags-only model did not. <a href="skill_by_horizon.svg">Light version</a> · <a href="skill_by_horizon.pdf">PDF</a></p>
 </figure>
-
-<h2>What the data allowed</h2>
-<p>A recording entered a pool only if it was at least 3 minutes long and yielded 60 clean, contiguous 18-second windows under the gate: contact 2 or better on the electrode, under 200 µV peak to peak, 90 % of the samples arrived, two of four electrodes accepted. The gate, not the analyst, decided who got in.</p>
-<div class="table-scroll"><table class="numbers"><thead><tr><th>Pool</th><th>Recordings ≥ 3 min</th><th>Usable fraction, mean</th><th>Eligible</th><th>Minutes used</th></tr></thead><tbody>
-<tr><td>mine (the owner's head)</td><td class='n'>14</td><td class='n'>0.45</td><td class='n'>6</td><td class='n'>51</td></tr>
+</div>
+</div>
+<main>
+<section id="data">
+  <h2>What the data allowed</h2>
+  <p class="sub">A recording entered a pool only if it was at least 3 minutes long and yielded 60 clean, contiguous 18-second windows under the gate: contact 2 or better on the electrode, under 200 µV peak to peak, 90 % of the samples arrived, two of four electrodes accepted. The gate, not the analyst, decided who got in.</p>
+  <div class="tiles">
+    <div class="tile"><b>13 of 115</b><span>recordings of 3 minutes or more passed the gate</span></div>
+    <div class="tile"><b>51 min</b><span>of the owner's head in play, 6 sessions, one afternoon</span></div>
+    <div class="tile"><b>84 min</b><span>from the cold-exposure periods, 6 sessions, no plunge</span></div>
+    <div class="tile"><b>0.11 vs 0.45</b><span>usable fraction of the cold-period recordings against the owner's</span></div>
+    <div class="tile"><b>0</b><span>recordings labelled before or after a plunge that passed</span></div>
+  </div>
+  <div class="table-scroll"><table class="numbers"><thead><tr><th>Pool</th><th>Recordings ≥ 3 min</th><th>Usable fraction, mean</th><th>Eligible</th><th>Minutes used</th></tr></thead><tbody>
+<tr><td>the owner's head</td><td class='n'>14</td><td class='n'>0.45</td><td class='n'>6</td><td class='n'>51</td></tr>
 <tr><td>cold periods</td><td class='n'>89</td><td class='n'>0.11</td><td class='n'>6</td><td class='n'>84</td></tr>
 <tr><td>all</td><td class='n'>115</td><td class='n'>0.16</td><td class='n'>13</td><td class='n'>225</td></tr>
 </tbody></table></div>
-<ul>
-<li>The six eligible sessions of the owner's head are one afternoon, 2025-12-13, recorded while the recorder was being written.</li>
-<li>No recording labelled as before or after a plunge reached 60 clean windows. The cold pool is six recordings from the cold-exposure periods, none a plunge, wearers unnamed and not the owner. Nothing here is a plunge response.</li>
-<li>Coverage is what separates cold from calm: 7 % of the cold-period recordings qualify against 43 % of the owner's, and the usable fraction at the recording level is 0.11 against 0.45.</li>
-</ul>
+  <div class="grid cards">
+    <div class="card"><b>One afternoon</b>The six eligible sessions of the owner's head are all from 2025-12-13, recorded while the recorder was being written. "My head" here means one day of it.</div>
+    <div class="card"><b>No plunge</b>No recording labelled as before or after a plunge reached 60 clean windows. The cold pool is six recordings from the cold-exposure periods, wearers unnamed and not the owner. Nothing here is a plunge response.</div>
+    <div class="card"><b>Coverage, not skill, separates cold from calm</b>7 % of the cold-period recordings qualify against 43 % of the owner's. The pre-registered P7 compared usable fractions inside the eligible pools and is refuted as worded; at the recording level the gap is 0.11 against 0.45.</div>
+  </div>
+</section>
 
-<h2>What was found</h2>
-<ol>
-<li><b>The index can be anticipated 2 to 16 s ahead, relative to "it stays where it is".</b> Ridge on the last eight values removes 0.30 to 0.46 of persistence's squared error in every pool, on held-out time and on held-out sessions, every interval clear of zero.</li>
-<li><b>Most of that is drift back to the session's level.</b> The session mean by itself, used as the forecast, removes +0.31 (owner) and +0.25 (cold periods) of persistence's error at 2 s. The game's quantity wanders about a level and persistence chases the noise.</li>
-<li><b>Beyond the level, 16 s of history adds a little at 2 s and nothing by 16 s.</b> A within-session permutation test, which shuffles the older history while every target keeps its own current value, says the past does carry information (p = 0.005 in all six primary cells, Holm-adjusted 0.030); the amount is a few hundredths to 0.16 of the error.</li>
-<li><b>Nothing personal at these horizons.</b> A model trained on other people's sessions anticipates the owner's as well as one trained on his own (+0.41 against +0.40).</li>
-<li><b>The small recurrent network lost to ridge everywhere.</b> Fifty to two hundred minutes per pool is not enough for it.</li>
-<li><b>The pre-registered primary model was the fragile one.</b> Ridge with band powers and motion added extrapolated badly on two January sessions when trained on a session's first 60 %; lags alone did not. Three predictions read as refuted for that reason; the lags-only numbers are the ones to trust, and both are published.</li>
-<li><b>Asleep the picture inverts</b>: in the one overnight recording persistence is a good baseline and the mean a bad one. One night; an observation.</li>
-</ol>
-
-<h3>Skill, ridge on the lags, trained on other sessions</h3>
-<p class="sub">Pooled skill with its interval; columns are how far ahead.</p>
-<div class="table-scroll"><table class="numbers"><thead><tr><th>against persistence</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
-<tr><td>mine</td><td class='n'>+0.38 [+0.27, +0.44]</td><td class='n'>+0.41 [+0.30, +0.46]</td><td class='n'>+0.42 [+0.35, +0.46]</td><td class='n'>+0.38 [+0.26, +0.42]</td></tr>
+<section id="found">
+  <h2>What was found</h2>
+  <p class="sub">Seven things. Every number is in the tables below and in <a href="FORECAST.md">FORECAST.md</a>.</p>
+  <div class="tiles">
+    <div class="tile"><b>0.29 to 0.46</b><span>of persistence's error removed by ridge on 16 s of history, 2 to 16 s ahead, every pool, held out</span></div>
+    <div class="tile"><b>0.25 to 0.42</b><span>removed by the session's own mean alone, owner and cold pools</span></div>
+    <div class="tile"><b>+0.03 to +0.16</b><span>beyond the mean at 2 s, owner and cold pools; nothing left by 16 s</span></div>
+    <div class="tile"><b>0.409 vs 0.400</b><span>other heads' model on the owner's sessions, against his own</span></div>
+  </div>
+  <ol class="steps">
+    <li class="card"><b>The index can be anticipated 2 to 16 s ahead, relative to "it stays where it is".</b> Ridge on the last eight values removes 0.29 to 0.46 of persistence's squared error in every pool, on held-out time and on held-out sessions, every interval clear of zero.</li>
+    <li class="card"><b>Most of that is drift back to the session's level.</b> The session mean by itself, used as the forecast, removes 0.25 to 0.42 of persistence's error in the owner's and the cold pools. The game's quantity wanders about a level and persistence chases the noise.</li>
+    <li class="card"><b>Beyond the level, 16 s of history adds a little at 2 s and nothing by 16 s.</b> A within-session permutation test, which shuffles the older history while every target keeps its own current value, says the past does carry information (p = 0.005 in all six primary cells, Holm-adjusted 0.030); the amount is a few hundredths to 0.16 of the error.</li>
+    <li class="card"><b>Nothing personal at these horizons.</b> A model trained on other people's sessions anticipates the owner's as well as one trained on his own (0.409 against 0.400).</li>
+    <li class="card"><b>The small recurrent network lost to ridge everywhere.</b> Fifty to two hundred minutes per pool is not enough for it.</li>
+    <li class="card"><b>The pre-registered primary model was the fragile one.</b> Ridge with band powers and motion added extrapolated badly on two January sessions when trained on a session's first 60 %; lags alone did not. Three predictions read as refuted for that reason; the lags-only numbers are the ones to trust, and both are published.</li>
+    <li class="card"><b>Asleep the picture inverts.</b> In the one overnight recording persistence is a good baseline and the mean a bad one. One night; an observation.</li>
+  </ol>
+  <h3>Skill, ridge on the lags, trained on other sessions</h3>
+  <p class="sub">Pooled skill with its 95 % interval; columns are how far ahead.</p>
+  <div class="table-scroll"><table class="numbers"><thead><tr><th>against persistence</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
+<tr><td>the owner's head</td><td class='n'>+0.38 [+0.27, +0.44]</td><td class='n'>+0.41 [+0.30, +0.46]</td><td class='n'>+0.42 [+0.35, +0.46]</td><td class='n'>+0.38 [+0.26, +0.42]</td></tr>
 <tr><td>cold periods</td><td class='n'>+0.33 [+0.25, +0.38]</td><td class='n'>+0.38 [+0.31, +0.42]</td><td class='n'>+0.38 [+0.27, +0.46]</td><td class='n'>+0.40 [+0.29, +0.46]</td></tr>
 <tr><td>all</td><td class='n'>+0.36 [+0.33, +0.41]</td><td class='n'>+0.38 [+0.34, +0.43]</td><td class='n'>+0.40 [+0.36, +0.45]</td><td class='n'>+0.36 [+0.32, +0.42]</td></tr>
 </tbody></table></div>
-<div class="table-scroll"><table class="numbers"><thead><tr><th>against the session mean</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
-<tr><td>mine</td><td class='n'>+0.03 [-0.07, +0.15]</td><td class='n'>+0.02 [-0.06, +0.10]</td><td class='n'>+0.00 [-0.07, +0.05]</td><td class='n'>-0.05 [-0.20, +0.03]</td></tr>
+  <div class="table-scroll"><table class="numbers"><thead><tr><th>against the session mean</th><th>2 s</th><th>4 s</th><th>8 s</th><th>16 s</th></tr></thead><tbody>
+<tr><td>the owner's head</td><td class='n'>+0.03 [-0.07, +0.15]</td><td class='n'>+0.02 [-0.06, +0.10]</td><td class='n'>+0.00 [-0.07, +0.05]</td><td class='n'>-0.05 [-0.20, +0.03]</td></tr>
 <tr><td>cold periods</td><td class='n'>+0.16 [+0.06, +0.22]</td><td class='n'>+0.08 [-0.05, +0.14]</td><td class='n'>+0.00 [-0.11, +0.05]</td><td class='n'>-0.03 [-0.20, +0.01]</td></tr>
 <tr><td>all</td><td class='n'>+0.46 [+0.04, +0.59]</td><td class='n'>+0.44 [+0.01, +0.57]</td><td class='n'>+0.41 [-0.00, +0.55]</td><td class='n'>+0.40 [-0.07, +0.52]</td></tr>
 </tbody></table></div>
-
-<h3>The pre-registered predictions</h3>
-<div class="table-scroll"><table class="numbers"><thead><tr><th></th><th>Prediction</th><th>Verdict</th></tr></thead><tbody>
+  <h3>The pre-registered predictions</h3>
+  <div class="table-scroll"><table class="numbers"><thead><tr><th></th><th>Prediction</th><th>Verdict</th></tr></thead><tbody>
 <tr><td>P1</td><td>On the owner&#x27;s head, within a session, skill over persistence at 2 s between 0.05 and 0.30</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P2</td><td>Skill over the session mean falls with horizon and is at most 0.05 at 16 s, in every pool</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P3</td><td>The GRU never beats ridge by more than 0.05</td><td><span class='tier tier-verified'>supported</span></td></tr><tr><td>P4</td><td>Across-session ridge exceeds within-session ridge at 2 s by at most 0.03</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P5</td><td>A model trained on other heads reads the owner&#x27;s within 0.05 of one trained on his own</td><td><span class='tier tier-verified'>supported</span></td></tr><tr><td>P6</td><td>The cold pool&#x27;s skill at 2 s is within 0.10 of the owner&#x27;s</td><td><span class='tier tier-refused'>refuted</span></td></tr><tr><td>P7</td><td>The cold pool&#x27;s usable fraction is lower than the owner&#x27;s by at least 0.15 (as worded, inside the eligible pools)</td><td><span class='tier tier-refused'>refuted</span></td></tr>
 </tbody></table></div>
-<p>P1 is refuted upward: the owner's head was more predictable than written, for the reason in point 2. P2, P4 and P6 fall to the fragile model in point 6 and to this n. The full design, with the two amendments made before the first run, is in <a href="PREDICTIONS.md">PREDICTIONS.md</a>.</p>
+  <p>P1 is refuted upward: the owner's head was more predictable than written, for the reason in point 2. P2, P4 and P6 fall to the fragile model in point 6 and to this n. The design, with the two amendments made before the first run, is in <a href="PREDICTIONS.md">PREDICTIONS.md</a>.</p>
+</section>
 
-<h2>A local model proposes, the gate disposes</h2>
-<p>Ornith, a 9-billion-parameter model running on the laptop through Ollama, saw only a briefing: the column dictionary, counts per pool and condition, group means, and in the first round the forecasting summary. It was asked for twelve falsifiable claims in a fixed grammar (two groups compared on a statistic, a correlation across sessions, or a forecast-skill statement). Each claim met a permutation test or the held-out forecast result, with Holm correction across all its claims, groups under five sessions abstaining. The ledger is the result.</p>
+<section id="model">
+  <h2>A local model proposes, the gate disposes</h2>
+  <p class="sub">Ornith, a 9-billion-parameter model running on the laptop through Ollama, saw only a briefing: the column dictionary, counts per pool and condition, group means, and in the first round the forecasting summary. It was asked for twelve falsifiable claims in a fixed grammar (two groups compared on a statistic, a correlation across sessions, or a forecast-skill statement). Each claim met a permutation test or the held-out forecast result, with Holm correction across all its claims, groups under five sessions abstaining.</p>
+  <div class="tiles">
+    <div class="tile"><b>24</b><span>claims in two rounds</span></div>
+    <div class="tile"><b>8</b><span>let through as empirical</span></div>
+    <div class="tile"><b>2</b><span>refuted, both textbook intuitions</span></div>
+    <div class="tile"><b>5</b><span>inconclusive at this n</span></div>
+    <div class="tile"><b>7</b><span>malformed: groups that overlap</span></div>
+  </div>
 <h3>Round one: the model saw the forecast numbers</h3>
 <p class='sub'>12 claims: 6 supported, 0 refuted, 2 inconclusive at this n, 1 abstained, 3 malformed.</p>
 <div class='table-scroll'><table class='numbers'><thead><tr><th>#</th><th>The claim</th><th>Outcome</th><th>What the gate saw</th><th>The model's reason</th></tr></thead><tbody>
@@ -110,19 +136,34 @@
 <tr><td>11</td><td>mean_logbeta - mean_logalpha across all</td><td><span class='tier tier-refused'>refuted</span></td><td class='n'>rho 0.755; n 39; p_stated_holm 1.000</td><td>Beta and alpha are often inversely related (beta up during alertness, alpha up during rest), so a negative correlation is plausible across sessions.</td></tr>
 <tr><td>12</td><td>mean_loggamma - mean_logalpha across all</td><td><span class='tier tier-refused'>refuted</span></td><td class='n'>rho 0.649; n 39; p_stated_holm 1.000</td><td>Gamma power is typically low during relaxed states where alpha dominates, suggesting a negative correlation between gamma and alpha across sessions.</td></tr>
 </tbody></table></div>
-<p>Reading the two rounds together: shown the forecast numbers, the model proposed them back; shown none, it proposed no forecast at all. Its supported claims are correlations that are nearly definitional on a four-electrode headband. Its refuted claims are textbook intuitions (beta and gamma fall as alpha rises) that run the other way across these sessions, where every band moves with amplitude and contact. It compared "the owner" with "cold periods" seven times in a way the gate could not test, after being told how. And once it set a negative skill threshold and called the result "marginally supported"; the gate returned inconclusive. The gate held every time.</p>
+  <div class="card" style="margin-top:14px"><b>Reading the two rounds together</b><p>Shown the forecast numbers, the model proposed them back; shown none, it proposed no forecast at all. Its supported claims are correlations that are nearly definitional on a four-electrode headband. Its refuted claims are textbook intuitions (beta and gamma fall as alpha rises) that run the other way across these sessions, where every band moves with amplitude and contact. It compared "the owner" with "cold periods" seven times in a way the gate could not test, after being told how. And once it set a negative skill threshold and called the result "marginally supported"; the gate returned inconclusive. The gate held every time. The ledger is the result, not the count of green rows.</p></div>
+</section>
 
-<h2>What this does not show</h2>
-<p>It does not show that a plunge response can be anticipated, that any mental state is read, or that the index after a plunge means arousal rather than muscle. Anticipation at 2 to 4 s is real and is mostly reversion to the level, which is exactly what a game can use to cancel its one to two seconds of latency. Anticipating the response to cold needs marked plunges (in and out markers, a 60 s baseline, 10 to 15 minutes after exit) and a leave-one-plunge-out test, which is the next thing to record.</p>
+<section id="limits">
+  <h2>What this does not show</h2>
+  <div class="card"><p>It does not show that a plunge response can be anticipated, that any mental state is read, or that the index after a plunge means arousal rather than muscle. Anticipation at 2 to 4 s is real and is mostly reversion to the level, which is exactly what a game can use to cancel its one to two seconds of latency. Anticipating the response to cold needs marked plunges (in and out markers, a 60 s baseline, 10 to 15 minutes after exit) and a leave-one-plunge-out test, which is the next thing to record.</p></div>
+</section>
 
-<h2>Files</h2>
-<ul class="files">
-<li><a href="PREDICTIONS.md">The pre-registration</a>, committed before the first run, with its two amendments.</li>
-<li><a href="FORECAST.md">Every forecasting cell</a>: both protocols, three models and two baselines, four horizons, intervals, the permutation null, the Holm-adjusted primary cells.</li>
-<li><a href="PROPOSALS.md">Round one</a> and <a href="PROPOSALS_BLIND.md">round two</a> of the proposer, with <a href="proposals_round1_prompt.txt">what it was shown</a> (<a href="proposals_round2_prompt.txt">blind</a>), <a href="proposals_round1_reply.txt">what it replied</a> (<a href="proposals_round2_reply.txt">blind</a>) and the ledgers (<a href="proposals_round1_ledger.jsonl">1</a>, <a href="proposals_round2_ledger.jsonl">2</a>).</li>
-<li><a href="code.zip">The code</a>: the epoch gate, the pools, the forecasting, the claim grammar, the tests and the scripts. Point it at a folder of MuseLog CSV files and it rebuilds all of this in a few minutes.</li>
-</ul>
-<p class="foot">Nothing on this page is verified in the exact sense; the best a forecast or a proposed claim can earn is empirical, with its interval. The per-session tables the model saw are not published because their keys carry the recordings' names. The raw recordings stay with the people who made them.</p>
-</div>
+<section id="files">
+  <h2>Files</h2>
+  <ul class="files">
+    <li><a href="PREDICTIONS.md">The pre-registration</a>, committed before the first run, with its two amendments.</li>
+    <li><a href="FORECAST.md">Every forecasting cell</a>: both protocols, three models and two baselines, four horizons, intervals, the permutation null, the Holm-adjusted primary cells.</li>
+    <li><a href="PROPOSALS.md">Round one</a> and <a href="PROPOSALS_BLIND.md">round two</a> of the proposer, with <a href="proposals_round1_prompt.txt">what it was shown</a> (<a href="proposals_round2_prompt.txt">blind</a>), <a href="proposals_round1_reply.txt">what it replied</a> (<a href="proposals_round2_reply.txt">blind</a>) and the ledgers (<a href="proposals_round1_ledger.jsonl">1</a>, <a href="proposals_round2_ledger.jsonl">2</a>).</li>
+    <li><a href="skill_by_horizon.svg">The figure</a> (light), <a href="skill_by_horizon_dark.svg">dark</a>, <a href="skill_by_horizon.pdf">PDF</a>.</li>
+    <li><a href="code.zip">The code</a>: the epoch gate, the pools, the forecasting, the claim grammar, the tests and the scripts.</li>
+  </ul>
+</section>
+</main>
+<footer>
+  <b>How this page is honest</b>
+  <ul>
+    <li>The gate is the one in the lab's Buzzkill paper, applied before any model saw a sample: contact, 200 µV, 90 % of samples, two electrodes. Recordings that failed it are counted, not dropped quietly.</li>
+    <li>The design was committed before the first run; its two amendments were made before the first run and are recorded with their reasons. Predictions that failed are reported as failed.</li>
+    <li>Skill is measured on held-out time or held-out sessions, against two baselines, with intervals from resampling sessions. Nothing here is verified in the exact sense; the best a forecast or a proposed claim earns is empirical, with its interval.</li>
+    <li>The language model saw aggregate tables and nothing else; its claims, its reasons and the gate's verdicts are published in full. The per-session tables it saw are not, because their keys carry the recordings' names.</li>
+    <li>The raw recordings stay with the people who made them. No plunge is in this study, and the page says so wherever it matters.</li>
+  </ul>
+</footer>
 </body>
 </html>
