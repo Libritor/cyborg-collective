@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How a scan is made</title>
+<!-- Written by scan_publish.py, which also copies the tools named here into tools/. No script. -->
+<style>
+  :root { color-scheme: light dark; --bg: #f6f7f9; --card: #ffffff; --ink: #16181d; --muted: #6b7280; --line: #e5e7eb; --accent: #1f4e79; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1115; --card: #171a21; --ink: #e5e7eb; --muted: #9ca3af; --line: #262a33; --accent: #7fb3e6; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 28px 16px 56px; }
+  a { color: var(--accent); overflow-wrap: anywhere; }
+  h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
+  h2 { margin: 30px 0 8px; font-size: 20px; }
+  h3 { margin: 18px 0 4px; font-size: 15px; color: var(--muted); font-weight: 600; }
+  p, li { max-width: 74ch; }
+  .muted { color: var(--muted); font-size: 13.5px; }
+  ol.chain { padding-left: 22px; } ol.chain li { margin: 0 0 8px; }
+  .table-scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  th, td { text-align: left; vertical-align: top; padding: 6px 10px; border-top: 1px solid var(--line); }
+  tr:first-child th, tr:first-child td { border-top: 0; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  td.file { white-space: nowrap; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+<p class="muted"><a href="./">← all scans</a> · <a href="live.html">live</a></p>
+<h1>How a scan is made</h1>
+<p>A thing or a place is photographed with a Meta Quest 3S headset, a laptop turns the photographs into a Gaussian splat and, for an object, into a closed solid sliced for a 3-D printer, and the result goes onto this site. Everything it is made with is on this page.</p>
+
+<h2>The chain</h2>
+<ol class="chain">
+<li><b>The headset keeps pictures.</b> Its app keeps a picture from the passthrough camera every 5 cm or 6 degrees of head movement, with the headset's own position and direction for it and an 80 × 60 grid of depth rays behind it. Pulling the trigger on a thing names it as the object. The headset has no lidar: its depth comes from its two tracking cameras.</li>
+<li><b>Live, if asked for.</b> While it scans, the app can also send one depth reading per ray to the laptop over the USB cable. The laptop keeps one per 2 cm of surface and passes them through the relay; <a href="live.html">the live page</a> draws each as a Gaussian the moment it arrives. These are placed, not trained.</li>
+<li><b>The laptop trains the splat.</b> The headset's positions are used as they are, with no structure from motion. The pictures are cropped round the object and <a href="https://github.com/ArthurBrussee/brush">Brush</a> trains the Gaussians for 8,000 steps, about two minutes on a laptop's graphics card. A tenth of the pictures are kept back and compared with what the splat draws from their positions.</li>
+<li><b>From splat to solid.</b> The splat's depth is drawn from every camera position and voted into a grid: outside where enough cameras see past a cell, surface where they see it, solid where none could see, so the body is closed. It is cut flat on the surface it stood on.</li>
+<li><b>Sliced.</b> The solid is scaled and sliced for a Bambu H2C with the slicer's command line. Nothing is sent to a printer.</li>
+<li><b>Published, if asked for.</b> <a href="https://www.open3d.org/">Open3D</a> reads the trained splat and writes it compressed, about a tenth of the size; that file, the solid, a render and the print files go into this site's repository. Open3D does not make the splat: it has no training. The camera pictures are not published.</li>
+</ol>
+<pre>.\start_quest_scan.ps1                  scan, splat, solid, print file: everything stays on the laptop
+.\start_quest_scan.ps1 -Live -Publish   the same, with the live view and the finished scan on this site</pre>
+
+<h2>What has been checked, and what has not</h2>
+<ul>
+<li><b>Against known shapes.</b> Two made-up scans of known models, drawn at the headset camera's geometry with noise in the depth, went through the same steps: half of the T. rex's surface lies within 0.47 mm of the true one, its sizes within 0.3 %, its volume within 0.5 %; the Triceratops, 0.37 mm. Both are <a href="./">on the list</a>, labelled as tests.</li>
+<li><b>On the headset.</b> One sitting so far, from one seat in a room: 26 pictures, a view to look round rather than an object. Its depth rays land within 0.02 px sideways and 4 px vertically of where they were cast, so the camera model holds on the device.</li>
+<li><b>These pages.</b> Each has a browser test that travels with it (<a href="test_scans_page.py">test_scans_page.py</a>, <a href="test_live_page.py">test_live_page.py</a>); the live page's test sends a made-up room through a relay and requires the page to draw it and let it go.</li>
+<li><b>Not yet.</b> A walk all the way round one object with the headset; the live view from the headset itself (only made-up rooms have been sent so far); AR and VR inside the headset from this site; a print.</li>
+</ul>
+
+<h2>The tools</h2>
+<p>Plain files, as they are used; nothing here is built. They are Python (numpy, scipy, numba, Open3D, scikit-image, Pillow, playwright), PowerShell, and one C# script for Unity 6 with Meta's XR packages. Their own defaults name folders in the user's home folder.</p>
+<h3>On the headset</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/PrintWhatISee.cs">PrintWhatISee.cs</a></td><td>The headset app (Unity, Meta&#x27;s passthrough camera and depth): keeps a picture, the camera&#x27;s position and a grid of depth rays every 5 cm of head movement; the trigger names the object; the splat sensor sends one reading per depth ray for the live view.</td></tr>
+<tr><td class="file"><a href="tools/PrintSeeBuild.cs">PrintSeeBuild.cs</a></td><td>Builds the app&#x27;s scene and its Android package.</td></tr>
+<tr><td class="file"><a href="tools/compile_check.py">compile_check.py</a></td><td>Compiles the app&#x27;s scripts in seconds, without a build.</td></tr>
+<tr><td class="file"><a href="tools/printsee_build.ps1">printsee_build.ps1</a></td><td>Runs the Unity build without a window, watching the disk.</td></tr>
+</table></div>
+<h3>One sitting</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/start_quest_scan.ps1">start_quest_scan.ps1</a></td><td>The one command: scan, splat, solid, print file; -Live and -Publish send to this site.</td></tr>
+<tr><td class="file"><a href="tools/scan_session.py">scan_session.py</a></td><td>Waits for the headset to be worn, starts the app, follows its log, then runs the steps below.</td></tr>
+<tr><td class="file"><a href="tools/quest_scan.py">quest_scan.py</a></td><td>The laptop&#x27;s part: checks the scan, writes the training set, trains the splat (Brush), cuts out the object, makes the solid, slices it, draws the pictures.</td></tr>
+</table></div>
+<h3>The parts of the laptop&#x27;s work</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/scan_lib.py">scan_lib.py</a></td><td>Reads a scan folder; the headset camera&#x27;s model; writes the training set in COLMAP&#x27;s layout; reads and writes splat files.</td></tr>
+<tr><td class="file"><a href="tools/splat_render.py">splat_render.py</a></td><td>Draws a Gaussian splat on the processor: colour, depth and coverage from any camera position.</td></tr>
+<tr><td class="file"><a href="tools/scan_solid.py">scan_solid.py</a></td><td>From splat to solid: the surface the object stands on, the object&#x27;s own Gaussians, depth from every side voted into a closed body with a flat base.</td></tr>
+<tr><td class="file"><a href="tools/slice_h2c.py">slice_h2c.py</a></td><td>Slices an STL for a Bambu H2C with the slicer&#x27;s own command line; reports time and grams.</td></tr>
+<tr><td class="file"><a href="tools/scan_view.py">scan_view.py</a></td><td>Serves the viewer (view.html on this site) on the laptop and to the headset through the USB cable.</td></tr>
+<tr><td class="file"><a href="tools/fetch_vendor.py">fetch_vendor.py</a></td><td>Fetches the two libraries the viewer runs on, checked against recorded hashes.</td></tr>
+</table></div>
+<h3>A room seen from one spot</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/scan_view_folder.py">scan_view_folder.py</a></td><td>Gathers an early sitting&#x27;s pictures into one folder.</td></tr>
+<tr><td class="file"><a href="tools/scan_mono_depth.py">scan_mono_depth.py</a></td><td>Depth for pictures that have none: a depth network&#x27;s map per picture, pinned to the headset&#x27;s own measurements.</td></tr>
+<tr><td class="file"><a href="tools/scan_room_model.py">scan_room_model.py</a></td><td>Fuses those depth maps into a coloured shell of the room and a diorama to print.</td></tr>
+</table></div>
+<h3>Checking the method</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/scan_synth.py">scan_synth.py</a></td><td>Draws a made-up scan of a known model, at the headset camera&#x27;s geometry and with noisy depth.</td></tr>
+<tr><td class="file"><a href="tools/scan_gate.py">scan_gate.py</a></td><td>Measures the result against the known model and says pass or fail.</td></tr>
+</table></div>
+<h3>To this site</h3>
+<div class="table-scroll"><table>
+<tr><td class="file"><a href="tools/scan_publish.py">scan_publish.py</a></td><td>Puts a finished scan here (the splat compressed by Open3D), takes one off, and writes these pages.</td></tr>
+<tr><td class="file"><a href="tools/quest_splat.py">quest_splat.py</a></td><td>The live view&#x27;s sender: takes the app&#x27;s depth readings over the USB cable, keeps one per 2 cm, records them, passes them to the relay.</td></tr>
+<tr><td class="file"><a href="tools/start_quest_splat.ps1">start_quest_splat.ps1</a></td><td>The live sender on its own, without a scan.</td></tr>
+<tr><td class="file"><a href="tools/splat_live_check.py">splat_live_check.py</a></td><td>Sends a labelled test pattern through the public relay and checks that the home page draws it and lets it go.</td></tr>
+<tr><td class="file"><a href="tools/SCAN_README.md">SCAN_README.md</a></td><td>The notes kept with the tools: how to run them, every file, the method, what was checked and what was not.</td></tr>
+</table></div>
+<p class="muted">The viewer is <a href="view.html">view.html</a> and the live page <a href="live.html">live.html</a>: their source is the page itself. <code>scan_view.py</code> expects the viewer as <code>web/splat/index.html</code> beside it, with the libraries <code>fetch_vendor.py</code> fetches.</p>
+
+<h2>What they stand on</h2>
+<ul>
+<li><a href="https://github.com/ArthurBrussee/brush">Brush</a> trains the splat (Apache 2.0).</li>
+<li><a href="https://www.open3d.org/">Open3D</a> compresses it to <code>.spz</code> (MIT).</li>
+<li><a href="https://sparkjs.dev/">Spark</a> and <a href="https://threejs.org/">three.js</a> draw it in the browser (both MIT; both kept in <code>vendor/</code> beside these pages, with their licences).</li>
+<li>Meta's passthrough camera and depth interfaces on the headset; Bambu Studio's command line for slicing.</li>
+</ul>
+<p class="muted">Part of <a href="../">6ense.com</a> · <a href="./">scans</a> · <a href="live.html">live</a> · <a href="../space/">rooms rebuilt from walks</a></p>
+</main>
+</body>
+</html>

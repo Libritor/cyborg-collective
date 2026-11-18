@@ -15,6 +15,9 @@
   a { color: var(--accent); overflow-wrap: anywhere; }
   h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: -0.01em; }
   .lede { max-width: 72ch; margin: 0 0 8px; }
+  .doors { display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 12px 0; }
+  .doors a { display: inline-block; text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; }
+  .doors b { color: var(--accent); }
   .muted { color: var(--muted); font-size: 13.5px; max-width: 80ch; }
   .scan { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin: 20px 0; }
   .pics img { display: block; width: 100%; height: auto; border-radius: 8px; background: #fff; }
@@ -36,6 +39,7 @@
 <main>
 <h1>Scans in 3-D</h1>
 <p class="lede">Things and places photographed with a Meta Quest 3S headset and rebuilt as Gaussian splats: clouds of soft coloured blobs, trained until they reproduce the photographs. From the splat of one object a closed solid is made and sliced for a 3-D printer.</p>
+<p class="doors"><a href="live.html"><b>Live</b>: what a headset is scanning now, as Gaussians, while it scans</a> <a href="how.html"><b>How a scan is made</b>, with the tools</a></p>
 <p class="muted">How a scan gets here: the headset keeps pictures, with its own position for each; a laptop trains the splat from them (Brush), makes the solid, and compresses the splat (Open3D); the viewer on this site (Spark and three.js, both kept beside the page) draws it. The headset has no lidar: where depth is used, it is the depth the headset works out from its two tracking cameras. &ldquo;Pictures kept back&rdquo;: a tenth of the pictures are not used for training, and the number says how closely the splat reproduces them (higher is closer).</p>
 <article class="scan" id="room-17-nov">
 <div class="pics"><a href="view.html?scan=room-17-nov"><img src="runs/room-17-nov/picture.jpg" alt="The splat seen from the spot it was photographed from, looking round in eight directions" width="1400" height="525" decoding="async"></a></div>

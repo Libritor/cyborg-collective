@@ -145,6 +145,14 @@ def file_checks():
     have = sorted(d for d in os.listdir(os.path.join(ROOT, "scans", "runs")) if os.path.isdir(os.path.join(ROOT, "scans", "runs", d)))
     check(listed == have and "<script" not in read("scans/index.html").lower() and all('id="%s"' % s in read("scans/index.html") for s in listed),
           "the list of scans is a page with no script that names exactly the scans that are there", (listed, have))
+    # how a scan is made: a plain page, every tool it names is beside it, and none of them names somebody's own folders
+    how = read("scans/how.html")
+    named = re.findall(r'href="(tools/[^"]+)"', how)
+    gone = [t for t in named if not os.path.exists(os.path.join(ROOT, "scans", t))]
+    private = [t for t in sorted(os.listdir(os.path.join(ROOT, "scans", "tools")))
+               if re.search(r"[A-Za-z]:[\\/]+Users[\\/]+\w", open(os.path.join(ROOT, "scans", "tools", t), encoding="utf-8", errors="replace").read())]
+    check("<script" not in how.lower() and len(named) >= 15 and not gone and not private,
+          "how a scan is made: a page with no script, with the %d tools it names beside it and no private folder named in them" % len(named), (gone, private))
 
 
 # ------------------------------------------------------------------ the pages in a browser, layers taken away
@@ -194,6 +202,12 @@ def browser_checks(url, serve):
             check(r.status == 200 and "image/jpeg" in r.headers.get("content-type", ""), "scans: the picture of %s answers" % s["id"], r.status)
         pg.goto(url + "scans/view.html?scan=%s" % (listed[0]["id"] if listed else "none"), wait_until="load")
         check(pg.locator("#plain").is_visible() and pg.locator('#plain a[href="./"]').count() == 1, "a scan's 3-D view, scripts off: it says so and points to the list")
+        pg.goto(url + "scans/live.html", wait_until="load")
+        check(pg.locator("#plain").is_visible() and pg.locator('#plain a[href="./"]').count() == 1 and not pg.locator("#panel").is_visible(),
+              "the live page, scripts off: it says so and points to the list")
+        pg.goto(url + "scans/how.html", wait_until="load")
+        check("The chain" in pg.inner_text("body") and pg.locator('a[href="tools/quest_scan.py"]').count() == 1 and pg.context.request.get(url + "scans/tools/quest_scan.py").status == 200,
+              "how a scan is made, scripts off: the chain is told and the tools are there to take")
         pg.goto(url, wait_until="load")
         pg.goto(url + "record.html", wait_until="load")
         n = pg.locator("table.sessions tbody tr").count()
@@ -376,7 +390,7 @@ def browser_checks(url, serve):
         pg.context.close()
 
         print("7. a phone: nothing slides sideways")
-        for path in ("", "record.html", "space/", "head/", "scans/"):
+        for path in ("", "record.html", "space/", "head/", "scans/", "scans/how.html", "scans/live.html?relay=off"):
             pg, _ = page(width=390, height=844)
             pg.goto(url + path, wait_until="load")
             if path == "":

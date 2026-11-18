@@ -553,7 +553,7 @@
       const blk = document.createElement("div"); blk.className = "splat";
       blk.innerHTML = `<div class="cam-head"><b>Splat sensor</b><span class="splat-facts"></span></div>
         <div class="splat-view"></div>
-        <p class="status splat-note">What the headset's depth sensing sees, as coloured blobs laid down from depth and the camera's colour: one for each 2 cm of surface, filling in as the wearer looks around. They are not a trained Gaussian-splat scene. Drag to turn it; click it, then scroll, to zoom. These blobs do pass through the relay, which keeps none of them.</p>`;
+        <p class="status splat-note">What the headset's depth sensing sees, as coloured blobs laid down from depth and the camera's colour: one for each 2 cm of surface, filling in as the wearer looks around. They are not a trained Gaussian-splat scene. Drag to turn it; click it, then scroll, to zoom. These blobs do pass through the relay, which keeps none of them. <a href="scans/live.html">See it large, each one drawn as a Gaussian</a>.</p>`;
       p.el.querySelector(".camnote").before(blk);
       p.splat = window.SplatView.create(blk.querySelector(".splat-view"));
       window.__splat = p.splat;

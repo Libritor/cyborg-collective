@@ -74,6 +74,8 @@ const say = (t) => { document.getElementById('status').textContent = t; };
 const q = new URLSearchParams(location.search);
 const state = { ready: false, splats: 0, error: null, xr: false, frames: 0 };
 window.viewer = state;
+// ?bare=1: shown inside another page (live.html, while nobody is scanning): the picture alone, no panel
+if (q.has('bare')) for (const id of ['panel', 'status', 'xr']) document.getElementById(id).style.display = 'none';
 
 const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, preserveDrawingBuffer: q.has('shot') });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
