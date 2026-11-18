@@ -296,3 +296,11 @@ table.numbers td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .door .tier { display: inline-block; margin: 0; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); white-space: nowrap; }
 .door .tier-verified { color: var(--good); } .door .tier-measured { color: var(--accent); } .door .tier-estimated { color: var(--ok); } .door .tier-refused { color: var(--bad); }
 .door > span + .table-scroll { margin-top: 2px; }
+
+#trust .doors { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+#trust .door.wide table.numbers th:first-child, #trust .door.wide table.numbers td:first-child { width: 30%; }
+#trust .door.wide { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 4px 18px; align-items: start; }
+#trust .door.wide > a { display: block; }
+#trust .door.wide img.figure { width: 100%; max-width: 100%; height: auto; margin: 0; border-radius: 8px; }
+#trust .door.wide table.numbers { font-size: 12.5px; }
+@media (max-width: 900px) { #trust .doors, #trust .door.wide { grid-template-columns: minmax(0, 1fr); } }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794980958">
+<link rel="stylesheet" href="style.css?v=1794984382">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -99,6 +99,24 @@
         </tbody>
       </table></div>
     </div>
+    <div class="card door wide" id="anticipation">
+      <a href="trust/anticipation/"><img class="figure" src="trust/anticipation/skill_by_horizon.svg" width="1440" height="1080" alt="Four panels of forecast skill against horizon for three pools of headband recordings, within a session and across sessions, against persistence and against the session mean"></a>
+      <div>
+        <b>How far ahead can a headband be read?</b>
+        <span>A pre-registered test on the recordings on the owner's laptop, with this page's gate deciding which recordings count (13 of 115). Ridge on the last 16 s of the activation index removes 0.30 to 0.46 of the error of “it stays where it is” 2 to 16 s ahead, on held-out time and held-out sessions. The session's own mean removes 0.25 to 0.42 by itself, so most of that is drift back to the level. Beyond the level, the past adds a few hundredths at 2 s and nothing by 16 s. A model trained on other heads reads the owner's as well as one trained on his own. No plunge is in it: no before-or-after-plunge recording passed the gate.</span>
+        <p class="cap">Ridge on the lags, trained on other sessions: pooled skill with its 95 % interval.</p>
+        <div class="table-scroll"><table class="numbers">
+          <thead><tr><th>Pool</th><th>vs. persistence, 2 s</th><th>16 s</th><th>vs. the session mean, 2 s</th><th>16 s</th></tr></thead>
+          <tbody>
+          <tr><td>the owner's head (6 sessions)</td><td class='n'>+0.38 [+0.27, +0.44]</td><td class='n'>+0.38 [+0.26, +0.42]</td><td class='n'>+0.03 [-0.07, +0.15]</td><td class='n'>-0.05 [-0.20, +0.03]</td></tr>
+          <tr><td>cold periods (6)</td><td class='n'>+0.33 [+0.25, +0.38]</td><td class='n'>+0.40 [+0.29, +0.46]</td><td class='n'>+0.16 [+0.06, +0.22]</td><td class='n'>-0.03 [-0.20, +0.01]</td></tr>
+          <tr><td>all (13)</td><td class='n'>+0.36 [+0.33, +0.41]</td><td class='n'>+0.36 [+0.32, +0.42]</td><td class='n'>+0.46 [+0.04, +0.59]</td><td class='n'>+0.40 [-0.07, +0.52]</td></tr>
+          </tbody>
+        </table></div>
+        <span>A local language model (9 billion parameters, on the laptop) proposed 24 claims about the same tables. The gate let 8 through as empirical, refuted 2 textbook ones, found 5 inconclusive, abstained on 2 and rejected 7 as malformed; shown the forecast numbers it proposed them back, shown none it proposed no forecast at all.</span>
+        <p class="links"><a href="trust/anticipation/">The whole reading, the pre-registration, every number, the model's ledgers</a><a href="trust/anticipation/code.zip">The code (zip)</a></p>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -165,15 +183,15 @@
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>Splats: a headset's card can show what its depth sensing sees as coloured blobs in 3-D. They are laid down straight from depth and the camera's colour, one for each 2 cm of surface; nothing is trained, so this is not an optimised Gaussian-splat scene. Unlike a camera's picture they do pass through the relay on their way to you. The relay keeps none of them; the recording (a ROS 2 bag and a splat file) stays on the computer the headset hangs off.</li>
     <li>Scans: each one says whether a headset saw it or whether it is a test of the method, drawn on a computer from a shape that is known so that the result can be measured. What is published of a scan was computed from its pictures (the splat, the solid, renders, print files); the camera pictures themselves are not here. The live Gaussians on <a href="scans/live.html">the live page</a> are placed from depth, not trained.</li>
-    <li>Trust: the two cards under Trust keep the same rule as the rest of the page. The benchmark numbers are copied from the preprint linked there (its Tables 2 and 3) and the figure was drawn from the same results; the tier table says, for each kind of number on this page, what was checked and what was not.</li>
+    <li>Trust: the two cards under Trust keep the same rule as the rest of the page. The benchmark numbers are copied from the preprint linked there (its Tables 2 and 3) and the figure was drawn from the same results; the tier table says, for each kind of number on this page, what was checked and what was not; the third card's numbers come from a pre-registered run whose design, every cell and the language model's own claims and reasons are published beside it, and whose raw recordings are not.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
     <li>The band's waves: the dots in the brain-wave panel at the top of the page are samples, not decoration, drawn in microvolts against seconds. With nobody live, and while the band is silent, they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794980958"></script>
-<script src="splat-view.js?v=1794980958"></script>
-<script src="app.js?v=1794980958"></script>
+<script src="video-rtc.js?v=1794984382"></script>
+<script src="splat-view.js?v=1794984382"></script>
+<script src="app.js?v=1794984382"></script>
 <script>
 // The head. Three layers, each standing where the one above it is missing:
 //   1. the still picture, always there, a link to the head's own page, with the electrodes' names written over it
@@ -266,7 +284,7 @@
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794980958")
+import("./music/player.js?v=1794984382")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),
