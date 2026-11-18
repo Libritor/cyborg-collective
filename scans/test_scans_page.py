@@ -139,8 +139,9 @@ def browser_checks(url, listed, shots):
             links = pg.locator("#files a")
             check(links.count() == len(m["downloads"]), "%s: its files to take away are offered (%d)" % (sid, links.count()))
             for d in m["downloads"]:
-                r = pg.context.request.head(url + "scans/runs/%s/%s" % (sid, d["file"]))
-                size = int(r.headers.get("content-length", "-1"))
+                # asked for as it is: a host that compresses on the way would state the compressed length
+                r = pg.context.request.head(url + "scans/runs/%s/%s" % (sid, d["file"]), headers={"Accept-Encoding": "identity"})
+                size = int(r.headers.get("content-length", "-1")) if not r.headers.get("content-encoding") else -1
                 check(r.status == 200 and size in (d["bytes"], -1), "%s: %s answers (%d bytes)" % (sid, d["file"], d["bytes"]), (r.status, size))
             check(not errors, "%s: no script error" % sid, errors[:2])
             check(not outside, "%s: nothing is asked of another site" % sid, outside[:3])
