@@ -106,7 +106,8 @@ def honest():
     return f"""<footer>
   <b>How these pages are honest</b>
   <ul>
-    <li>Seen by a headset, or a test: every scan carries one of the two labels. A test was drawn on a computer from a model whose shape is known, so that the result could be measured; it is not passed off as a headset scan.</li>
+    <li>Seen by a headset, photographed with a phone, or a test: every scan carries one of these labels. A test was drawn on a computer from a model whose shape is known, so that the result could be measured; it is not passed off as a scan.</li>
+    <li>A scan from a phone has no size. A phone has no depth sensor and does not know where it is, so where each picture was taken from is worked out from the pictures themselves, and the size shown is a guess. A scan of a head shows a face: it is here because the person it belongs to sent it, and they can take it down from their phone.</li>
     <li>What is published is what was computed: the splat, the solid, renders of them and the print files. The camera pictures stay with the person who took them.</li>
     <li>A place photographed from one spot is shown as that: a view to look round from where it was taken, with gaps away from that spot and no solid. A room model beside it is an estimate, and its card says where its shape comes from.</li>
     <li>Live Gaussians are placed, not trained: one for each reading of the headset's depth sensing, drawn as it arrives. The trained splat of the same sitting comes minutes later. The relay passes the live ones on and keeps none.</li>
@@ -133,9 +134,19 @@ def sliced(text):
 def facts(m):
     rows = []
     s, tr, pr, rm = m.get("size_cm"), m.get("train") or {}, m.get("print") or {}, m.get("room") or {}
-    if m["mode"] == "object" and s:
+    if m["mode"] == "object" and s and not m.get("size_note"):
         rows.append(("Real size", f"{s[0]} × {s[2]} × {s[1]} cm high"))
-    rows.append(("Pictures", str(m.get("pictures", "—"))))
+    pl = m.get("placing") or {}
+    if pl.get("pictures"):
+        # a phone's pictures: how many there were, and how many could be placed from what they show
+        rows.append(("Pictures", f"{pl['pictures']}, of which {pl.get('placed')} placed (to {pl.get('reprojection_px')} px)"))
+    else:
+        rows.append(("Pictures", str(m.get("pictures", "—"))))
+    if m.get("size_note"):
+        rows.append(("Size", "a guess: pictures alone carry no scale"))
+    eeg = (m.get("bag") or {}).get("eeg")
+    if eeg:
+        rows.append(("With it", f"{eeg:,} samples of brain waves and {(m.get('bag') or {}).get('imu', 0):,} of the phone's motion, in the same recording"))
     if tr.get("gaussians"):
         part = m.get("splat_count") if m.get("splat_count") != tr["gaussians"] else None
         rows.append(("Splat", f"{tr['gaussians']:,} Gaussians, {tr.get('steps'):,} steps"
@@ -157,12 +168,14 @@ def facts(m):
 
 
 def tiles(metas):
-    seen = sum(1 for m in metas if m["kind"] != "test")
+    seen = sum(1 for m in metas if m["kind"] == "headset")
+    phones = sum(1 for m in metas if m["kind"] == "phone")
     gauss = sum((m.get("train") or {}).get("gaussians") or 0 for m in metas)
     pics = sum(m.get("pictures") or 0 for m in metas)
     best = min((m["check"]["median_mm"] for m in metas if (m.get("check") or {}).get("median_mm") is not None), default=None)
     secs = [(m.get("train") or {}).get("seconds") for m in metas if (m.get("train") or {}).get("seconds")]
-    out = [(str(len(metas)), "scans here"), (str(seen), "seen by a headset"), (f"{gauss:,}", "Gaussians trained"), (str(pics), "pictures they were trained from")]
+    out = [(str(len(metas)), "scans here"), (str(seen), "seen by a headset")] + ([(str(phones), "photographed with a phone")] if phones else []) \
+        + [(f"{gauss:,}", "Gaussians trained"), (str(pics), "pictures they were trained from")]
     if best is not None:
         out.append((f"{best} mm", "closest to a known shape (half the surface)"))
     if secs:
@@ -204,7 +217,9 @@ def list_page(metas, stamp):
             pics = "".join(f'<img src="runs/{sid}/{e(p["file"])}" alt="{e(p["alt"])}" width="{p["w"]}" height="{p["h"]}">' for p in m["pictures_shown"])
             rows = "".join(f"<dt>{e(a)}</dt><dd>{e(b)}</dd>" for a, b in facts(m))
             files = " · ".join(f'<a href="runs/{sid}/{e(d["file"])}" download>{e(d["label"])}</a> {mb(d["bytes"])}' for d in m["downloads"])
-            badge = ('<span class="badge test first">a test of the method</span>' if m["kind"] == "test" else '<span class="badge seen first">seen by a headset</span>')
+            badge = ('<span class="badge test first">a test of the method</span>' if m["kind"] == "test"
+                     else '<span class="badge seen first">photographed with a phone</span>' if m["kind"] == "phone"
+                     else '<span class="badge seen first">seen by a headset</span>')
             opener = "Look round it in 3-D" if m["mode"] == "view" else "Turn it round in 3-D"
             parts.append(f"""  <article class="card scan" id="{sid}">
     <a class="scan-pic" href="view.html?scan={sid}">{pics}</a>

@@ -83,6 +83,11 @@ Two separate things can go to 6ense.com, each only when asked for, because both 
   left out so a room can be looked into, a marker where the headset is, and "ride with the headset" to stand
   there. When nobody is scanning it shows the most recent finished scan and says so. The home page's live card
   links to it. Placed, not trained: the trained splat is the one `-Publish` puts up afterwards.
+- **The look.** The four scans pages (list, how a scan is made, viewer, live) are laid out as the home page is:
+  full width, a masthead with the words on the left and a dark panel on the right (the chain from headset to
+  print, or the 3-D stage), tiles, cards, and a footer that says how the pages are honest. The home page opens
+  them from its "Scans in 3-D" section. `python scans/test_scans_page.py` compares each page's colours and type
+  with the home page's, in light and in dark (83 checks).
 - **The tools themselves** are on the site as plain files, `6ense.com/scans/tools/`, listed with what each is for
   on `6ense.com/scans/how.html` (how a scan is made). `scan_publish.py` writes both (`TOOLS` in it is the list)
   and refuses a tool that names this computer's user folder.
@@ -93,6 +98,37 @@ Two separate things can go to 6ense.com, each only when asked for, because both 
 
 On the site since 17 Nov 2026: `room-17-nov` (the first sitting's view, with its room model and diorama),
 `trex-test` and `triceratops-test` (the two synthetic scans, each labelled a test of the method, not a headset scan).
+
+## Scans from phones
+
+MuseLog's Scan in 3-D (the cube icon on its Devices screen) photographs a head or a place with a phone and,
+if the person says so, sends the recording to the relay as a ROS 2 bag. A computer with a graphics card
+turns each one into a splat on the site:
+
+    python phone_scan_worker.py --make-key     once: makes ~/.6ense/scan_worker.key and says where the relay needs it
+    python phone_scan_worker.py                looks every minute; Ctrl-C or a file STOP_PHONE_SCANS stops it
+    python phone_scan.py <bag> [--kind head|world] [--name NAME]      one bag by hand, into Downloads/phone_scans/NAME
+    python scan_publish.py <run> --kind phone                          publish a run made by hand
+
+The relay hands a bag to nobody but whoever sends its key (SCANBOX_WORKER_KEY in the relay's environment,
+the same string as in the key file). Until a key is set on the relay, phones' scans wait there.
+
+What phone_scan.py does, and what it assumes. A phone has no depth sensor and does not know where it is, so
+where each picture was taken from comes from the pictures themselves (COLMAP through pycolmap: a plain
+pinhole camera, every pair of pictures compared up to 100 pictures, neighbours in time beyond). "Up" is how
+the phone was held. For a head, the point all the pictures look at becomes the middle and what lies within
+0.30 of it is cut out as the object (the rest is the "room" button). For a place, the spot of the picture
+nearest the middle of the walk is where the viewer stands. SIZE IS A GUESS: pictures alone carry no scale,
+so a head scan is scaled as if the phone had been 0.6 m from the head, and a place as if two pictures in a
+row were 0.3 m apart; the pages say "no scale" and show no measurement. No solid and no print file are made
+from a phone's scan. The worker deletes the bag and the pictures once the splat is made (--keep-pictures
+keeps them), and takes a splat off the site when its owner removes the scan from their phone.
+
+Checked 2026-11-19: a bag written by the app's own writer from 56 pictures of a known scene, sent by the
+app's own uploader to a private relay, fetched by the worker, placed (56 of 56, 0.48 px; the focal length
+found was within 1 px of the true one), trained (3000 steps, 78 s, pictures kept back reproduced at 32 dB),
+published into a copy of the site, opened in the viewer, and taken down again by the owner key.
+Not checked: anything on a real phone (the camera, the motion sensors, a real head, a real walk).
 
 ## The parts
 
@@ -110,6 +146,7 @@ On the site since 17 Nov 2026: `room-17-nov` (the first sitting's view, with its
 | `scan_mono_depth.py` | depth for pictures that have none: a depth network's map per picture, scaled to the headset's depth rays or to the trigger point; `mono\*.npy`, `mono_points.ply` (use as `quest_scan.py --points`) |
 | `scan_room_model.py` | a view run's depth maps fused into a coloured shell of the room (`room\room_model.glb`) and a printable diorama (`room\room_diorama.stl`, `_h2c.3mf`) |
 | `scan_publish.py` + `web/scans/test_scans_page.py` | a finished run onto 6ense.com/scans/ (and off again); the page's browser test, which travels with the page |
+| `scan_pages.py` + `web/splat/scans.css` | the words and markup of the list of scans and of "how a scan is made", and the look of all four scans pages: the home page's own (they load its `style.css`, then `scans.css`; the viewer on the laptop has only `scans.css`, which repeats what it needs) |
 | `quest_splat.py` | the rough live view: listens for the app's splat packets, records them, passes them to the relay (`--no-launch` when the scan session starts the app) |
 | `brush\brush_app.exe` in the home folder | the trainer (Brush 0.3.0): runs on the laptop's RTX 4060 through its own graphics API, no CUDA install |
 

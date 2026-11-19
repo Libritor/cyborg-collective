@@ -128,6 +128,13 @@
     </table></div>
   </div>
   <div class="card">
+    <h3>From a phone</h3>
+    <div class="table-scroll"><table class="sessions">
+      <tr><td><a href="tools/phone_scan.py">phone_scan.py</a></td><td>A phone&#x27;s recording (a ROS 2 bag from MuseLog&#x27;s Scan in 3-D) to a splat: takes the pictures out, works out where each was taken from (structure from motion), sets up, middle and a guessed size, trains, draws the pictures.</td></tr>
+      <tr><td><a href="tools/phone_scan_worker.py">phone_scan_worker.py</a></td><td>Runs on a computer with a graphics card: asks the relay for scans that phones sent, makes the splat of each, publishes it here, and takes down what its owner removed.</td></tr>
+    </table></div>
+  </div>
+  <div class="card">
     <h3>The parts of the laptop&#x27;s work</h3>
     <div class="table-scroll"><table class="sessions">
       <tr><td><a href="tools/scan_lib.py">scan_lib.py</a></td><td>Reads a scan folder; the headset camera&#x27;s model; writes the training set in COLMAP&#x27;s layout; reads and writes splat files.</td></tr>
@@ -182,7 +189,8 @@
 <footer>
   <b>How these pages are honest</b>
   <ul>
-    <li>Seen by a headset, or a test: every scan carries one of the two labels. A test was drawn on a computer from a model whose shape is known, so that the result could be measured; it is not passed off as a headset scan.</li>
+    <li>Seen by a headset, photographed with a phone, or a test: every scan carries one of these labels. A test was drawn on a computer from a model whose shape is known, so that the result could be measured; it is not passed off as a scan.</li>
+    <li>A scan from a phone has no size. A phone has no depth sensor and does not know where it is, so where each picture was taken from is worked out from the pictures themselves, and the size shown is a guess. A scan of a head shows a face: it is here because the person it belongs to sent it, and they can take it down from their phone.</li>
     <li>What is published is what was computed: the splat, the solid, renders of them and the print files. The camera pictures stay with the person who took them.</li>
     <li>A place photographed from one spot is shown as that: a view to look round from where it was taken, with gaps away from that spot and no solid. A room model beside it is an estimate, and its card says where its shape comes from.</li>
     <li>Live Gaussians are placed, not trained: one for each reading of the headset's depth sensing, drawn as it arrives. The trained splat of the same sitting comes minutes later. The relay passes the live ones on and keeps none.</li>

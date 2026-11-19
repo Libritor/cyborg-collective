@@ -63,8 +63,13 @@ def file_checks():
         sizes = [d["file"] for d in m["downloads"] if os.path.exists(os.path.join(scans, "runs", sid, d["file"])) and os.path.getsize(os.path.join(scans, "runs", sid, d["file"])) != d["bytes"]]
         check(not gone and not sizes, "%s: every file its record names is there, at the size stated" % sid, (gone, sizes))
         check('id="%s"' % sid in page and "view.html?scan=%s" % sid in page, "%s is on the list, with a link to the viewer" % sid)
-        check(m["kind"] in ("headset", "test") and bool(m.get("note")) and (m["kind"] != "test" or "Not a headset scan" in m["note"]),
+        check(m["kind"] in ("headset", "phone", "test") and bool(m.get("note")) and (m["kind"] != "test" or "Not a headset scan" in m["note"])
+              and (m["kind"] != "phone" or ("phone" in m["note"] and "guess" in m["note"] and "not published" in m["note"])),
               "%s says what it is (%s)" % (sid, m["kind"]))
+        if m["kind"] == "phone":
+            check(listed[0] != sid or all(json.load(open(os.path.join(scans, "runs", s, "meta.json"), encoding="utf-8"))["kind"] != "headset" for s in listed),
+                  "%s (from a phone) does not stand first while a headset scan is there" % sid)
+            check(bool(m.get("size_note")) or m["mode"] == "view", "%s does not pass a guessed size off as a measurement" % sid)
         shots = [f for f in os.listdir(os.path.join(scans, "runs", sid)) if f.lower().endswith((".jpg", ".png")) and f not in [p["file"] for p in m["pictures_shown"]]]
         check(not shots, "%s holds no picture beyond the renders it shows" % sid, shots)
     vend = os.path.join(scans, "vendor")

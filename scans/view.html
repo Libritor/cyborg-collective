@@ -126,7 +126,9 @@ if (!meta) {
   $('title').textContent = document.title = meta.title || meta.name;
   const s = meta.size_cm || [20, 20, 20];
   size = Math.max(s[0], s[1], s[2]) / 100;
+  const phone = meta.kind === 'phone';
   $('sub').textContent = (test ? 'A test of the method, not a headset scan'
+    : phone ? (viewMode ? 'A place photographed with a phone, from where one picture was taken' : 'Photographed with a phone')
     : viewMode ? 'What a Quest 3S looked at, from where it was' : 'Scanned with a Quest 3S') + (meta.made ? ` · ${meta.made.slice(0, 10)}` : '');
   if (meta.note) { const n = $('note'); n.textContent = meta.note; n.hidden = false; }
   // the numbers, as tiles
@@ -134,8 +136,12 @@ if (!meta) {
   const sliced = (t) => (t || '').replace(/^sliced \S+ for the H2C: /, '').replace(/ print time/, '').replace(/, \d+ layers$/, '');
   const mm = (a) => a.map(v => Math.round(v)).join(' × ') + ' mm';
   const facts = [];
-  if (!viewMode) facts.push([`${s[0]} × ${s[2]} × ${s[1]} cm`, 'real size, the last its height']);
-  facts.push([meta.pictures, 'pictures']);
+  // a phone's pictures carry no scale: its size is a guess and is not shown as a measurement
+  if (!viewMode && !meta.size_note) facts.push([`${s[0]} × ${s[2]} × ${s[1]} cm`, 'real size, the last its height']);
+  const pl = meta.placing || {};
+  if (pl.pictures) facts.push([`${pl.placed} of ${pl.pictures}`, 'pictures placed from what they show']);
+  else facts.push([meta.pictures, 'pictures']);
+  if (meta.size_note) facts.push(['no scale', meta.size_note]);
   if (tr.gaussians) facts.push([tr.gaussians.toLocaleString(), `Gaussians, trained in ${Number(tr.steps).toLocaleString()} steps`]);
   if (tr.held_out_psnr_db) facts.push([`${tr.held_out_psnr_db} dB`, 'pictures kept back, reproduced at']);
   if (meta.check && meta.check.median_mm != null) facts.push([`${meta.check.median_mm} mm`, 'from the true shape (half the surface)']);

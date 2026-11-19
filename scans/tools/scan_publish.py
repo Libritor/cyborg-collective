@@ -67,6 +67,10 @@ TOOLS = [
         ("scan_session.py", "Waits for the headset to be worn, starts the app, follows its log, then runs the steps below."),
         ("quest_scan.py", "The laptop's part: checks the scan, writes the training set, trains the splat (Brush), cuts out the object, makes the solid, slices it, draws the pictures."),
     ]),
+    ("From a phone", [
+        ("phone_scan.py", "A phone's recording (a ROS 2 bag from MuseLog's Scan in 3-D) to a splat: takes the pictures out, works out where each was taken from (structure from motion), sets up, middle and a guessed size, trains, draws the pictures."),
+        ("phone_scan_worker.py", "Runs on a computer with a graphics card: asks the relay for scans that phones sent, makes the splat of each, publishes it here, and takes down what its owner removed."),
+    ]),
     ("The parts of the laptop's work", [
         ("scan_lib.py", "Reads a scan folder; the headset camera's model; writes the training set in COLMAP's layout; reads and writes splat files."),
         ("splat_render.py", "Draws a Gaussian splat on the processor: colour, depth and coverage from any camera position."),
@@ -179,7 +183,8 @@ def stage(run, clone, sid=None, title=None, note=None, kind=None):
     meta = json.load(open(os.path.join(web, "meta.json"), encoding="utf-8"))
     view = meta.get("mode") == "view"
     truth = os.path.exists(os.path.join(run, "truth", "truth.json"))
-    kind = kind or ("test" if truth else "headset")
+    kind = kind or ("test" if truth else "phone" if meta.get("source") == "phone" else "headset")
+    phone = kind == "phone"
     sid = slug(sid or meta["name"])
     when = day(meta.get("made"))
     out = os.path.join(clone, "scans", "runs", sid)
@@ -189,7 +194,8 @@ def stage(run, clone, sid=None, title=None, note=None, kind=None):
 
     pub = {"id": sid, "kind": kind, "mode": "view" if view else "object", "name": meta["name"], "made": meta.get("made"),
            "published": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "secure_copy": SECURE_COPY}
-    for k in ("size_cm", "print", "pictures", "train", "eye_height_m", "look_yaw_rad", "look_pitch_rad", "yaw_span_rad", "room"):
+    for k in ("size_cm", "print", "pictures", "train", "eye_height_m", "look_yaw_rad", "look_pitch_rad", "yaw_span_rad", "room",
+              "size_note", "assumed", "placing", "round_deg", "bag"):
         if meta.get(k) is not None:
             pub[k] = meta[k]
 
@@ -212,6 +218,7 @@ def stage(run, clone, sid=None, title=None, note=None, kind=None):
     pics = []
     for name, rel, alt in (("picture.jpg", "renders/look_around.jpg" if view else "renders/turntable.jpg",
                             "The splat seen from the spot it was photographed from, looking round in eight directions" if view
+                            else "The splat, from six sides" if phone
                             else "The splat (top row) and the solid made from it (bottom row), from six sides"),):
         p = os.path.join(run, rel)
         if os.path.exists(p):
@@ -259,6 +266,20 @@ def stage(run, clone, sid=None, title=None, note=None, kind=None):
                                "Quest 3S camera's geometry and with noise added to the depth, and those pictures went through the same steps "
                                "as a real scan." + (f" Because the true shape is known, the solid can be measured against it: half of its "
                                                     f"surface lies within {med} mm of the true one." if med is not None else ""))
+    elif phone:
+        # photographed with a phone (MuseLog, Scan in 3-D): no depth and no tracking, so where each picture was taken
+        # from was worked out from the pictures, and the size is a guess
+        placed, taken = (meta.get("placing") or {}).get("placed"), (meta.get("placing") or {}).get("pictures")
+        eeg = (meta.get("bag") or {}).get("eeg")
+        pub["title"] = title or (f"A place photographed with a phone, {when}" if view else f"Something photographed with a phone, {when}")
+        pub["note"] = note or ((f"Photographed with a phone on {when}: {taken} pictures, of which {placed} could be placed. " if placed != taken
+                                else f"Photographed with a phone on {when}: {taken} pictures. ")
+                               + "A phone does not know where it is, so where each picture was taken from was worked out from the pictures "
+                               "themselves, and the splat was trained from them on a computer with a graphics card. "
+                               + ("To be looked round from the spot one of the pictures was taken from. " if view else "")
+                               + "Its size is a guess: pictures alone carry no scale. "
+                               + ("The recording also holds the brain waves of the headband worn while it was made. " if eeg else "")
+                               + "Sent by the person who made it; the pictures themselves are not published.")
     elif view:
         pub["title"] = title or f"A place looked at, {when}"
         pub["note"] = note or (f"Looked at with a Meta Quest 3S on {when}: {n} pictures. Nothing was walked round, so this is a view to look "
@@ -288,8 +309,11 @@ def scans_in(clone):
         p = os.path.join(root, d, "meta.json")
         if os.path.exists(p):
             metas.append(json.load(open(p, encoding="utf-8")))
-    # what a headset saw first, newest first; then the tests of the method
-    return sorted(metas, key=lambda m: (m["kind"] == "test", [-ord(c) for c in (m.get("made") or "")], m["id"]))
+    # what a headset saw first, newest first; then what phones sent; then the tests of the method. The first of
+    # the list is the picture other pages show for the scans and what the live page falls back to, so a scan that
+    # somebody sent from a phone (a head shows a face) never takes that place while a headset scan is there
+    rank = {"headset": 0, "phone": 1, "test": 2}
+    return sorted(metas, key=lambda m: (rank.get(m["kind"], 1), [-ord(c) for c in (m.get("made") or "")], m["id"]))
 
 
 def publish_tools(root):
@@ -359,7 +383,8 @@ def main():
     ap.add_argument("--id", help="the scan's name in its address (letters, digits, dashes); default: from the folder's name")
     ap.add_argument("--title")
     ap.add_argument("--note", help="the paragraph shown with it; default: written from what the run is")
-    ap.add_argument("--kind", choices=("headset", "test"), help="default: test when the run has a known answer (truth\\), else headset")
+    ap.add_argument("--kind", choices=("headset", "phone", "test"),
+                    help="default: test when the run has a known answer (truth\\), phone when phone_scan.py made it, else headset")
     ap.add_argument("--remove", metavar="ID")
     ap.add_argument("--rebuild", action="store_true")
     ap.add_argument("--list", action="store_true")
