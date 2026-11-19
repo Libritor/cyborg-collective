@@ -1,0 +1,77 @@
+{
+ "id": "kentrosaurus-test",
+ "kind": "test",
+ "mode": "object",
+ "name": "_synth_kentrosaurus",
+ "made": "2026-11-19 17:05",
+ "published": "2026-11-19 17:39",
+ "secure_copy": "https://cyborg-collective-relay.onrender.com/scans/",
+ "size_cm": [
+  18.5,
+  10.5,
+  13.6
+ ],
+ "print": {
+  "scale": 0.6499,
+  "print_size_mm": [
+   120.0,
+   88.5,
+   68.2
+  ],
+  "real_size_mm": [
+   184.7,
+   136.2,
+   104.9
+  ],
+  "slice": "sliced _synth_kentrosaurus_print.stl for the H2C: 1h 39m 6s print time, 33.13 g PLA, 338 layers"
+ },
+ "pictures": 111,
+ "train": {
+  "steps": 8000,
+  "seconds": 142,
+  "gaussians": 430854,
+  "held_out_psnr_db": 37.91
+ },
+ "splat": "object.spz",
+ "splat_count": 5876,
+ "scene": "scene.spz",
+ "solid": "object.glb",
+ "pictures_shown": [
+  {
+   "file": "picture.jpg",
+   "alt": "The splat (top row) and the solid made from it (bottom row), from six sides",
+   "w": 1400,
+   "h": 467
+  }
+ ],
+ "downloads": [
+  {
+   "file": "object.spz",
+   "label": "the splat (.spz)",
+   "bytes": 99600
+  },
+  {
+   "file": "object_print.stl",
+   "label": "STL to print (120 mm)",
+   "bytes": 5807384
+  },
+  {
+   "file": "object_h2c.3mf",
+   "label": "sliced for a Bambu H2C (.3mf)",
+   "bytes": 6939773
+  }
+ ],
+ "check": {
+  "median_mm": 0.46,
+  "p95_mm": 1.87,
+  "size_error_pct": [
+   -1.9,
+   -2.1,
+   -1.4
+  ],
+  "volume_cm3": 255.7,
+  "true_volume_cm3": 250.6
+ },
+ "title": "Kentrosaurus (a test of the method)",
+ "note": "Not a headset scan. A Kentrosaurus, Stegosaurus's smaller and spikier cousin, was sculpted on the computer and drawn from 111 viewpoints all round it, 62 cm away, with the Quest 3S camera's geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.46 mm of the true one, and its overall size comes out 2 % small."
+}

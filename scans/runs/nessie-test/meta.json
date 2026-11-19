@@ -1,0 +1,77 @@
+{
+ "id": "nessie-test",
+ "kind": "test",
+ "mode": "object",
+ "name": "_synth_nessie",
+ "made": "2026-11-19 17:10",
+ "published": "2026-11-19 17:35",
+ "secure_copy": "https://cyborg-collective-relay.onrender.com/scans/",
+ "size_cm": [
+  18.1,
+  12.6,
+  15.3
+ ],
+ "print": {
+  "scale": 0.6626,
+  "print_size_mm": [
+   120.0,
+   101.6,
+   83.6
+  ],
+  "real_size_mm": [
+   181.1,
+   153.4,
+   126.1
+  ],
+  "slice": "sliced _synth_nessie_print.stl for the H2C: 1h 24m 8s print time, 24.90 g PLA, 418 layers"
+ },
+ "pictures": 111,
+ "train": {
+  "steps": 8000,
+  "seconds": 162,
+  "gaussians": 473962,
+  "held_out_psnr_db": 37.87
+ },
+ "splat": "object.spz",
+ "splat_count": 3797,
+ "scene": "scene.spz",
+ "solid": "object.glb",
+ "pictures_shown": [
+  {
+   "file": "picture.jpg",
+   "alt": "The splat (top row) and the solid made from it (bottom row), from six sides",
+   "w": 1400,
+   "h": 467
+  }
+ ],
+ "downloads": [
+  {
+   "file": "object.spz",
+   "label": "the splat (.spz)",
+   "bytes": 63026
+  },
+  {
+   "file": "object_print.stl",
+   "label": "STL to print (120 mm)",
+   "bytes": 4160884
+  },
+  {
+   "file": "object_h2c.3mf",
+   "label": "sliced for a Bambu H2C (.3mf)",
+   "bytes": 4781953
+  }
+ ],
+ "check": {
+  "median_mm": 0.45,
+  "p95_mm": 1.79,
+  "size_error_pct": [
+   -0.5,
+   -0.3,
+   -0.4
+  ],
+  "volume_cm3": 160.8,
+  "true_volume_cm3": 154.5
+ },
+ "title": "Nessie, a Plesiosaurus (a test of the method)",
+ "note": "Not a headset scan. A Plesiosaurus (a sea reptile of the dinosaurs' time, not a dinosaur; the Loch Ness monster is usually drawn as one) was sculpted on the computer and drawn from 111 viewpoints all round it, 61 cm away, with the Quest 3S camera's geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.45 mm of the true one."
+}

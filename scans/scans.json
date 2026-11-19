@@ -10,6 +10,24 @@
    "splat_count": 400000
   },
   {
+   "id": "nessie-test",
+   "title": "Nessie, a Plesiosaurus (a test of the method)",
+   "kind": "test",
+   "mode": "object",
+   "made": "2026-11-19 17:10",
+   "published": "2026-11-19 17:35",
+   "splat_count": 3797
+  },
+  {
+   "id": "kentrosaurus-test",
+   "title": "Kentrosaurus (a test of the method)",
+   "kind": "test",
+   "mode": "object",
+   "made": "2026-11-19 17:05",
+   "published": "2026-11-19 17:39",
+   "splat_count": 5876
+  },
+  {
    "id": "trex-test",
    "title": "T. rex (a test of the method)",
    "kind": "test",

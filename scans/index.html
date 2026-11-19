@@ -26,10 +26,10 @@
 </nav>
 <div class="side">
 <div class="tiles">
-  <div class="tile"><b>3</b><span>scans here</span></div>
+  <div class="tile"><b>5</b><span>scans here</span></div>
   <div class="tile"><b>1</b><span>seen by a headset</span></div>
-  <div class="tile"><b>1,258,914</b><span>Gaussians trained</span></div>
-  <div class="tile"><b>248</b><span>pictures they were trained from</span></div>
+  <div class="tile"><b>2,163,730</b><span>Gaussians trained</span></div>
+  <div class="tile"><b>470</b><span>pictures they were trained from</span></div>
   <div class="tile"><b>0.37 mm</b><span>closest to a known shape (half the surface)</span></div>
   <div class="tile"><b>1.8–3.7 min</b><span>to train one on a laptop</span></div>
 </div>
@@ -93,6 +93,22 @@
     <p class="note">Looked at from one seat with a Meta Quest 3S on 17 November 2026: 26 pictures. Nothing was walked round, so this is a view to look round from where it was photographed; away from that spot it has gaps. The 3-D model of the room is an estimate: the headset measured only the wall with the map, and the rest of the shape comes from a depth-estimating network pinned to one measured point per picture. Published by the person whose room it is; the camera pictures stay with them.</p>
     <dl><dt>Pictures</dt><dd>26</dd><dt>Splat</dt><dd>525,956 Gaussians, 7,000 steps; 400,000 shown here</dd><dt>Pictures kept back</dt><dd>reproduced at 33.35 dB</dd><dt>Room model</dt><dd>4.64 × 4.7 m, 2.95 m high (an estimate)</dd><dt>Diorama print</dt><dd>1:30, 155 × 156 × 76 mm; 14h 34m 56s, 222.39 g PLA</dd></dl>
     <p class="actions"><a class="btn primary open" href="view.html?scan=room-17-nov">Look round it in 3-D</a><span class="files"><a href="runs/room-17-nov/view.spz" download>the splat (.spz)</a> 6.7 MB · <a href="runs/room-17-nov/room.glb" download>the room model (.glb)</a> 16 MB · <a href="runs/room-17-nov/room_diorama_stl.zip" download>diorama STL, 1:30 (zip)</a> 18 MB</span></p>
+  </article>
+  <article class="card scan" id="nessie-test">
+    <a class="scan-pic" href="view.html?scan=nessie-test"><img src="runs/nessie-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467"></a>
+    <h3>Nessie, a Plesiosaurus (a test of the method)</h3>
+    <div><span class="badge test first">a test of the method</span></div>
+    <p class="note">Not a headset scan. A Plesiosaurus (a sea reptile of the dinosaurs&#x27; time, not a dinosaur; the Loch Ness monster is usually drawn as one) was sculpted on the computer and drawn from 111 viewpoints all round it, 61 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.45 mm of the true one.</p>
+    <dl><dt>Real size</dt><dd>18.1 × 15.3 × 12.6 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>473,962 Gaussians, 8,000 steps; 3,797 are the object</dd><dt>Pictures kept back</dt><dd>reproduced at 37.87 dB</dd><dt>From the true shape</dt><dd>0.45 mm for half the surface, 1.79 mm for 95 %</dd><dt>Print</dt><dd>120 × 102 × 84 mm; 1h 24m 8s, 24.90 g PLA</dd></dl>
+    <p class="actions"><a class="btn primary open" href="view.html?scan=nessie-test">Turn it round in 3-D</a><span class="files"><a href="runs/nessie-test/object.spz" download>the splat (.spz)</a> 63 kB · <a href="runs/nessie-test/object_print.stl" download>STL to print (120 mm)</a> 4.2 MB · <a href="runs/nessie-test/object_h2c.3mf" download>sliced for a Bambu H2C (.3mf)</a> 4.8 MB</span></p>
+  </article>
+  <article class="card scan" id="kentrosaurus-test">
+    <a class="scan-pic" href="view.html?scan=kentrosaurus-test"><img src="runs/kentrosaurus-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467"></a>
+    <h3>Kentrosaurus (a test of the method)</h3>
+    <div><span class="badge test first">a test of the method</span></div>
+    <p class="note">Not a headset scan. A Kentrosaurus, Stegosaurus&#x27;s smaller and spikier cousin, was sculpted on the computer and drawn from 111 viewpoints all round it, 62 cm away, with the Quest 3S camera&#x27;s geometry and with noise added to the depth, and those pictures went through the same steps as a real scan. Because the true shape is known, the solid can be measured against it: half of its surface lies within 0.46 mm of the true one, and its overall size comes out 2 % small.</p>
+    <dl><dt>Real size</dt><dd>18.5 × 13.6 × 10.5 cm high</dd><dt>Pictures</dt><dd>111</dd><dt>Splat</dt><dd>430,854 Gaussians, 8,000 steps; 5,876 are the object</dd><dt>Pictures kept back</dt><dd>reproduced at 37.91 dB</dd><dt>From the true shape</dt><dd>0.46 mm for half the surface, 1.87 mm for 95 %</dd><dt>Print</dt><dd>120 × 88 × 68 mm; 1h 39m 6s, 33.13 g PLA</dd></dl>
+    <p class="actions"><a class="btn primary open" href="view.html?scan=kentrosaurus-test">Turn it round in 3-D</a><span class="files"><a href="runs/kentrosaurus-test/object.spz" download>the splat (.spz)</a> 100 kB · <a href="runs/kentrosaurus-test/object_print.stl" download>STL to print (120 mm)</a> 5.8 MB · <a href="runs/kentrosaurus-test/object_h2c.3mf" download>sliced for a Bambu H2C (.3mf)</a> 6.9 MB</span></p>
   </article>
   <article class="card scan" id="trex-test">
     <a class="scan-pic" href="view.html?scan=trex-test"><img src="runs/trex-test/picture.jpg" alt="The splat (top row) and the solid made from it (bottom row), from six sides" width="1400" height="467"></a>

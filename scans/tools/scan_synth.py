@@ -130,6 +130,9 @@ def model_arrays(path, length, at, yaw_deg, table):
     a = np.radians(yaw_deg)
     Ry = np.array([[np.cos(a), 0, np.sin(a)], [0, 1, 0], [-np.sin(a), 0, np.cos(a)]])
     v = v @ Ry.T + np.array([at[0], table, at[2]])
+    if m.has_vertex_colors():                                    # a model that comes painted keeps its own colours
+        m.vertices = o3d.utility.Vector3dVector(v)
+        return m, v, np.asarray(m.triangles), np.clip(np.asarray(m.vertex_colors, float), 0, 1)
     # paint: stripes and blotches, so the pictures have something to match on
     rng = np.random.default_rng(3)
     k = rng.normal(size=(6, 3)) * 90
