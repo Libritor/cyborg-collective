@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cyborg Collective</title>
 <meta name="description" content="A window the person opens, not a feed that is taken: live brain-sensing shared on the person's own terms, and the record of a year of wearable EEG experiments.">
-<link rel="stylesheet" href="style.css?v=1794985068">
+<link rel="stylesheet" href="style.css?v=1795074944">
 <noscript><style>.needs-js { display: none !important; }</style></noscript>
 </head>
 <body>
@@ -45,6 +45,7 @@
     <div class="tile"><b id="alpha">—</b><span>pooled relative alpha</span></div>
     <div class="tile"><b id="arousal">—</b><span>pooled activation estimate (usable only)</span></div>
     <div class="tile"><b id="cams">0</b><span>cameras live</span></div>
+    <div class="tile"><b id="scanners">0</b><span>phones scanning</span></div>
   </div>
   <div class="grid needs-js" id="grid"></div>
   <div class="empty needs-js" id="empty">Nobody is sharing right now. The record below is always here.</div>
@@ -58,6 +59,11 @@
     <a class="card door" href="scans/"><img src="scans/cover.jpg" width="1400" height="525" alt="The most recent scan, drawn from its Gaussian splat"><b>The scans</b><span>Each one opens in 3-D, to turn round or to look round from where it was photographed, with its numbers and its files.</span></a>
     <a class="card door" href="scans/live.html"><b>Live Gaussian splatting</b><span>What a headset is scanning now, drawn as Gaussians while it scans. When nobody is scanning, the most recent finished scan.</span></a>
     <a class="card door" href="scans/how.html"><b>How a scan is made</b><span>The chain from headset to print file, what has been checked and what has not, and every tool as a plain file.</span></a>
+  </div>
+  <div id="phone-scans" class="needs-js" hidden>
+    <h3>Scans from phones</h3>
+    <p class="sub">A head, or a place, photographed with a phone in MuseLog's <i>Scan in 3-D</i> and sent here by the person who made it, as a ROS 2 bag: the pictures, the phone's motion, and brain waves if a headband was on. A computer with a graphics card trains a Gaussian splat from the pictures; until it has, the scan is listed as waiting. The pictures themselves are not published, and the person can remove their scan from their phone.</p>
+    <ul class="phone-scans" id="phone-scan-rows"></ul>
   </div>
 </section>
 
@@ -182,16 +188,16 @@
     <li>The record: an epoch counts as clean when its 2-second peak-to-peak swing stays under 200 µV; sessions from app versions that did not stream contact quality are marked so.</li>
     <li>Cameras: shown only while the computer they hang off runs its gateway; the picture goes from that computer to your browser and never through the relay, which carries only the camera's name and address. Recordings are ROS 2 bags that stay on that computer; the Collective keeps none of the video.</li>
     <li>Splats: a headset's card can show what its depth sensing sees as coloured blobs in 3-D. They are laid down straight from depth and the camera's colour, one for each 2 cm of surface; nothing is trained, so this is not an optimised Gaussian-splat scene. Unlike a camera's picture they do pass through the relay on their way to you. The relay keeps none of them; the recording (a ROS 2 bag and a splat file) stays on the computer the headset hangs off.</li>
-    <li>Scans: each one says whether a headset saw it or whether it is a test of the method, drawn on a computer from a shape that is known so that the result can be measured. What is published of a scan was computed from its pictures (the splat, the solid, renders, print files); the camera pictures themselves are not here. The live Gaussians on <a href="scans/live.html">the live page</a> are placed from depth, not trained.</li>
+    <li>Scans: each one says whether a headset saw it or whether it is a test of the method, drawn on a computer from a shape that is known so that the result can be measured. What is published of a scan was computed from its pictures (the splat, the solid, renders, print files); the camera pictures themselves are not here. The live Gaussians on <a href="scans/live.html">the live page</a> are placed from depth, not trained. A scan from a phone is a splat trained afterwards from the phone's pictures on a computer, never on the phone or the relay; a head scan shows a face, and is here because the person it belongs to sent it.</li>
     <li>Trust: the two cards under Trust keep the same rule as the rest of the page. The benchmark numbers are copied from the preprint linked there (its Tables 2 and 3) and the figure was drawn from the same results; the tier table says, for each kind of number on this page, what was checked and what was not; the third card's numbers come from a pre-registered run whose design, every cell and the language model's own claims and reasons are published beside it, and whose raw recordings are not.</li>
     <li>The relay keeps a stream only when the person switched “keep this share” on; it then holds what was streamed, lists the session under The record, and removes all of it when the person asks from their phone. Published check-ins work the same way. Raw recordings stay with the person who made them.</li>
     <li>The band's waves: the dots in the brain-wave panel at the top of the page are samples, not decoration, drawn in microvolts against seconds. With nobody live, and while the band is silent, they are one minute of one electrode of the session the day's piece is made from, published exactly as the recording stores it by the person who recorded it (<a href="music/eeg/index.json"><code>music/eeg/</code></a> lists every session this is done for; nothing else of any recording is here). With a live sharer who opened their headband to the music and sends the raw trace, they are that trace as it arrives. Where there are only band powers, the waves show those, and the note under the menu says which of the three you are looking at.</li>
     <li>The chains: under the brain-wave panel, while the music plays, are the two chains the band runs on, drawn for the bar that is sounding from that bar and the numbers it was generated from: the chord walk (which step of which progression, and the generator's own reason for it) and the signal chain (what sets the concentration C, which devices C opens, which voices sound). Nothing in the drawing is decided by the drawing; <a href="music/listen.html?relay=1">the desk</a> shows the same chains with every rule beside them.</li>
   </ul>
 </footer>
-<script src="video-rtc.js?v=1794985068"></script>
-<script src="splat-view.js?v=1794985068"></script>
-<script src="app.js?v=1794985068"></script>
+<script src="video-rtc.js?v=1795074944"></script>
+<script src="splat-view.js?v=1795074944"></script>
+<script src="app.js?v=1795074944"></script>
 <script>
 // The head. Three layers, each standing where the one above it is missing:
 //   1. the still picture, always there, a link to the head's own page, with the electrodes' names written over it
@@ -284,7 +290,7 @@
 </script>
 <script type="module">
 // Asked for at run time, so that a band that is missing or broken says so on the page and takes nothing else down with it.
-import("./music/player.js?v=1794985068")
+import("./music/player.js?v=1795074944")
   .then(({ mountPlayer }) => mountPlayer({ button: document.getElementById("listen"), status: document.getElementById("listen-status"),
               mark: document.getElementById("mark-6ense"), note: document.getElementById("listen-note"),
               panel: document.getElementById("swim"), caption: document.getElementById("swim-caption"),

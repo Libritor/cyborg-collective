@@ -87,6 +87,7 @@
   }
   function ensure(msg) {
     if (msg.kind === "camera") return ensureCamera(msg);
+    if (msg.kind === "scanner") return ensureScanner(msg);
     let p = people.get(msg.pseudonym);
     if (!p) {
       p = { pseudonym: msg.pseudonym, tier: msg.tier, device: msg.device, raw: CH.map(() => []) };
@@ -571,12 +572,119 @@
       : "waiting for the first splats";
   }
 
+  // ---------------- a phone scanning a head or a place (MuseLog, Scan in 3-D) ----------------
+  // The card says how far the scan has got; the phone's own picture is shown
+  // only when the person switched that on, straight from the phone through
+  // the relay, kept nowhere. The splat is made afterwards, on a computer.
+  const SCAN_STATE = {
+    ready: "about to start", capturing: "taking pictures", saving: "saving the recording",
+    uploading: "sending the recording", uploaded: "sent: a computer now makes the splat",
+    "kept on the phone": "finished; kept on the phone" };
+  function scannerCard(p) {
+    const el = document.createElement("section");
+    el.className = "card scanner";
+    el.innerHTML = `
+      <h3 style="margin:0 0 4px;font-size:16px"><span class="name"></span><span class="badge tier">scanning</span><span class="badge dev"></span></h3>
+      <div class="facts"><span class="fact what"></span><span class="fact count"></span><span class="fact state"></span></div>
+      <div class="scan-row">
+        <figure class="scan-frame" hidden><img alt="What the phone's camera sees right now" decoding="async"><figcaption>the phone's camera, live · kept nowhere</figcaption></figure>
+        <div class="scan-ring" role="img" aria-label="How far the scan has got">
+          <svg viewBox="0 0 120 120" width="120" height="120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="50"/><circle class="arc" cx="60" cy="60" r="50" transform="rotate(-90 60 60)"/></svg>
+          <b class="scan-n">0</b><span class="scan-l">pictures</span>
+        </div>
+      </div>
+      <h4 class="imu-title" hidden>Phone motion</h4><div class="imu" hidden></div>
+      <p class="status scan-note">A phone taking pictures for a 3-D scan. When the scan is finished the recording is sent as a ROS 2 bag, a computer with a graphics card trains a Gaussian splat from its pictures, and the splat is listed under <a href="#scans">Scans in 3-D</a>. Nothing here is a Gaussian yet: a phone has no depth sensor to place them with while it scans.</p>`;
+    el.querySelector(".name").textContent = p.name || p.pseudonym;
+    el.querySelector(".dev").textContent = p.device || "";
+    return el;
+  }
+  function ensureScanner(msg) {
+    let p = people.get(msg.pseudonym);
+    if (!p) {
+      p = { pseudonym: msg.pseudonym, kind: "scanner", tier: "scan", device: msg.device, name: msg.name };
+      p.el = scannerCard(p); grid.appendChild(p.el); people.set(msg.pseudonym, p); empty.hidden = true;
+    }
+    if (msg.name && msg.name !== p.name) { p.name = msg.name; p.el.querySelector(".name").textContent = msg.name; }
+    return p;
+  }
+  const mmss = s => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function setScan(p, m) {
+    p.scan = m;
+    const head = m.what === "head", el = p.el;
+    el.querySelector(".what").textContent = (head ? "a head" : "a place") + (m.title ? `: ${m.title}` : "");
+    const n = m.pictures ?? 0;
+    el.querySelector(".count").textContent = `${n} picture${n === 1 ? "" : "s"}` +
+      (m.seconds != null ? ` · ${mmss(m.seconds)}` : "") + (m.eeg ? " · with brain waves" : "");
+    let state = SCAN_STATE[m.state] || m.state || "";
+    if (m.state === "uploading" && m.bytes) state += ` (${Math.min(100, Math.round(100 * (m.sent || 0) / m.bytes))} %)`;
+    if (m.state === "capturing" && m.will_upload === false) state += " · stays on the phone";
+    el.querySelector(".state").textContent = state;
+    // the ring: how far round a head; for a place, only the count
+    const turn = head ? Math.min(1, (m.angle || 0) / 360) : 0, C = 2 * Math.PI * 50;
+    const arc = el.querySelector(".arc");
+    arc.style.strokeDasharray = `${(turn * C).toFixed(1)} ${C.toFixed(1)}`;
+    el.querySelector(".scan-n").textContent = head ? `${Math.min(360, m.angle || 0)}°` : String(n);
+    el.querySelector(".scan-l").textContent = head ? "round the head" : "pictures";
+    if (m.frames_live === false || m.state !== "capturing") {
+      // no picture is being sent (any more): do not leave the last one standing
+      const fig = el.querySelector(".scan-frame");
+      if (m.frames_live === false || m.state === "uploaded" || m.state === "kept on the phone") { fig.hidden = true; fig.querySelector("img").removeAttribute("src"); }
+    }
+  }
+  function setFrame(p, m) {
+    if (typeof m.jpg !== "string" || !/^\/9j\/[A-Za-z0-9+/]+={0,2}$/.test(m.jpg)) return;
+    const fig = p.el.querySelector(".scan-frame");
+    fig.querySelector("img").src = "data:image/jpeg;base64," + m.jpg;
+    fig.hidden = false;
+  }
+
+  // ---------------- scans sent from phones (listed under Scans in 3-D) ----------------
+  // From the relay's scan box: what was sent, where it stands, and the splat
+  // once a computer has made it. Never a picture: the relay hands those to
+  // the computer that makes the splat and to nobody else.
+  const PHONE_SCAN_STATE = { waiting: "waiting for a computer to make the splat", processing: "a computer is making the splat now",
+    published: "", failed: "no splat could be made", "being removed": "being removed" };
+  let liveUrl = "";            // the relay socket this page is on
+  let scanBoxKnown = false;    // that relay has said it has a scan box (its aggregate counts scanners)
+  async function loadPhoneScans() {
+    const box = $("phone-scans"), rows = $("phone-scan-rows");
+    if (!box || !rows || !liveUrl) return;
+    let list = null;
+    try {
+      const r = await fetch(liveUrl.replace(/^ws/, "http").replace(/\/live\/?$/, "/scanbox/list"), { cache: "no-store" });
+      if (r.ok) { const j = await r.json(); if (Array.isArray(j.scans)) list = j.scans; }
+    } catch {}
+    window.__phoneScans = list;
+    if (!list || !list.length) { box.hidden = true; rows.replaceChildren(); return; }
+    rows.replaceChildren(...list.map(s => {
+      const li = document.createElement("li");
+      const what = s.title || (s.kind === "head" ? "A head" : "A place");
+      const who = s.name || s.pseudonym || "";
+      const when = s.uploaded_at ? new Date(s.uploaded_at * 1000).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "";
+      const facts = [s.kind === "head" ? "a head" : "a place", who && `by ${who}`, when,
+        s.pictures && `${s.pictures} pictures`, s.duration_s && mmss(s.duration_s),
+        s.topics && s.topics["/muse/eeg"] ? "with brain waves" : "",
+        s.splats && `${s.splats.toLocaleString()} Gaussians`].filter(Boolean).join(" · ");
+      const safe = typeof s.url === "string" && /^(?:https?:\/\/|\.?\/)?[A-Za-z0-9._~\/?=&%-]+$/.test(s.url) && !/^\/\//.test(s.url);
+      const state = PHONE_SCAN_STATE[s.state] ?? s.state ?? "";
+      li.innerHTML = (s.state === "published" && safe ? `<a href="${escapeHtml(s.url)}"><b>${escapeHtml(what)}</b></a>` : `<b>${escapeHtml(what)}</b>`) +
+        ` <span class="badge ${s.state === "published" ? "ok" : ""}">${escapeHtml(s.state === "published" ? "Gaussian splat" : state)}</span>` +
+        `<small>${escapeHtml(facts)}${s.note && s.state === "failed" ? ` · ${escapeHtml(s.note)}` : ""}</small>`;
+      return li;
+    }));
+    box.hidden = false;
+  }
+
   function aggregate(a) {
     // the relay served this page with a stamp of its script and stylesheet;
     // when the relay reports a different one, the page has changed: reload
     if (window.ASSET_V && a.asset_v && a.asset_v !== window.ASSET_V) { location.reload(); return; }
     $("n").textContent = a.n;
     if ($("cams")) $("cams").textContent = a.cameras ?? 0;
+    if ($("scanners")) $("scanners").textContent = a.scanners ?? 0;
+    // a relay that counts scanners has a scan box: ask it once for what phones have sent
+    if (!scanBoxKnown && a.scanners != null) { scanBoxKnown = true; loadPhoneScans(); }
     $("usable").textContent = a.n ? `${a.usable_n} / ${a.n}` : "—";
     $("alpha").textContent = a.rel_alpha_mean == null ? "—" : (a.rel_alpha_mean * 100).toFixed(0) + "%";
     $("arousal").textContent = a.arousal_mean == null ? "—" : (a.arousal_mean * 100).toFixed(0) + "%";
@@ -586,6 +694,7 @@
       case "snapshot":
         for (const p of msg.people) {
           if (p.kind === "camera") { const q = ensureCamera(p); if (p.last?.camera) setCamera(q, p.last.camera); if (p.last?.splat) setSplat(q, null); continue; }
+          if (p.kind === "scanner") { const q = ensureScanner(p); if (p.last?.scan) setScan(q, p.last.scan); if (p.last?.imu) setImu(q, p.last.imu); continue; }
           const q = ensure(p);
           setProfile(q, p);
           if (p.last?.device) setDevice(q, p.last.device);
@@ -602,8 +711,11 @@
       case "wearable": setWearable(ensure(msg), msg); break;
       case "camera": setCamera(ensureCamera(msg), msg); break;
       case "splat": setSplat(ensureCamera(msg), msg); break;
+      case "scan": setScan(ensureScanner(msg), msg); break;
+      case "frame": setFrame(ensureScanner(msg), msg); break;
+      case "scans_changed": loadPhoneScans(); break;
       case "join": case "presence": ensure(msg); break;
-      case "profile": setProfile(ensure(msg), msg); break;
+      case "profile": { const q = ensure(msg); if (q.kind !== "scanner") setProfile(q, msg); break; }  // a scanner's name is set by ensure
       case "device": setDevice(ensure(msg), msg); break;
       case "imu": setImu(ensure(msg), msg); break;
       case "optics": setOptics(ensure(msg), msg); break;
@@ -649,10 +761,11 @@
     if (!url) url = DEFAULT_RELAY;
     let ws;
     try { ws = new WebSocket(url); } catch { linkEl.textContent = "relay address invalid."; return; }
+    liveUrl = url;
     linkEl.textContent = "connecting to the relay…";
     ws.onopen = () => { linkEl.textContent = "live"; };
     ws.onmessage = ev => { try { handle(JSON.parse(ev.data)); } catch {} };
-    ws.onclose = () => { linkEl.textContent = "relay offline; retrying…"; for (const k of [...people.keys()]) remove(k); setTimeout(connect, 5000); };
+    ws.onclose = () => { linkEl.textContent = "relay offline; retrying…"; scanBoxKnown = false; for (const k of [...people.keys()]) remove(k); setTimeout(connect, 5000); };
     ws.onerror = () => { try { ws.close(); } catch {} };
   }
   connect();

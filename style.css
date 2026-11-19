@@ -54,7 +54,7 @@ section > .sub { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
 .tile b { display: block; font-size: 22px; }
 .tile span { color: var(--muted); font-size: 12px; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); gap: 14px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(440px, 100%), 1fr)); gap: 14px; }   /* min(): on a phone a card is as wide as the page, not 440 px */
 .empty { color: var(--muted); padding: 18px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
 .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--soft); color: var(--muted); margin-left: 6px; vertical-align: middle; }
 .dots { display: flex; gap: 10px; margin: 8px 0; font-size: 12px; color: var(--muted); }
@@ -194,6 +194,22 @@ camera-stream video { display: block; width: 100%; height: 100%; object-fit: con
 .camnote { margin: 10px 0 0; }
 /* a headset's splats: what its depth sensing sees, drawn in 3-D (splat-view.js) */
 .card.camera .splat { margin-top: 10px; }
+/* a phone that is scanning a head or a place: its picture (if switched on) beside how far it has got */
+.card.scanner .scan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 8px 0; }
+.scan-frame { margin: 0; flex: 0 1 300px; min-width: 0; }
+.scan-frame img { display: block; width: 100%; max-height: 380px; object-fit: contain; border-radius: 8px; background: #0b0e14; }
+.scan-frame figcaption { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.scan-ring { position: relative; width: 120px; height: 120px; flex: none; display: grid; place-content: center; text-align: center; }
+.scan-ring svg { position: absolute; inset: 0; }
+.scan-ring circle { fill: none; stroke-width: 9; }
+.scan-ring .track { stroke: var(--line); }
+.scan-ring .arc { stroke: #16a34a; stroke-linecap: round; stroke-dasharray: 0 315; transition: stroke-dasharray .4s; }
+.scan-ring .scan-n { font-size: 26px; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.scan-ring .scan-l { font-size: 11px; color: var(--muted); max-width: 84px; }
+ul.phone-scans { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+ul.phone-scans li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+ul.phone-scans li small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; }
+ul.phone-scans .badge.ok { background: #dcfce7; color: #166534; }
 .splat-view { height: 340px; background: #0b0e14; border-radius: 6px; overflow: hidden; }
 .splat-view canvas { display: block; touch-action: none; cursor: grab; outline: none; }
 .splat-view canvas:active { cursor: grabbing; }
